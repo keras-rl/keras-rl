@@ -67,7 +67,7 @@ print(model.summary())
 memory = Memory(limit=1000000)
 processor = AtariProcessor()
 dqn = DQNAgent(model=model, nb_actions=nb_actions, window_length=WINDOW_LENGTH, memory=memory,
-	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=1)
+	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=4)
 dqn.compile(RMSprop(lr=.00025, clipvalue=25.), metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training

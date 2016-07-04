@@ -109,16 +109,16 @@ class TrainEpisodeLogger(Callback):
 			for idx, name in enumerate(self.metrics_names):
 				if idx > 0:
 					metrics_template += ', '
-				metrics_template += '{}: {}'
 				try:
 					value = np.nanmean(metrics[:, idx])
+					metrics_template += '{}: {:f}'
 				except Warning:
 					value = '--'
+					metrics_template += '{}: {}'
 				metrics_variables += [name, value]
 					
 		metrics_text = metrics_template.format(*metrics_variables)
-		print metrics_text
-
+		
 		template = 'Episode {episode}: {duration:.3f}s, steps: {steps}, steps per second: {sps:.0f}, total reward: {total_reward:.3f}, reward: {reward:.3f} [{reward_min:.3f}, {reward_max:.3f}], action: {action:.3f} [{action_min:.3f}, {action_max:.3f}], observations: {obs:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
 		variables = {
 			'episode': episode + 1,

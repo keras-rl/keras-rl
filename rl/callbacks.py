@@ -42,9 +42,9 @@ class CallbackList(KerasCallbackList):
 			# Check if callback supports the more appropriate `on_step_begin` callback.
 			# If not, fall back to `on_batch_begin` to be compatible with built-in Keras callbacks.
 			if callable(getattr(callback, 'on_step_begin', None)):
-				callback.on_step_begin(episode, logs=logs)
+				callback.on_step_begin(step, logs=logs)
 			else:
-				callback.on_batch_begin(episode, logs=logs)
+				callback.on_batch_begin(step, logs=logs)
 
 	def on_step_end(self, step, logs={}):
 		for callback in self.callbacks:

@@ -36,34 +36,30 @@ class RingBuffer(object):
 
 
 class Memory(object):
-	def __init__(self, temporal_window, memory_limit):
-		self.temporal_window = temporal_window
-		self.memory_limit = memory_limit
+	def __init__(self, limit):
+		self.limit = limit
 
 		# Do not use deque to implement the memory. This data structure may seem convenient but
 		# it is way too slow on random access. Instead, we use our own ring buffer implementation.
-		maxlen = memory_limit + temporal_window
-		self.actions = RingBuffer(maxlen)
-		self.rewards = RingBuffer(maxlen)
-		self.terminals = RingBuffer(maxlen)
-		self.observations = RingBuffer(maxlen)
-		self.maxlen = maxlen
+		self.actions = RingBuffer(limit)
+		self.rewards = RingBuffer(limit)
+		self.terminals = RingBuffer(limit)
+		self.observations = RingBuffer(limit)
 
-	def sample(self, batch_size):
-		# Draw random indexes such that we have at least self.temporal_window entries
-		# before each index.
-		batch_idxs = np.random.random_integers(self.temporal_window, self.nb_entries - 1, size=batch_size)
+	def sample(self, batch_size, window_length):
+		# Draw random indexes such that we have at least `window_length` entries before each index.
+		batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
 		assert len(batch_idxs) == batch_size
 		
 		# Create experiences
 		experiences = []
 		for idx in batch_idxs:
-			state0 = [self.observations[i] for i in xrange(idx - self.temporal_window, idx)]
+			state0 = [self.observations[i] for i in xrange(idx - window_length, idx)]
 			action = self.actions[idx - 1]
 			reward = self.rewards[idx - 1]
 			terminal = self.terminals[idx - 1]
-			state1 = [self.observations[i] for i in xrange(idx - self.temporal_window + 1, idx + 1)]
-			assert len(state0) == self.temporal_window
+			state1 = [self.observations[i] for i in xrange(idx - window_length + 1, idx + 1)]
+			assert len(state0) == window_length
 			assert len(state1) == len(state0)
 			experiences.append(Experience(state0, action, reward, terminal, state1))
 		assert len(experiences) == batch_size

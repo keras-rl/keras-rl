@@ -120,10 +120,10 @@ class Agent(object):
     def reset_states(self):
         pass
 
-    def forward(self, current_input):
+    def forward(self, observation):
         raise NotImplementedError()
 
-    def backward(self, reward, terminal=False):
+    def backward(self, reward, terminal):
         raise NotImplementedError()
 
     def load_weights(self, filepath):
@@ -131,6 +131,18 @@ class Agent(object):
 
     def save_weights(self, filepath, overwrite=False):
         raise NotImplementedError()
+
+
+class Processor(object):
+    def process_observation(self, observation):
+        """Processed observation will be stored in memory
+        """
+        return observation
+
+    def process_state_batch(self, batch):
+        """Process for input into NN
+        """
+        return batch
 
 
 # Note: the API of the `Env` and `Space` classes are taken from the OpenAI Gym implementation.

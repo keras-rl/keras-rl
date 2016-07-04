@@ -5,6 +5,8 @@ from rl.callbacks import TestLogger, TrainEpisodeLogger, Visualizer, CallbackLis
 
 class Agent(object):
     def fit(self, env, nb_episodes=100, action_repetition=1, callbacks=[], verbose=1, visualize=False):
+        if not self.compiled:
+            raise RuntimeError('Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
@@ -47,14 +49,14 @@ class Agent(object):
                     if d:
                         done = True
                         break
-                stats = self.backward(reward, terminal=done)
+                metrics = self.backward(reward, terminal=done)
                 total_reward += reward
                 
                 step_logs = {
                     'action': action,
                     'observation': observation,
                     'reward': reward,
-                    'stats': stats,
+                    'metrics': metrics,
                     'episode': episode_idx,
                 }
                 callbacks.on_step_end(step_idx, step_logs)
@@ -67,7 +69,8 @@ class Agent(object):
         callbacks.on_train_end()
 
     def test(self, env, nb_episodes=1, action_repetition=1, callbacks=[], visualize=True):
-        # TODO: implement callbacks. The Keras callbacks do not really fit, maybe we need to extend.
+        if not self.compiled:
+            raise RuntimeError('Your tried to test your agent but it hasn\'t been compiled yet. Please call `compile()` before `test()`.')
         if action_repetition < 1:
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
@@ -126,10 +129,17 @@ class Agent(object):
     def backward(self, reward, terminal):
         raise NotImplementedError()
 
+    def compile(self, optimizer, metrics=[]):
+        raise NotImplementedError()
+
     def load_weights(self, filepath):
         raise NotImplementedError()
 
     def save_weights(self, filepath, overwrite=False):
+        raise NotImplementedError()
+
+    @property
+    def metrics_names(self):
         raise NotImplementedError()
 
 

@@ -27,6 +27,27 @@ def predict_on_batch(model, input_batch, output_name='output'):
 	return output
 
 
+# TODO: do we still need this in Keras 1.x?
+def train_on_batch(model, input_batch, target_batch, output_name='output'):
+	metrics = None
+	if isinstance(model, Graph):
+		data = dict(input_batch)  # shallow copy
+		data[output_name] = target_batch
+		metrics = model.train_on_batch(data)
+	elif isinstance(model, Sequential):
+		input_batch = np.array(input_batch)
+		target_batch = np.array(target_batch)
+		assert input_batch.shape[0] == target_batch.shape[0]
+		metrics = model.train_on_batch(input_batch, target_batch)
+	else:
+		raise RuntimeError('unknown model type')
+	assert metrics is not None
+
+	if not isinstance(metrics, list):
+		metrics = [metrics]
+	return metrics
+
+
 class QPolicy(object):
 	def select_action(self, q_values, step=1, training=True):
 		raise NotImplementedError()
@@ -70,27 +91,6 @@ class BoltzmannQPolicy(QPolicy):
 		probs = exp_values / np.sum(exp_values)
 		action = np.random.choice(range(nb_actions), p=probs)
 		return action
-
-
-# TODO: do we still need this in Keras 1.x?
-def train_on_batch(model, input_batch, target_batch, output_name='output'):
-	loss = 0.
-	if isinstance(model, Graph):
-		data = dict(input_batch)  # shallow copy
-		data[output_name] = target_batch
-		loss = model.train_on_batch(data)
-	elif isinstance(model, Sequential):
-		input_batch = np.array(input_batch)
-		target_batch = np.array(target_batch)
-		assert input_batch.shape[0] == target_batch.shape[0]
-		loss = model.train_on_batch(input_batch, target_batch)
-	else:
-		raise RuntimeError('unknown model type')
-
-	# TODO: fix this by reporting the metrics!
-	if isinstance(loss, list):
-		loss = loss[0]
-	return loss
 
 
 # An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
@@ -187,10 +187,11 @@ class DQNAgent(Agent):
 
 	def backward(self, reward, terminal):
 		self.step += 1
+		metrics = [np.nan for _ in self.metrics_names]
 		if not self.training:
 			# We're done here. No need to update the experience memory since we only use the working
 			# memory to obtain the state over the most recent observations.
-			return 0.
+			return metrics
 
 		# Clip the reward to be in reward_range.
 		reward = min(max(reward, self.reward_range[0]), self.reward_range[1])
@@ -254,6 +255,7 @@ class DQNAgent(Agent):
 			# since we do this in the training step anyway, but this is currently the simplest
 			# way to set the gradients of the non-affected output units to zero.
 			ys = predict_on_batch(self.model, state0_batch)
+			mean_q = np.mean(np.max(ys, axis=-1))
 			assert ys.shape == (self.batch_size, self.nb_actions)
 
 			# Compute r_t + gamma * max_a Q(s_t+1, a) and update the target ys accordingly,
@@ -273,11 +275,14 @@ class DQNAgent(Agent):
 			ys = np.array(ys).astype('float32')
 
 			# Finally, perform a single update on the entire batch.
-			loss = train_on_batch(self.model, state0_batch, ys)
-		else:
-			loss = 0.
+			metrics = train_on_batch(self.model, state0_batch, ys)
+			metrics.append(mean_q)
 
 		if self.step % self.target_model_update_interval == 0:
 			self.update_target_model()
 
-		return loss  # TODO: return dict
+		return metrics
+
+	@property
+	def metrics_names(self):
+		return self.model.metrics_names[:] + ['mean_q']

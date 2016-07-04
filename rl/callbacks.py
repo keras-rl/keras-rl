@@ -1,3 +1,5 @@
+import warnings
+
 import timeit
 import numpy as np
 
@@ -76,11 +78,11 @@ class TrainEpisodeLogger(Callback):
 		self.observations = {}
 		self.rewards = {}
 		self.actions = {}
-		self.losses = {}
-		self.average_qs = {}
+		self.metrics = {}
 
 	def on_train_begin(self, logs):
 		self.train_start = timeit.default_timer()
+		self.metrics_names = self.model.metrics_names
 		print('Training for {} episodes ...'.format(self.params['nb_episodes']))
 
 	def on_train_end(self, logs):
@@ -92,123 +94,131 @@ class TrainEpisodeLogger(Callback):
 		self.observations[episode] = []
 		self.rewards[episode] = []
 		self.actions[episode] = []
-		self.losses[episode] = []
-		self.average_qs[episode] = []
+		self.metrics[episode] = []
 
 	def on_episode_end(self, episode, logs):
-		if len(self.average_qs[episode]) == 0:
-			self.average_qs[episode].append(0.)
-		if len(self.losses[episode]) == 0:
-			self.losses[episode].append(0.)
 		duration = timeit.default_timer() - self.episode_start[episode]
 		steps = len(self.observations[episode])
-		template = 'Episode {0}: {1:.3f}s, steps: {2}, steps per second: {3:.0f}, reward: {4:.3f} [{5:.3f}, {6:.3f}], loss: {7:.3f}, avg q: {14:.3f} action: {8:.3f} [{9:.3f}, {10:.3f}], observations: {11:.3f} [{12:.3f}, {13:.3f}]'
-		variables = [
-			episode + 1,
-			duration,
-			steps,
-			float(steps) / duration,
-			np.sum(self.rewards[episode]),
-			np.min(self.rewards[episode]),
-			np.max(self.rewards[episode]),
-			np.sum(self.losses[episode]),
-			np.mean(self.actions[episode]),
-			np.min(self.actions[episode]),
-			np.max(self.actions[episode]),
-			np.mean(self.observations[episode]),
-			np.min(self.observations[episode]),
-			np.max(self.observations[episode]),
-			np.mean(self.average_qs[episode]),
-		]
-		print(template.format(*variables))
+
+		# Format all metrics.
+		metrics = np.array(self.metrics[episode])
+		metrics_template = ''
+		metrics_variables = []
+		with warnings.catch_warnings():
+			warnings.filterwarnings('error')
+			for idx, name in enumerate(self.metrics_names):
+				if idx > 0:
+					metrics_template += ', '
+				metrics_template += '{}: {}'
+				try:
+					value = np.nanmean(metrics[:, idx])
+				except Warning:
+					value = '--'
+				metrics_variables += [name, value]
+					
+		metrics_text = metrics_template.format(*metrics_variables)
+		print metrics_text
+
+		template = 'Episode {episode}: {duration:.3f}s, steps: {steps}, steps per second: {sps:.0f}, total reward: {total_reward:.3f}, reward: {reward:.3f} [{reward_min:.3f}, {reward_max:.3f}], action: {action:.3f} [{action_min:.3f}, {action_max:.3f}], observations: {obs:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
+		variables = {
+			'episode': episode + 1,
+			'duration': duration,
+			'steps': steps,
+			'sps': float(steps) / duration,
+			'total_reward': np.sum(self.rewards[episode]),
+			'reward': np.mean(self.rewards[episode]),
+			'reward_min': np.min(self.rewards[episode]),
+			'reward_max': np.max(self.rewards[episode]),
+			'action': np.mean(self.actions[episode]),
+			'action_min': np.min(self.actions[episode]),
+			'action_max': np.max(self.actions[episode]),
+			'obs': np.mean(self.observations[episode]),
+			'obs_min': np.min(self.observations[episode]),
+			'obs_max': np.max(self.observations[episode]),
+			'metrics': metrics_text,
+		}
+		print(template.format(**variables))
 
 		# Free up resources.
 		del self.episode_start[episode]
 		del self.observations[episode]
 		del self.rewards[episode]
 		del self.actions[episode]
-		del self.losses[episode]
-		del self.average_qs[episode]
+		del self.metrics[episode]
 
 	def on_step_end(self, step, logs):
 		episode = logs['episode']
 		self.observations[episode].append(np.concatenate(logs['observation']))
 		self.rewards[episode].append(logs['reward'])
 		self.actions[episode].append(logs['action'])
-		
-		stats = logs['stats']
-		if not isinstance(stats, (list, tuple)):
-			stats = [stats]
-		self.losses[episode].append(stats[0])
-		if len(stats) >= 2:
-			self.average_qs[episode].append(stats[1])
+		self.metrics[episode].append(logs['metrics'])
 
-class TrainIntervalLogger(Callback):
-	def __init__(self, interval=10000):
-		self.interval = interval
-		self.steps = 0
-		self.reset()
+# class TrainIntervalLogger(Callback):
+# 	def __init__(self, interval=10000):
+# 		self.interval = interval
+# 		self.steps = 0
+# 		self.reset()
 
-	def reset(self):
-		self.interval_start = timeit.default_timer()
-		self.observations = []
-		self.rewards = []
-		self.actions = []
-		self.losses = []
-		self.average_qs = []
+# 	def reset(self):
+# 		self.interval_start = timeit.default_timer()
+# 		self.observations = []
+# 		self.rewards = []
+# 		self.actions = []
+# 		self.metrics = []
+# 		self.average_qs = []
 
-	def on_train_begin(self, logs):
-		self.train_start = timeit.default_timer()
-		print('Training for {} episodes ...'.format(self.params['nb_episode']))
+# 	def on_train_begin(self, logs):
+# 		self.train_start = timeit.default_timer()
+# 		print('Training for {} episodes ...'.format(self.params['nb_episode']))
 
-	def on_train_end(self, logs):
-		duration = timeit.default_timer() - self.train_start
-		print('done, took {0:.3f} seconds'.format(duration))
+# 	def on_train_end(self, logs):
+# 		duration = timeit.default_timer() - self.train_start
+# 		print('done, took {0:.3f} seconds'.format(duration))
 
-	def print_report(self):
-		if len(self.average_qs) == 0:
-			self.average_qs.append(0.)
-		if len(self.losses) == 0:
-			self.losses.append(0.)
-		duration = timeit.default_timer() - self.interval_start
-		interval_steps = len(self.observations)
-		template = '{0}: {1:.3f}s, interval steps: {2}, steps per second: {3:.0f}, reward: {4:.3f} [{5:.3f}, {6:.3f}], loss: {7:.3f}, avg q: {14:.3f} action: {8:.3f} [{9:.3f}, {10:.3f}], observations: {11:.3f} [{12:.3f}, {13:.3f}]'
-		variables = [
-			self.steps,
-			duration,
-			interval_steps,
-			float(interval_steps) / duration,
-			np.sum(self.rewards),
-			np.min(self.rewards),
-			np.max(self.rewards),
-			np.sum(self.losses),
-			np.mean(self.actions),
-			np.min(self.actions),
-			np.max(self.actions),
-			np.mean(self.observations),
-			np.min(self.observations),
-			np.max(self.observations),
-			np.mean(self.average_qs),
-		]
-		print(template.format(*variables))
+# 	def print_report(self):
+# 		if len(self.average_qs) == 0:
+# 			self.average_qs.append(0.)
+# 		if len(self.metrics) == 0:
+# 			self.metrics.append(0.)
+# 		duration = timeit.default_timer() - self.interval_start
+# 		interval_steps = len(self.observations)
+# 		template = '{0}: {1:.3f}s, interval steps: {2}, steps per second: {3:.0f}, reward: {4:.3f} [{5:.3f}, {6:.3f}], loss: {7:.3f}, avg q: {14:.3f} action: {8:.3f} [{9:.3f}, {10:.3f}], observations: {11:.3f} [{12:.3f}, {13:.3f}]'
+# 		variables = [
+# 			self.steps,
+# 			duration,
+# 			interval_steps,
+# 			float(interval_steps) / duration,
+# 			np.sum(self.rewards),
+# 			np.min(self.rewards),
+# 			np.max(self.rewards),
+# 			np.sum(self.metrics),
+# 			np.mean(self.actions),
+# 			np.min(self.actions),
+# 			np.max(self.actions),
+# 			np.mean(self.observations),
+# 			np.min(self.observations),
+# 			np.max(self.observations),
+# 			np.mean(self.average_qs),
+# 		]
+# 		print(template.format(*variables))
 
-	def on_step_end(self, step, logs):
-		if self.steps % self.interval == 0:
-			if self.steps > 0:
-				self.print_report()
-			self.reset()
+# 	def on_step_end(self, step, logs):
+# 		if self.steps % self.interval == 0:
+# 			if self.steps > 0:
+# 				self.print_report()
+# 			self.reset()
 
-		# Book-keeping.
-		self.steps += 1
-		self.observations.append(np.concatenate(logs['observation']))
-		self.rewards.append(logs['reward'])
-		self.actions.append(logs['action'])
-		stats = logs['stats']
-		if not isinstance(stats, (list, tuple)):
-			stats = [stats]
-		self.losses.append(stats[0])
-		if len(stats) >= 2:
-			self.average_qs.append(stats[1])
+# 		# Book-keeping.
+# 		self.steps += 1
+# 		self.observations.append(np.concatenate(logs['observation']))
+# 		self.rewards.append(logs['reward'])
+# 		self.actions.append(logs['action'])
+# 		stats = logs['stats']
+# 		if not isinstance(stats, (list, tuple)):
+# 			stats = [stats]
+# 		self.metrics.append(stats[0])
+# 		if len(stats) >= 2:
+# 			self.average_qs.append(stats[1])
 
 
 class Visualizer(Callback):

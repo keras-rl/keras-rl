@@ -28,25 +28,28 @@ def predict_on_batch(model, input_batch, output_name='output'):
 
 
 class QPolicy(object):
-	def select_action(self, q_values):
+	def select_action(self, q_values, step=1, training=True):
 		raise NotImplementedError()
 
 
 class AnnealedQPolicy(QPolicy):
-	def __init__(self, eps_max=1., eps_min=0.05, nb_annealing_steps=10000):
+	def __init__(self, eps_max=1., eps_min=.1, eps_test=.05, nb_annealing_steps=10000):
 		super(AnnealedQPolicy, self).__init__()
 		self.eps_max = eps_max
 		self.eps_min = eps_min
+		self.eps_test = eps_test
 		self.nb_annealing_steps = nb_annealing_steps
-		self.step = 0  # this state is managed by the agent
 
-	def select_action(self, q_values):
+	def select_action(self, q_values, step=1, training=True):
 		assert q_values.ndim == 1
 		nb_actions = q_values.shape[0]
 
-		m = -float(self.eps_max - self.eps_min) / float(self.nb_annealing_steps)
-		c = float(self.eps_max)
-		eps = max(self.eps_min, m * float(self.step) + c)
+		if training:
+			m = -float(self.eps_max - self.eps_min) / float(self.nb_annealing_steps)
+			c = float(self.eps_max)
+			eps = max(self.eps_min, m * float(step) + c)
+		else:
+			eps = self.eps_test
 		if np.random.uniform() < eps:
 			action = np.random.random_integers(0, nb_actions-1)
 		else:
@@ -59,7 +62,7 @@ class BoltzmannQPolicy(QPolicy):
 		super(BoltzmannQPolicy, self).__init__()
 		self.temperature = temperature
 
-	def select_action(self, q_values):
+	def select_action(self, q_values, step=1, training=True):
 		assert q_values.ndim == 1
 		nb_actions = q_values.shape[0]
 
@@ -174,7 +177,7 @@ class DQNAgent(Agent):
 		state = np.array(list(self.recent_observations)[1:] + [observation])
 		assert len(state) == self.window_length
 		q_values = self.compute_q_values(state)
-		action = self.policy.select_action(q_values)
+		action = self.policy.select_action(q_values, step=self.step, training=self.training)
 
 		# Book-keeping.
 		self.recent_observations.append(observation)
@@ -184,7 +187,6 @@ class DQNAgent(Agent):
 
 	def backward(self, reward, terminal):
 		self.step += 1
-		self.policy.step = self.step
 		if not self.training:
 			# We're done here. No need to update the experience memory since we only use the working
 			# memory to obtain the state over the most recent observations.

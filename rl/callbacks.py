@@ -58,10 +58,11 @@ class CallbackList(KerasCallbackList):
 
 class TestLogger(Callback):
 	def on_episode_end(self, episode, logs):
-		template = 'Episode {0}: reward: {1:.3f}'
+		template = 'Episode {0}: reward: {1:.3f}, steps: {2}'
 		variables = [
-			episode,
+			episode + 1,
 			logs['total_reward'],
+			logs['nb_steps'],
 		]
 		print(template.format(*variables))
 
@@ -103,7 +104,7 @@ class TrainEpisodeLogger(Callback):
 		steps = len(self.observations[episode])
 		template = 'Episode {0}: {1:.3f}s, steps: {2}, steps per second: {3:.0f}, reward: {4:.3f} [{5:.3f}, {6:.3f}], loss: {7:.3f}, avg q: {14:.3f} action: {8:.3f} [{9:.3f}, {10:.3f}], observations: {11:.3f} [{12:.3f}, {13:.3f}]'
 		variables = [
-			episode,
+			episode + 1,
 			duration,
 			steps,
 			float(steps) / duration,

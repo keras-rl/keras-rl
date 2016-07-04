@@ -6,6 +6,7 @@ import gym
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Convolution2D
 from keras.optimizers import RMSprop
+from keras.callbacks import ModelCheckpoint
 
 from rl.agents import DQNAgent
 from rl.memory import Memory
@@ -61,10 +62,26 @@ model.add(Dense(nb_actions))
 model.add(Activation('linear'))
 print(model.summary())
 
-# Finally, we configure our agent.
+# Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
+# even the metrics!
 memory = Memory(limit=1000000)
 processor = AtariProcessor()
 dqn = DQNAgent(model=model, nb_actions=nb_actions, window_length=WINDOW_LENGTH, memory=memory,
 	processor=processor)
-dqn.compile(RMSprop(lr=.00025))
-dqn.fit(env)
+dqn.compile(RMSprop(lr=.00025), metrics=['mae'])
+
+# Okay, now it's time to learn something! We capture the interrupt exception so that training
+# can be prematurely aborted. Notice that you can the built-in Keras callbacks!
+weights_filename = 'weights_dqn_{}.h5f'.format(ENV_NAME)
+callbacks = [ModelCheckpoint(weights_filename)]
+try:
+	dqn.fit(env, callbacks=callbacks, nb_episodes=5000)
+except KeyboardInterrupt:
+	# Ignore this, and continue with the rest.
+	pass
+
+# After training is done, we save the final weights one more time.
+dqn.save_weights(weights_filename, overwrite=True)
+
+# Finally, evaluate our algorithm for 5 episodes.
+dqn.test(env, nb_episodes=5)

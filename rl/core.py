@@ -61,6 +61,7 @@ class Agent(object):
                 step_idx += 1
             episode_logs = {
                 'total_reward': total_reward,
+                'nb_steps': step_idx,
             }
             callbacks.on_episode_end(episode_idx, episode_logs)
         callbacks.on_train_end()
@@ -78,17 +79,17 @@ class Agent(object):
         callbacks = CallbackList(callbacks)
         callbacks._set_model(self)
         callbacks._set_params({
-            'nb_episode': nb_episode,
+            'nb_episodes': nb_episodes,
             'env': env,
         })
 
-        for episode_idx in xrange(nb_episode):
+        for episode_idx in xrange(nb_episodes):
             callbacks.on_episode_begin(episode_idx)
             total_reward = 0.
             step_idx = 0
 
             # Obtain the initial observation by resetting the environment.
-            self.reset()
+            self.reset_states()
             observation = env.reset()
             assert observation is not None
 
@@ -112,10 +113,9 @@ class Agent(object):
                 step_idx += 1
             episode_logs = {
                 'total_reward': total_reward,
+                'nb_steps': step_idx,
             }
             callbacks.on_episode_end(episode_idx, episode_logs)
-            game.reset()
-            self.reset_states()
 
     def reset_states(self):
         pass

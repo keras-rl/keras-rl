@@ -33,7 +33,7 @@ class QPolicy(object):
 
 
 class AnnealedQPolicy(QPolicy):
-	def __init__(self, eps_max=1., eps_min=.1, eps_test=.05, nb_annealing_steps=10000):
+	def __init__(self, eps_max=1., eps_min=.1, eps_test=.05, nb_annealing_steps=500000):
 		super(AnnealedQPolicy, self).__init__()
 		self.eps_max = eps_max
 		self.eps_min = eps_min

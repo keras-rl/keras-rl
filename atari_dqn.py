@@ -1,5 +1,6 @@
 from argparse import ArgumentParser
 
+from PIL import Image
 import numpy as np
 import gym
 
@@ -12,18 +13,10 @@ from rl.agents import DQNAgent
 from rl.memory import Memory
 from rl.core import Processor
 
-import PIL
-from PIL import Image
-
 
 INPUT_SHAPE = (84, 84)
 ENV_NAME = 'Breakout-v0'
 WINDOW_LENGTH = 4
-
-
-def rgb2gray(rgb):
-	# https://en.wikipedia.org/wiki/Grayscale#Converting_color_to_grayscale
-    return np.dot(rgb, [0.299, 0.587, 0.114])
 
 
 class AtariProcessor(Processor):

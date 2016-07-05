@@ -60,7 +60,7 @@ print(model.summary())
 memory = Memory(limit=1000000)
 processor = AtariProcessor()
 dqn = DQNAgent(model=model, nb_actions=nb_actions, window_length=WINDOW_LENGTH, memory=memory,
-	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=4)
+	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=4, delta_range=(-1., 1.))
 dqn.compile(RMSprop(lr=.00025, clipvalue=25.), metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
@@ -68,7 +68,7 @@ dqn.compile(RMSprop(lr=.00025, clipvalue=25.), metrics=['mae'])
 weights_filename = 'weights_dqn_{}.h5f'.format(ENV_NAME)
 callbacks = [ModelCheckpoint(weights_filename)]
 try:
-	dqn.fit(env, callbacks=callbacks, nb_episodes=5000)
+	dqn.fit(env, callbacks=callbacks, nb_episodes=5000, action_repetition=4, nb_max_random_start_steps=30)
 except KeyboardInterrupt:
 	# Ignore this, and continue with the rest.
 	pass

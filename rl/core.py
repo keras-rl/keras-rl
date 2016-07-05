@@ -1,10 +1,13 @@
+import warnings
+
 import numpy as np
 
 from rl.callbacks import TestLogger, TrainEpisodeLogger, Visualizer, CallbackList
 
 
 class Agent(object):
-    def fit(self, env, nb_episodes=100, action_repetition=1, callbacks=[], verbose=1, visualize=False):
+    def fit(self, env, nb_episodes=100, action_repetition=1, callbacks=[], verbose=1,
+        visualize=False, validation_size=1000, nb_max_random_start_steps=0):
         if not self.compiled:
             raise RuntimeError('Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
@@ -33,6 +36,16 @@ class Agent(object):
             self.reset()
             observation = env.reset()
             assert observation is not None
+
+            # Perform random starts at beginning of episode and do not record them into the experience.
+            # This slightly changes the start position between games.
+            nb_random_start_steps = 0 if nb_max_random_start_steps == 0 else np.random.randint(nb_max_random_start_steps)
+            for _ in xrange(nb_random_start_steps):
+                observation, _, done, _ = env.step(env.action_space.sample())
+                if done:
+                    warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_random_start_steps` parameter.'.format(nb_random_start_steps))
+                    observation = env.reset()
+                    break
 
             # Run the episode until we're done.
             done = False

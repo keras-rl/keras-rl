@@ -52,6 +52,14 @@ class QPolicy(object):
 	def select_action(self, q_values, step=1, training=True):
 		raise NotImplementedError()
 
+	@property
+	def metrics_names(self):
+		return []
+
+	@property
+	def metrics(self, step=1, training=True):
+		return []
+
 
 class AnnealedQPolicy(QPolicy):
 	def __init__(self, eps_max=1., eps_min=.1, eps_test=.05, nb_annealing_steps=500000):
@@ -61,21 +69,33 @@ class AnnealedQPolicy(QPolicy):
 		self.eps_test = eps_test
 		self.nb_annealing_steps = nb_annealing_steps
 
-	def select_action(self, q_values, step=1, training=True):
-		assert q_values.ndim == 1
-		nb_actions = q_values.shape[0]
-
+	def compute_eps(self, step, training):
 		if training:
 			m = -float(self.eps_max - self.eps_min) / float(self.nb_annealing_steps)
 			c = float(self.eps_max)
 			eps = max(self.eps_min, m * float(step) + c)
 		else:
 			eps = self.eps_test
+		return eps
+
+	def select_action(self, q_values, step=1, training=True):
+		assert q_values.ndim == 1
+		nb_actions = q_values.shape[0]
+
+		eps = self.compute_eps(step, training)
 		if np.random.uniform() < eps:
 			action = np.random.random_integers(0, nb_actions-1)
 		else:
 			action = np.argmax(q_values)
 		return action
+
+	@property
+	def metrics_names(self):
+		return ['mean_eps']
+
+	@property
+	def metrics(self, step=1, training=True):
+		return [self.compute_eps(step, training)]
 
 
 class BoltzmannQPolicy(QPolicy):
@@ -277,6 +297,7 @@ class DQNAgent(Agent):
 			# Finally, perform a single update on the entire batch.
 			metrics = train_on_batch(self.model, state0_batch, ys)
 			metrics.append(mean_q)
+			metrics.extend(self.policy.metrics)
 
 		if self.step % self.target_model_update_interval == 0:
 			self.update_target_model()
@@ -285,4 +306,4 @@ class DQNAgent(Agent):
 
 	@property
 	def metrics_names(self):
-		return self.model.metrics_names[:] + ['mean_q']
+		return self.model.metrics_names[:] + ['mean_q'] + self.policy.metrics_names[:]

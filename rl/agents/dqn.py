@@ -56,8 +56,7 @@ class QPolicy(object):
 	def metrics_names(self):
 		return []
 
-	@property
-	def metrics(self, step=1, training=True):
+	def get_metrics(self, step=1, training=True):
 		return []
 
 
@@ -93,8 +92,7 @@ class AnnealedQPolicy(QPolicy):
 	def metrics_names(self):
 		return ['mean_eps']
 
-	@property
-	def metrics(self, step=1, training=True):
+	def get_metrics(self, step=1, training=True):
 		return [self.compute_eps(step, training)]
 
 
@@ -297,7 +295,7 @@ class DQNAgent(Agent):
 			# Finally, perform a single update on the entire batch.
 			metrics = train_on_batch(self.model, state0_batch, ys)
 			metrics.append(mean_q)
-			metrics.extend(self.policy.metrics)
+			metrics.extend(self.policy.get_metrics(step=self.step, training=self.training))
 
 		if self.step % self.target_model_update_interval == 0:
 			self.update_target_model()

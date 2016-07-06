@@ -190,7 +190,6 @@ class TrainIntervalLogger(Callback):
 
 	def on_step_begin(self, step, logs):
 		if self.steps % self.interval == 0:
-			print np.nanmean(self.metrics, axis=0)
 			self.reset()
 			print('Interval {} ({} steps performed)'.format(self.steps / self.interval + 1, self.steps))
 

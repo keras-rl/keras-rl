@@ -54,12 +54,26 @@ class Memory(object):
 		# Create experiences
 		experiences = []
 		for idx in batch_idxs:
-			# TODO: this handles terminal states incorrectly
-			state0 = [self.observations[i] for i in xrange(idx - window_length, idx)]
+			# This code is slightly complicated by the fact that subsequent observations might be
+			# from different episodes.
+			state0 = [self.observations[idx - 1]]
+			for current_idx in xrange(idx - 2, idx - window_length - 1, -1):
+				if self.terminals[current_idx]:
+					break
+				state0.insert(0, self.observations[current_idx])
+			while len(state0) < window_length:
+				state0.insert(0, np.copy(state0[0]))
+
 			action = self.actions[idx - 1]
 			reward = self.rewards[idx - 1]
 			terminal = self.terminals[idx - 1]
-			state1 = [self.observations[i] for i in xrange(idx - window_length + 1, idx + 1)]
+			if terminal:
+				# The next state is part of a new episode, which means that the correct state is
+				# the next state repeated `window_length` times.
+				state1 = [np.copy(self.observations[idx]) for _ in xrange(window_length)]
+			else:
+				state1 = [self.observations[i] for i in xrange(idx - window_length + 1, idx + 1)]
+
 			assert len(state0) == window_length
 			assert len(state1) == len(state0)
 			experiences.append(Experience(state0, action, reward, terminal, state1))

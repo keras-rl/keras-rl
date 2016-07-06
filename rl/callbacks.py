@@ -202,7 +202,7 @@ class TrainIntervalLogger(Callback):
 				filtered_metrics.append(value)
 			else:
 				mean = np.nan
-				if len(self.metrics) > 0:
+				if len(self.metrics) > 0 and not np.isnan(self.metrics).all():
 					if means is None:
 						means = np.nanmean(self.metrics, axis=0)
 						assert means.shape == (len(self.metrics_names),)

@@ -5,7 +5,7 @@ import numpy as np
 import gym
 
 from keras.models import Sequential
-from keras.layers import Dense, Activation, Flatten, Convolution2D
+from keras.layers import Dense, Activation, Flatten, Convolution2D, BatchNormalization
 from keras.optimizers import RMSprop
 from keras.callbacks import ModelCheckpoint
 
@@ -49,8 +49,10 @@ model.add(Activation('relu'))
 model.add(Convolution2D(64, 3, 3, subsample=(1, 1)))
 model.add(Activation('relu'))
 model.add(Flatten())
+model.add(BatchNormalization())
 model.add(Dense(512))
 model.add(Activation('relu'))
+model.add(BatchNormalization())
 model.add(Dense(nb_actions))
 model.add(Activation('linear'))
 print(model.summary())
@@ -60,15 +62,16 @@ print(model.summary())
 memory = Memory(limit=1000000)
 processor = AtariProcessor()
 dqn = DQNAgent(model=model, nb_actions=nb_actions, window_length=WINDOW_LENGTH, memory=memory,
-	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=4, delta_range=(-1., 1.))
-dqn.compile(RMSprop(lr=.00025, clipvalue=25.), metrics=['mae'])
+	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=1, delta_range=(-1., 1.))
+dqn.compile(RMSprop(lr=.00025, clipvalue=10.), metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
 weights_filename = 'weights_dqn_{}.h5f'.format(ENV_NAME)
 callbacks = [ModelCheckpoint(weights_filename)]
 try:
-	dqn.fit(env, callbacks=callbacks, nb_episodes=5000, action_repetition=4, nb_max_random_start_steps=30)
+	dqn.fit(env, callbacks=callbacks, nb_steps=10000000, action_repetition=4,
+		nb_max_random_start_steps=30, log_interval=10000)
 except KeyboardInterrupt:
 	# Ignore this, and continue with the rest.
 	pass
@@ -77,4 +80,4 @@ except KeyboardInterrupt:
 dqn.save_weights(weights_filename, overwrite=True)
 
 # Finally, evaluate our algorithm for 5 episodes.
-dqn.test(env, nb_episodes=5)
+dqn.test(env, nb_episodes=5, action_repetition=4)

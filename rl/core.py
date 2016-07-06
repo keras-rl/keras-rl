@@ -2,12 +2,12 @@ import warnings
 
 import numpy as np
 
-from rl.callbacks import TestLogger, TrainEpisodeLogger, Visualizer, CallbackList
+from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Visualizer, CallbackList
 
 
 class Agent(object):
-    def fit(self, env, nb_episodes=100, action_repetition=1, callbacks=[], verbose=1,
-        visualize=False, validation_size=1000, nb_max_random_start_steps=0):
+    def fit(self, env, nb_episodes=None, nb_steps=None, action_repetition=1, callbacks=[], verbose=1,
+        visualize=False, validation_size=1000, nb_max_random_start_steps=0, log_interval=10000):
         if not self.compiled:
             raise RuntimeError('Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
@@ -16,69 +16,90 @@ class Agent(object):
         self.training = True
 
         if verbose > 0:
-            callbacks += [TrainEpisodeLogger()]
+            if nb_episodes is not None:
+                callbacks += [TrainEpisodeLogger()]
+            else:
+                callbacks += [TrainIntervalLogger(interval=log_interval)]
         if visualize:
             callbacks += [Visualizer()]
         callbacks = CallbackList(callbacks)
         callbacks._set_model(self)
         callbacks._set_params({
             'nb_episodes': nb_episodes,
+            'nb_steps': nb_steps,
             'env': env,
         })
         callbacks.on_train_begin()
 
-        for episode_idx in xrange(nb_episodes):
-            callbacks.on_episode_begin(episode_idx)
-            step_idx = 0
-            total_reward = 0.
+        episode = 0
+        step = 0
+        observation = None
+        episode_reward = None
+        episode_step = None
+        while (nb_episodes is None or episode < nb_episodes) and (nb_steps is None or step < nb_steps):
+            if observation is None:  # start of a new episode
+                callbacks.on_episode_begin(episode)
+                episode_step = 0
+                episode_reward = 0.
 
-            # Obtain the initial observation by resetting the environment.
-            self.reset()
-            observation = env.reset()
+                # Obtain the initial observation by resetting the environment.
+                self.reset()
+                observation = env.reset()
+                assert observation is not None
+
+                # Perform random starts at beginning of episode and do not record them into the experience.
+                # This slightly changes the start position between games.
+                nb_random_start_steps = 0 if nb_max_random_start_steps == 0 else np.random.randint(nb_max_random_start_steps)
+                for _ in xrange(nb_random_start_steps):
+                    observation, _, done, _ = env.step(env.action_space.sample())
+                    if done:
+                        warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_random_start_steps` parameter.'.format(nb_random_start_steps))
+                        observation = env.reset()
+                        break
+
+            # At this point, we expect to be fully initialized.
+            assert episode_reward is not None
+            assert episode_step is not None
             assert observation is not None
 
-            # Perform random starts at beginning of episode and do not record them into the experience.
-            # This slightly changes the start position between games.
-            nb_random_start_steps = 0 if nb_max_random_start_steps == 0 else np.random.randint(nb_max_random_start_steps)
-            for _ in xrange(nb_random_start_steps):
-                observation, _, done, _ = env.step(env.action_space.sample())
-                if done:
-                    warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_random_start_steps` parameter.'.format(nb_random_start_steps))
-                    observation = env.reset()
-                    break
-
-            # Run the episode until we're done.
+            # Run a single step.
+            callbacks.on_step_begin(episode_step)    
+            # This is were all of the work happens. We first perceive and compute the action
+            # (forward step) and then use the reward to improve (backward step).
+            action = self.forward(observation)
+            reward = 0.
             done = False
-            while not done:
-                callbacks.on_step_begin(step_idx)
+            for _ in xrange(action_repetition):
+                observation, r, done, _ = env.step(action)
+                reward += r
+                if done:
+                    break
+            metrics = self.backward(reward, terminal=done)
+            episode_reward += reward
                 
-                # This is were all of the work happens. We first perceive and compute the action
-                # (forward step) and then use the reward to improve (backward step).
-                action = self.forward(observation)
-                reward = 0.
-                for _ in xrange(action_repetition):
-                    observation, r, d, _ = env.step(action)
-                    reward += r
-                    if d:
-                        done = True
-                        break
-                metrics = self.backward(reward, terminal=done)
-                total_reward += reward
-                
-                step_logs = {
-                    'action': action,
-                    'observation': observation,
-                    'reward': reward,
-                    'metrics': metrics,
-                    'episode': episode_idx,
-                }
-                callbacks.on_step_end(step_idx, step_logs)
-                step_idx += 1
-            episode_logs = {
-                'total_reward': total_reward,
-                'nb_steps': step_idx,
+            step_logs = {
+                'action': action,
+                'observation': observation,
+                'reward': reward,
+                'metrics': metrics,
+                'episode': episode,
             }
-            callbacks.on_episode_end(episode_idx, episode_logs)
+            callbacks.on_step_end(episode_step, step_logs)
+            episode_step += 1
+            step += 1
+
+            if done:
+                # This episode is finished, report and reset.
+                episode_logs = {
+                    'episode_reward': episode_reward,
+                    'nb_steps': step,
+                }
+                callbacks.on_episode_end(episode, episode_logs)
+
+                episode += 1
+                observation = None
+                episode_step = None
+                episode_reward = None
         callbacks.on_train_end()
 
     def test(self, env, nb_episodes=1, action_repetition=1, callbacks=[], visualize=True):
@@ -99,10 +120,10 @@ class Agent(object):
             'env': env,
         })
 
-        for episode_idx in xrange(nb_episodes):
-            callbacks.on_episode_begin(episode_idx)
-            total_reward = 0.
-            step_idx = 0
+        for episode in xrange(nb_episodes):
+            callbacks.on_episode_begin(episode)
+            episode_reward = 0.
+            episode_step = 0
 
             # Obtain the initial observation by resetting the environment.
             self.reset_states()
@@ -112,7 +133,7 @@ class Agent(object):
             # Run the episode until we're done.
             done = False
             while not done:
-                callbacks.on_step_begin(step_idx)
+                callbacks.on_step_begin(episode_step)
 
                 action = self.forward(observation)
                 reward = 0.
@@ -123,15 +144,15 @@ class Agent(object):
                         done = True
                         break
                 self.backward(reward, terminal=done)
-                total_reward += reward
+                episode_reward += reward
                 
-                callbacks.on_step_end(step_idx)
-                step_idx += 1
+                callbacks.on_step_end(episode_step)
+                episode_step += 1
             episode_logs = {
-                'total_reward': total_reward,
-                'nb_steps': step_idx,
+                'episode_reward': episode_reward,
+                'nb_steps': episode_step,
             }
-            callbacks.on_episode_end(episode_idx, episode_logs)
+            callbacks.on_episode_end(episode, episode_logs)
 
     def reset_states(self):
         pass

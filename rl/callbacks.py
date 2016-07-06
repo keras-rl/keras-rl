@@ -4,6 +4,7 @@ import timeit
 import numpy as np
 
 from keras.callbacks import Callback as KerasCallback, CallbackList as KerasCallbackList
+from keras.utils.generic_utils import Progbar
 
 
 class Callback(KerasCallback):
@@ -63,7 +64,7 @@ class TestLogger(Callback):
 		template = 'Episode {0}: reward: {1:.3f}, steps: {2}'
 		variables = [
 			episode + 1,
-			logs['total_reward'],
+			logs['episode_reward'],
 			logs['nb_steps'],
 		]
 		print(template.format(*variables))
@@ -83,11 +84,19 @@ class TrainEpisodeLogger(Callback):
 	def on_train_begin(self, logs):
 		self.train_start = timeit.default_timer()
 		self.metrics_names = self.model.metrics_names
-		print('Training for {} episodes ...'.format(self.params['nb_episodes']))
+		if self.params['nb_episodes'] is None and self.params['nb_steps'] is None:
+			print('Training indefinitely since `nb_steps` and `nb_episodes` are both `None` ...')
+		elif self.params['nb_episodes'] is None and self.params['nb_steps'] is not None:
+			print('Training for {} steps ...'.format(self.params['nb_steps']))
+		elif self.params['nb_episodes'] is not None and self.params['nb_steps'] is None:
+			print('Training for {} episodes ...'.format(self.params['nb_episodes']))
+		else:
+			print('Training for {} episodes or {} steps, whichever comes first ...'.format(self.params['nb_episodes'], self.params['nb_steps']))
+		
 
 	def on_train_end(self, logs):
 		duration = timeit.default_timer() - self.train_start
-		print('done, took {0:.3f} seconds'.format(duration))
+		print('done, took {:.3f} seconds'.format(duration))
 
 	def on_episode_begin(self, episode, logs):
 		self.episode_start[episode] = timeit.default_timer()
@@ -115,17 +124,16 @@ class TrainEpisodeLogger(Callback):
 				except Warning:
 					value = '--'
 					metrics_template += '{}: {}'
-				metrics_variables += [name, value]
-					
+				metrics_variables += [name, value]			
 		metrics_text = metrics_template.format(*metrics_variables)
 		
-		template = 'Episode {episode}: {duration:.3f}s, steps: {steps}, steps per second: {sps:.0f}, total reward: {total_reward:.3f}, reward: {reward:.3f} [{reward_min:.3f}, {reward_max:.3f}], action: {action:.3f} [{action_min:.3f}, {action_max:.3f}], observations: {obs:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
+		template = 'Episode {episode}: {duration:.3f}s, steps: {steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, reward: {reward:.3f} [{reward_min:.3f}, {reward_max:.3f}], action: {action:.3f} [{action_min:.3f}, {action_max:.3f}], observations: {obs:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
 		variables = {
 			'episode': episode + 1,
 			'duration': duration,
 			'steps': steps,
 			'sps': float(steps) / duration,
-			'total_reward': np.sum(self.rewards[episode]),
+			'episode_reward': np.sum(self.rewards[episode]),
 			'reward': np.mean(self.rewards[episode]),
 			'reward_min': np.min(self.rewards[episode]),
 			'reward_max': np.max(self.rewards[episode]),
@@ -153,72 +161,61 @@ class TrainEpisodeLogger(Callback):
 		self.actions[episode].append(logs['action'])
 		self.metrics[episode].append(logs['metrics'])
 
-# class TrainIntervalLogger(Callback):
-# 	def __init__(self, interval=10000):
-# 		self.interval = interval
-# 		self.steps = 0
-# 		self.reset()
+class TrainIntervalLogger(Callback):
+	def __init__(self, interval=10000):
+		self.interval = interval
+		self.steps = 0
+		self.reset()
 
-# 	def reset(self):
-# 		self.interval_start = timeit.default_timer()
-# 		self.observations = []
-# 		self.rewards = []
-# 		self.actions = []
-# 		self.metrics = []
-# 		self.average_qs = []
+	def reset(self):
+		self.interval_start = timeit.default_timer()
+		self.progbar = Progbar(target=self.interval)
+		self.metrics = []
 
-# 	def on_train_begin(self, logs):
-# 		self.train_start = timeit.default_timer()
-# 		print('Training for {} episodes ...'.format(self.params['nb_episode']))
+	def on_train_begin(self, logs):
+		self.train_start = timeit.default_timer()
+		self.metrics_names = self.model.metrics_names
+		if self.params['nb_episodes'] is None and self.params['nb_steps'] is None:
+			print('Training indefinitely since `nb_steps` and `nb_episodes` are both `None` ...')
+		elif self.params['nb_episodes'] is None and self.params['nb_steps'] is not None:
+			print('Training for {} steps ...'.format(self.params['nb_steps']))
+		elif self.params['nb_episodes'] is not None and self.params['nb_steps'] is None:
+			print('Training for {} episodes ...'.format(self.params['nb_episodes']))
+		else:
+			print('Training for {} episodes or {} steps, whichever comes first ...'.format(self.params['nb_episodes'], self.params['nb_steps']))
 
-# 	def on_train_end(self, logs):
-# 		duration = timeit.default_timer() - self.train_start
-# 		print('done, took {0:.3f} seconds'.format(duration))
+	def on_train_end(self, logs):
+		duration = timeit.default_timer() - self.train_start
+		print('done, took {:.3f} seconds'.format(duration))
 
-# 	def print_report(self):
-# 		if len(self.average_qs) == 0:
-# 			self.average_qs.append(0.)
-# 		if len(self.metrics) == 0:
-# 			self.metrics.append(0.)
-# 		duration = timeit.default_timer() - self.interval_start
-# 		interval_steps = len(self.observations)
-# 		template = '{0}: {1:.3f}s, interval steps: {2}, steps per second: {3:.0f}, reward: {4:.3f} [{5:.3f}, {6:.3f}], loss: {7:.3f}, avg q: {14:.3f} action: {8:.3f} [{9:.3f}, {10:.3f}], observations: {11:.3f} [{12:.3f}, {13:.3f}]'
-# 		variables = [
-# 			self.steps,
-# 			duration,
-# 			interval_steps,
-# 			float(interval_steps) / duration,
-# 			np.sum(self.rewards),
-# 			np.min(self.rewards),
-# 			np.max(self.rewards),
-# 			np.sum(self.metrics),
-# 			np.mean(self.actions),
-# 			np.min(self.actions),
-# 			np.max(self.actions),
-# 			np.mean(self.observations),
-# 			np.min(self.observations),
-# 			np.max(self.observations),
-# 			np.mean(self.average_qs),
-# 		]
-# 		print(template.format(*variables))
+	def on_step_begin(self, step, logs):
+		if self.steps % self.interval == 0:
+			print np.nanmean(self.metrics, axis=0)
+			self.reset()
+			print('Interval {} ({} steps performed)'.format(self.steps / self.interval + 1, self.steps))
 
-# 	def on_step_end(self, step, logs):
-# 		if self.steps % self.interval == 0:
-# 			if self.steps > 0:
-# 				self.print_report()
-# 			self.reset()
+	def on_step_end(self, step, logs):
+		# TODO: work around nan's in metrics. This isn't really great yet and probably not 100% accurate
+		filtered_metrics = []
+		means = None
+		for idx, value in enumerate(logs['metrics']):
+			if not np.isnan(value):
+				filtered_metrics.append(value)
+			else:
+				mean = np.nan
+				if len(self.metrics) > 0:
+					if means is None:
+						means = np.nanmean(self.metrics, axis=0)
+						assert means.shape == (len(self.metrics_names),)
+					mean = means[idx]
+				filtered_metrics.append(mean)
 
-# 		# Book-keeping.
-# 		self.steps += 1
-# 		self.observations.append(np.concatenate(logs['observation']))
-# 		self.rewards.append(logs['reward'])
-# 		self.actions.append(logs['action'])
-# 		stats = logs['stats']
-# 		if not isinstance(stats, (list, tuple)):
-# 			stats = [stats]
-# 		self.metrics.append(stats[0])
-# 		if len(stats) >= 2:
-# 			self.average_qs.append(stats[1])
+		values = [('reward', logs['reward'])]
+		if not np.isnan(filtered_metrics).any():
+			values += list(zip(self.metrics_names, filtered_metrics))
+		self.progbar.update((self.steps % self.interval) + 1, values=values)
+		self.steps += 1
+		self.metrics.append(logs['metrics'])
 
 
 class Visualizer(Callback):

@@ -5,7 +5,7 @@ import numpy as np
 import gym
 
 from keras.models import Sequential
-from keras.layers import Dense, Activation, Flatten, Convolution2D, BatchNormalization
+from keras.layers import Dense, Activation, Flatten, Convolution2D
 from keras.optimizers import RMSprop
 from keras.callbacks import ModelCheckpoint
 
@@ -51,7 +51,6 @@ model.add(Activation('relu'))
 model.add(Flatten())
 model.add(Dense(512))
 model.add(Activation('relu'))
-model.add(BatchNormalization())
 model.add(Dense(nb_actions))
 model.add(Activation('linear'))
 print(model.summary())

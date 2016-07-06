@@ -147,7 +147,7 @@ class DQNAgent(Agent):
 		# State.
 		self.compiled = False
 		self.step = 0
-		self.reset()
+		self.reset_states()
 
 	def compile(self, optimizer, metrics=[]):
 		self.compiled = True
@@ -163,7 +163,7 @@ class DQNAgent(Agent):
 	def save_weights(self, filepath, overwrite=False):
 		self.model.save_weights(filepath, overwrite=overwrite)
 
-	def reset(self):
+	def reset_states(self):
 		self.recent_action = None
 		self.recent_observations = deque(maxlen=self.window_length)
 

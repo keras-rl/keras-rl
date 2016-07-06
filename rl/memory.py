@@ -54,6 +54,7 @@ class Memory(object):
 		# Create experiences
 		experiences = []
 		for idx in batch_idxs:
+			# TODO: this handles terminal states incorrectly
 			state0 = [self.observations[i] for i in xrange(idx - window_length, idx)]
 			action = self.actions[idx - 1]
 			reward = self.rewards[idx - 1]

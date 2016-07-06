@@ -43,7 +43,7 @@ class Agent(object):
                 episode_reward = 0.
 
                 # Obtain the initial observation by resetting the environment.
-                self.reset()
+                self.reset_states()
                 observation = env.reset()
                 assert observation is not None
 

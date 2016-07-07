@@ -12,6 +12,7 @@ from keras.callbacks import ModelCheckpoint
 from rl.agents import DQNAgent
 from rl.memory import Memory
 from rl.core import Processor
+from rl.callbacks import FileLogger
 
 
 INPUT_SHAPE = (84, 84)
@@ -65,8 +66,9 @@ dqn.compile(RMSprop(lr=.00025, clipvalue=10.), metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
-weights_filename = 'weights_dqn_{}.h5f'.format(ENV_NAME)
-callbacks = [ModelCheckpoint(weights_filename)]
+weights_filename = 'dqn_{}_weights.h5f'.format(ENV_NAME)
+log_filename = 'dqn_{}_log.json'.format(ENV_NAME)
+callbacks = [ModelCheckpoint(weights_filename), FileLogger(log_filename)]
 try:
 	dqn.fit(env, callbacks=callbacks, nb_steps=10000000, action_repetition=4,
 		nb_max_random_start_steps=30, log_interval=10000)

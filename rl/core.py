@@ -92,6 +92,7 @@ class Agent(object):
                 # This episode is finished, report and reset.
                 episode_logs = {
                     'episode_reward': episode_reward,
+                    'nb_episode_steps': episode_step,
                     'nb_steps': step,
                 }
                 callbacks.on_episode_end(episode, episode_logs)

@@ -152,7 +152,8 @@ class DQNAgent(Agent):
 	def compile(self, optimizer, metrics=[]):
 		self.compiled = True
 		self.model.compile(optimizer=optimizer, loss='mse', metrics=metrics)
-		self.target_model.compile(optimizer=optimizer, loss='mse', metrics=metrics)
+		# We never train the target model, hence we can set the optimizer and loss arbitrarily.
+		self.target_model.compile(optimizer='sgd', loss='mse')
 
 	# TODO: implement support for pickle
 

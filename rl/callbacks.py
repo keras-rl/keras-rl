@@ -1,6 +1,7 @@
 import warnings
-
 import timeit
+import json
+
 import numpy as np
 
 from keras.callbacks import Callback as KerasCallback, CallbackList as KerasCallbackList
@@ -215,6 +216,70 @@ class TrainIntervalLogger(Callback):
 		self.progbar.update((self.steps % self.interval) + 1, values=values)
 		self.steps += 1
 		self.metrics.append(logs['metrics'])
+
+
+class FileLogger(Callback):
+	def __init__(self, filename):
+		self.filename = filename
+		# Some algorithms compute multiple episodes at once since they are multi-threaded.
+		# We therefore use a dict that maps from episode to metrics array.
+		self.metrics = {}
+		self.starts = {}
+		self.data = {}
+
+	def on_train_begin(self, logs):
+		self.metrics_names = self.model.metrics_names
+		self.file = open(self.filename, 'w')
+
+	def on_train_end(self, logs):
+		self.save_data()
+		self.file.close()
+
+	def on_episode_begin(self, episode, logs):
+		assert episode not in self.metrics
+		assert episode not in self.starts
+		self.metrics[episode] = []
+		self.starts[episode] = timeit.default_timer()
+
+	def on_episode_end(self, episode, logs):
+		duration = timeit.default_timer() - self.starts[episode]
+		
+		metrics = self.metrics[episode]
+		if np.isnan(metrics).all():
+			mean_metrics = np.array([np.nan for _ in self.metrics_names])
+		else:
+			mean_metrics = np.nanmean(metrics, axis=0)
+		assert len(mean_metrics) == len(self.metrics_names)
+
+		data = list(zip(self.metrics_names, mean_metrics))
+		data += list(logs.iteritems())
+		data += [('episode', episode), ('duration', duration)]
+		for key, value in data:
+			if key not in self.data:
+				self.data[key] = []
+			self.data[key].append(value)
+		self.save_data()
+
+		# Clean up.
+		del self.metrics[episode]
+		del self.starts[episode]
+
+	def on_step_end(self, step, logs):
+		self.metrics[logs['episode']].append(logs['metrics'])
+
+	def save_data(self):
+		# Sort everything by episode.
+		assert 'episode' in self.data
+		sorted_indexes = np.argsort(self.data['episode'])
+		sorted_data = {}
+		for key, values in self.data.iteritems():
+			assert len(self.data[key]) == len(sorted_indexes)
+			sorted_data[key] = [self.data[key][idx] for idx in sorted_indexes]
+
+		# Overwrite already open file. We can simply seek to the beginning since the file will
+		# grow strictly monotonously.
+		self.file.seek(0)
+		json.dump(sorted_data, self.file)
 
 
 class Visualizer(Callback):

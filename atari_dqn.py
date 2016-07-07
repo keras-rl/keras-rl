@@ -68,13 +68,10 @@ dqn.compile(Nadam(lr=.00025, clipvalue=10.), metrics=['mae'])
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
 weights_filename = 'dqn_{}_weights.h5f'.format(ENV_NAME)
 log_filename = 'dqn_{}_log.json'.format(ENV_NAME)
-callbacks = [ModelCheckpoint(weights_filename), FileLogger(log_filename)]
-try:
-	dqn.fit(env, callbacks=callbacks, nb_steps=10000000, action_repetition=4,
+callbacks = [ModelCheckpoint(weights_filename)]
+callbacks += [FileLogger(log_filename, save_continiously=True)]
+dqn.fit(env, callbacks=callbacks, nb_steps=10000000, action_repetition=4,
 		nb_max_random_start_steps=30, log_interval=10000)
-except KeyboardInterrupt:
-	# Ignore this, and continue with the rest.
-	pass
 
 # After training is done, we save the final weights one more time.
 dqn.save_weights(weights_filename, overwrite=True)

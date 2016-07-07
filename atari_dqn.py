@@ -6,7 +6,7 @@ import gym
 
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Convolution2D
-from keras.optimizers import RMSprop
+from keras.optimizers import Nadam
 from keras.callbacks import ModelCheckpoint
 
 from rl.agents import DQNAgent
@@ -62,7 +62,7 @@ memory = Memory(limit=1000000)
 processor = AtariProcessor()
 dqn = DQNAgent(model=model, nb_actions=nb_actions, window_length=WINDOW_LENGTH, memory=memory,
 	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=1, delta_range=(-1., 1.))
-dqn.compile(RMSprop(lr=.00025, clipvalue=10.), metrics=['mae'])
+dqn.compile(Nadam(lr=.00025, clipvalue=10.), metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!

@@ -1,6 +1,7 @@
 import warnings
 import timeit
 import json
+from tempfile import mkdtemp
 
 import numpy as np
 
@@ -219,8 +220,10 @@ class TrainIntervalLogger(Callback):
 
 
 class FileLogger(Callback):
-	def __init__(self, filename):
+	def __init__(self, filename, save_continiously=False):
 		self.filename = filename
+		self.save_continiously = save_continiously
+
 		# Some algorithms compute multiple episodes at once since they are multi-threaded.
 		# We therefore use a dict that maps from episode to metrics array.
 		self.metrics = {}
@@ -258,7 +261,9 @@ class FileLogger(Callback):
 			if key not in self.data:
 				self.data[key] = []
 			self.data[key].append(value)
-		self.save_data()
+
+		if self.save_continiously:
+			self.save_data()
 
 		# Clean up.
 		del self.metrics[episode]
@@ -268,6 +273,9 @@ class FileLogger(Callback):
 		self.metrics[logs['episode']].append(logs['metrics'])
 
 	def save_data(self):
+		if len(self.data.keys()) == 0:
+			return
+
 		# Sort everything by episode.
 		assert 'episode' in self.data
 		sorted_indexes = np.argsort(self.data['episode'])
@@ -285,3 +293,18 @@ class FileLogger(Callback):
 class Visualizer(Callback):
 	def on_step_end(self, step, logs):
 		self.params['env'].render(mode='human')
+
+class OpenAIGymLogger(Callback):
+	def __init__(self, api_key, path=None):
+		self.api_key = api_key
+		if path is None:
+			path = mkdtemp()
+		self.path = path
+
+	def on_train_begin(self, logs):
+		self.params['env'].monitor.start(self.path)
+
+	def on_train_end(self, logs):
+		import gym
+		self.params['env'].monitor.close()
+		gym.upload(self.path, api_key=self.api_key)

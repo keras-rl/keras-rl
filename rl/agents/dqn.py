@@ -2,7 +2,9 @@ from collections import deque
 from copy import deepcopy
 
 import numpy as np
+
 from keras.models import model_from_config, Sequential, Graph
+import keras.backend as K
 
 from rl.core import Agent
 
@@ -48,40 +50,48 @@ def train_on_batch(model, input_batch, target_batch, output_name='output'):
 	return metrics
 
 
+def mean_q(y_true, y_pred):
+	return K.mean(K.max(y_pred, axis=-1))
+
+
 class QPolicy(object):
-	def select_action(self, q_values, step=1, training=True):
+	def select_action(self, q_values):
 		raise NotImplementedError()
+
+	def _set_agent(self, agent):
+		self.agent = agent
 
 	@property
 	def metrics_names(self):
 		return []
 
-	def get_metrics(self, step=1, training=True):
+	def run_metrics(self):
 		return []
 
 
-class AnnealedQPolicy(QPolicy):
-	def __init__(self, eps_max=1., eps_min=.1, eps_test=.05, nb_annealing_steps=500000):
-		super(AnnealedQPolicy, self).__init__()
+class AnnealedEpsGreedyQPolicy(QPolicy):
+	def __init__(self, eps_max=1., eps_min=.1, eps_test=.05, nb_steps_annealing=500000):
+		super(AnnealedEpsGreedyQPolicy, self).__init__()
 		self.eps_max = eps_max
 		self.eps_min = eps_min
 		self.eps_test = eps_test
-		self.nb_annealing_steps = nb_annealing_steps
+		self.nb_steps_annealing = nb_steps_annealing
 
-	def compute_eps(self, step, training):
-		if training:
-			m = -float(self.eps_max - self.eps_min) / float(self.nb_annealing_steps)
-			c = float(self.eps_max)
-			eps = max(self.eps_min, m * float(step) + c)
+	def compute_eps(self):
+		if self.agent.training:
+			# Linear annealed: f(x) = ax + b.
+			a = -float(self.eps_max - self.eps_min) / float(self.nb_steps_annealing)
+			b = float(self.eps_max)
+			eps = max(self.eps_min, a * float(self.agent.step) + b)
 		else:
 			eps = self.eps_test
 		return eps
 
-	def select_action(self, q_values, step=1, training=True):
+	def select_action(self, q_values):
 		assert q_values.ndim == 1
 		nb_actions = q_values.shape[0]
 
-		eps = self.compute_eps(step, training)
+		eps = self.compute_eps()
 		if np.random.uniform() < eps:
 			action = np.random.random_integers(0, nb_actions-1)
 		else:
@@ -92,34 +102,60 @@ class AnnealedQPolicy(QPolicy):
 	def metrics_names(self):
 		return ['mean_eps']
 
-	def get_metrics(self, step=1, training=True):
-		return [self.compute_eps(step, training)]
+	def run_metrics(self):
+		return [self.compute_eps()]
 
 
-class BoltzmannQPolicy(QPolicy):
-	def __init__(self, temperature=1.):
-		super(BoltzmannQPolicy, self).__init__()
-		self.temperature = temperature
+class AnnealedBoltzmannQPolicy(QPolicy):
+	def __init__(self, temperature_max=10., temperature_min=1e-1, temperature_test=1e-1, nb_steps_annealing=500000):
+		super(AnnealedBoltzmannQPolicy, self).__init__()
+		self.temperature_max = temperature_max
+		self.temperature_min = temperature_min
+		self.temperature_test = temperature_test
+		self.nb_steps_annealing = nb_steps_annealing
 
-	def select_action(self, q_values, step=1, training=True):
+	def compute_temperature(self):
+		if self.agent.training:
+			# Linear annealed: f(x) = ax + b.
+			a = -float(self.temperature_max - self.temperature_min) / float(self.nb_steps_annealing)
+			b = float(self.temperature_max)
+			temperature = max(self.temperature_min, a * float(self.agent.step) + b)
+		else:
+			temperature = self.temperature_test
+		return temperature
+
+	def select_action(self, q_values):
 		assert q_values.ndim == 1
 		nb_actions = q_values.shape[0]
 
-		exp_values = np.exp(q_values / self.temperature)
+		temperature = self.compute_temperature()
+		exp_values = np.exp(q_values / temperature)
 		probs = exp_values / np.sum(exp_values)
 		action = np.random.choice(range(nb_actions), p=probs)
 		return action
 
+	@property
+	def metrics_names(self):
+		return ['mean_temperature']
+
+	def run_metrics(self):
+		return [self.compute_temperature()]
 
 # An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(Agent):
-	def __init__(self, model, nb_actions, memory, window_length, policy=AnnealedQPolicy(),
+	def __init__(self, model, nb_actions, memory, window_length, policy=AnnealedEpsGreedyQPolicy(),
 				 gamma=.9, batch_size=32, nb_steps_warmup=1000, train_interval=4, memory_interval=1,
 				 target_model_update_interval=10000, reward_range=(-np.inf, np.inf),
 				 delta_range=(-np.inf, np.inf), enable_double_dqn=True,
 				 custom_model_objects={}, processor=None):
+		# Validate (important) input.
+		if hasattr(model.output, '__len__') and len(model.output) > 1:
+			raise ValueError('Model "{}" has more than one output. DQN expects a model that has a single output.'.format(model))
+		if model.output._keras_shape != (None, nb_actions):
+			raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, nb_actions))
+		
 		super(DQNAgent, self).__init__()
 
 		self.model = model
@@ -142,6 +178,7 @@ class DQNAgent(Agent):
 		# Related objects.
 		self.memory = memory
 		self.policy = policy
+		self.policy._set_agent(self)
 		self.processor = processor
 
 		# State.
@@ -150,6 +187,7 @@ class DQNAgent(Agent):
 		self.reset_states()
 
 	def compile(self, optimizer, metrics=[]):
+		metrics += [mean_q]  # register default metrics
 		self.compiled = True
 		self.model.compile(optimizer=optimizer, loss='mse', metrics=metrics)
 		# We never train the target model, hence we can set the optimizer and loss arbitrarily.
@@ -196,7 +234,7 @@ class DQNAgent(Agent):
 		state = np.array(list(self.recent_observations)[1:] + [observation])
 		assert len(state) == self.window_length
 		q_values = self.compute_q_values(state)
-		action = self.policy.select_action(q_values, step=self.step, training=self.training)
+		action = self.policy.select_action(q_values)
 
 		# Book-keeping.
 		self.recent_observations.append(observation)
@@ -274,7 +312,6 @@ class DQNAgent(Agent):
 			# since we do this in the training step anyway, but this is currently the simplest
 			# way to set the gradients of the non-affected output units to zero.
 			ys = predict_on_batch(self.model, state0_batch)
-			mean_q = np.mean(np.max(ys, axis=-1))
 			assert ys.shape == (self.batch_size, self.nb_actions)
 
 			# Compute r_t + gamma * max_a Q(s_t+1, a) and update the target ys accordingly,
@@ -295,8 +332,7 @@ class DQNAgent(Agent):
 
 			# Finally, perform a single update on the entire batch.
 			metrics = train_on_batch(self.model, state0_batch, ys)
-			metrics.append(mean_q)
-			metrics.extend(self.policy.get_metrics(step=self.step, training=self.training))
+			metrics += self.policy.run_metrics()
 
 		if self.step % self.target_model_update_interval == 0:
 			self.update_target_model()
@@ -305,4 +341,4 @@ class DQNAgent(Agent):
 
 	@property
 	def metrics_names(self):
-		return self.model.metrics_names[:] + ['mean_q'] + self.policy.metrics_names[:]
+		return self.model.metrics_names[:] + self.policy.metrics_names[:]

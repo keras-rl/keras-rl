@@ -146,7 +146,7 @@ class AnnealedBoltzmannQPolicy(QPolicy):
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(Agent):
 	def __init__(self, model, nb_actions, memory, window_length, policy=AnnealedEpsGreedyQPolicy(),
-				 gamma=.9, batch_size=32, nb_steps_warmup=1000, train_interval=4, memory_interval=1,
+				 gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
 				 target_model_update_interval=10000, reward_range=(-np.inf, np.inf),
 				 delta_range=(-np.inf, np.inf), enable_double_dqn=True,
 				 custom_model_objects={}, processor=None):

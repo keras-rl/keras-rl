@@ -4,7 +4,8 @@ import gym
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten
 
-from rl.agents.dqn import DQNAgent, EpsGreedyQPolicy
+from rl.agents.dqn import DQNAgent
+from rl.policy import BoltzmannQPolicy
 from rl.memory import SequentialMemory
 
 
@@ -30,9 +31,10 @@ print(model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!
-memory = SequentialMemory(limit=10000)
+memory = SequentialMemory(limit=50000)
+policy = BoltzmannQPolicy()
 dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10,
-	target_model_update_interval=100)
+	target_model_update_interval=100, policy=policy)
 dqn.compile('nadam', metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
@@ -43,5 +45,5 @@ dqn.fit(env, nb_steps=10000, action_repetition=1, log_interval=1000, visualize=T
 dqn.save_weights('dqn_{}_weights.h5f'.format(ENV_NAME), overwrite=True)
 
 # Finally, evaluate our algorithm for 5 episodes.
-dqn.policy.eps = 0.
+dqn.policy.tau = 1e-2
 dqn.test(env, nb_episodes=5, action_repetition=1, visualize=True)

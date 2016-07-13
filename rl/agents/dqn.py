@@ -7,6 +7,7 @@ from keras.models import model_from_config, Sequential, Graph
 import keras.backend as K
 
 from rl.core import Agent
+from rl.policy import EpsGreedyQPolicy
 
 
 # TODO: move into util
@@ -54,98 +55,13 @@ def mean_q(y_true, y_pred):
 	return K.mean(K.max(y_pred, axis=-1))
 
 
-class QPolicy(object):
-	def select_action(self, q_values):
-		raise NotImplementedError()
 
-	def _set_agent(self, agent):
-		self.agent = agent
-
-	@property
-	def metrics_names(self):
-		return []
-
-	def run_metrics(self):
-		return []
-
-
-class AnnealedEpsGreedyQPolicy(QPolicy):
-	def __init__(self, eps_max=1., eps_min=.1, eps_test=.05, nb_steps_annealing=500000):
-		super(AnnealedEpsGreedyQPolicy, self).__init__()
-		self.eps_max = eps_max
-		self.eps_min = eps_min
-		self.eps_test = eps_test
-		self.nb_steps_annealing = nb_steps_annealing
-
-	def compute_eps(self):
-		if self.agent.training:
-			# Linear annealed: f(x) = ax + b.
-			a = -float(self.eps_max - self.eps_min) / float(self.nb_steps_annealing)
-			b = float(self.eps_max)
-			eps = max(self.eps_min, a * float(self.agent.step) + b)
-		else:
-			eps = self.eps_test
-		return eps
-
-	def select_action(self, q_values):
-		assert q_values.ndim == 1
-		nb_actions = q_values.shape[0]
-
-		eps = self.compute_eps()
-		if np.random.uniform() < eps:
-			action = np.random.random_integers(0, nb_actions-1)
-		else:
-			action = np.argmax(q_values)
-		return action
-
-	@property
-	def metrics_names(self):
-		return ['mean_eps']
-
-	def run_metrics(self):
-		return [self.compute_eps()]
-
-
-class AnnealedBoltzmannQPolicy(QPolicy):
-	def __init__(self, temperature_max=10., temperature_min=1e-1, temperature_test=1e-1, nb_steps_annealing=500000):
-		super(AnnealedBoltzmannQPolicy, self).__init__()
-		self.temperature_max = temperature_max
-		self.temperature_min = temperature_min
-		self.temperature_test = temperature_test
-		self.nb_steps_annealing = nb_steps_annealing
-
-	def compute_temperature(self):
-		if self.agent.training:
-			# Linear annealed: f(x) = ax + b.
-			a = -float(self.temperature_max - self.temperature_min) / float(self.nb_steps_annealing)
-			b = float(self.temperature_max)
-			temperature = max(self.temperature_min, a * float(self.agent.step) + b)
-		else:
-			temperature = self.temperature_test
-		return temperature
-
-	def select_action(self, q_values):
-		assert q_values.ndim == 1
-		nb_actions = q_values.shape[0]
-
-		temperature = self.compute_temperature()
-		exp_values = np.exp(q_values / temperature)
-		probs = exp_values / np.sum(exp_values)
-		action = np.random.choice(range(nb_actions), p=probs)
-		return action
-
-	@property
-	def metrics_names(self):
-		return ['mean_temperature']
-
-	def run_metrics(self):
-		return [self.compute_temperature()]
 
 # An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(Agent):
-	def __init__(self, model, nb_actions, memory, window_length, policy=AnnealedEpsGreedyQPolicy(),
+	def __init__(self, model, nb_actions, memory, window_length=1, policy=EpsGreedyQPolicy(),
 				 gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
 				 target_model_update_interval=10000, reward_range=(-np.inf, np.inf),
 				 delta_range=(-np.inf, np.inf), enable_double_dqn=True,
@@ -183,7 +99,6 @@ class DQNAgent(Agent):
 
 		# State.
 		self.compiled = False
-		self.step = 0
 		self.reset_states()
 
 	def compile(self, optimizer, metrics=[]):
@@ -234,7 +149,7 @@ class DQNAgent(Agent):
 		state = np.array(list(self.recent_observations)[1:] + [observation])
 		assert len(state) == self.window_length
 		q_values = self.compute_q_values(state)
-		action = self.policy.select_action(q_values)
+		action = self.policy.select_action(q_values=q_values)
 
 		# Book-keeping.
 		self.recent_observations.append(observation)
@@ -243,7 +158,6 @@ class DQNAgent(Agent):
 		return action
 
 	def backward(self, reward, terminal):
-		self.step += 1
 		metrics = [np.nan for _ in self.metrics_names]
 		if not self.training:
 			# We're done here. No need to update the experience memory since we only use the working

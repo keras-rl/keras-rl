@@ -32,13 +32,13 @@ class Agent(object):
         callbacks.on_train_begin()
 
         episode = 0
-        step = 0
+        self.step = 0
         observation = None
         episode_reward = None
         episode_step = None
         did_abort = False
         try:
-            while (nb_episodes is None or episode < nb_episodes) and (nb_steps is None or step < nb_steps):
+            while (nb_episodes is None or episode < nb_episodes) and (nb_steps is None or self.step < nb_steps):
                 if observation is None:  # start of a new episode
                     callbacks.on_episode_begin(episode)
                     episode_step = 0
@@ -88,14 +88,14 @@ class Agent(object):
                 }
                 callbacks.on_step_end(episode_step, step_logs)
                 episode_step += 1
-                step += 1
+                self.step += 1
 
                 if done:
                     # This episode is finished, report and reset.
                     episode_logs = {
                         'episode_reward': episode_reward,
                         'nb_episode_steps': episode_step,
-                        'nb_steps': step,
+                        'nb_steps': self.step,
                     }
                     callbacks.on_episode_end(episode, episode_logs)
 

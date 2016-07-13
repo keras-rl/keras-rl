@@ -37,10 +37,11 @@ dqn.compile('nadam', metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
-dqn.fit(env, nb_steps=10000, action_repetition=1, log_interval=1000, visualize=True)
+dqn.fit(env, nb_steps=10000, action_repetition=1, log_interval=1000, visualize=True, verbose=2)
 
 # After training is done, we save the final weights one more time.
 dqn.save_weights('dqn_{}_weights.h5f'.format(ENV_NAME), overwrite=True)
 
 # Finally, evaluate our algorithm for 5 episodes.
-dqn.test(env, nb_episodes=5, action_repetition=1, visualize=False)
+dqn.policy.eps = 0.
+dqn.test(env, nb_episodes=5, action_repetition=1, visualize=True)

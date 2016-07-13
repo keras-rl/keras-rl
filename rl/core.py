@@ -6,8 +6,8 @@ from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Vi
 
 
 class Agent(object):
-    def fit(self, env, nb_episodes=None, nb_steps=None, action_repetition=1, callbacks=[], verbose=1,
-        visualize=False, validation_size=1000, nb_max_random_start_steps=0, log_interval=10000):
+    def fit(self, env, nb_steps, action_repetition=1, callbacks=[], verbose=1,
+        visualize=False, nb_max_random_start_steps=0, log_interval=10000):
         if not self.compiled:
             raise RuntimeError('Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
@@ -15,18 +15,16 @@ class Agent(object):
 
         self.training = True
 
-        if verbose > 0:
-            if nb_episodes is not None:
-                callbacks += [TrainEpisodeLogger()]
-            else:
-                callbacks += [TrainIntervalLogger(interval=log_interval)]
+        if verbose == 1:
+            callbacks += [TrainIntervalLogger(interval=log_interval)]
+        elif verbose > 1:
+            callbacks += [TrainEpisodeLogger()]
         if visualize:
             callbacks += [Visualizer()]
         callbacks = CallbackList(callbacks)
         callbacks._set_model(self)
         callbacks._set_env(env)
         callbacks._set_params({
-            'nb_episodes': nb_episodes,
             'nb_steps': nb_steps,
         })
         callbacks.on_train_begin()
@@ -38,7 +36,7 @@ class Agent(object):
         episode_step = None
         did_abort = False
         try:
-            while (nb_episodes is None or episode < nb_episodes) and (nb_steps is None or self.step < nb_steps):
+            while self.step < nb_steps:
                 if observation is None:  # start of a new episode
                     callbacks.on_episode_begin(episode)
                     episode_step = 0

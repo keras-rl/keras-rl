@@ -90,20 +90,13 @@ class TrainEpisodeLogger(Callback):
 		self.rewards = {}
 		self.actions = {}
 		self.metrics = {}
+		self.step = 0
 
 	def on_train_begin(self, logs):
 		self.train_start = timeit.default_timer()
 		self.metrics_names = self.model.metrics_names
-		if self.params['nb_episodes'] is None and self.params['nb_steps'] is None:
-			print('Training indefinitely since `nb_steps` and `nb_episodes` are both `None` ...')
-		elif self.params['nb_episodes'] is None and self.params['nb_steps'] is not None:
-			print('Training for {} steps ...'.format(self.params['nb_steps']))
-		elif self.params['nb_episodes'] is not None and self.params['nb_steps'] is None:
-			print('Training for {} episodes ...'.format(self.params['nb_episodes']))
-		else:
-			print('Training for {} episodes or {} steps, whichever comes first ...'.format(self.params['nb_episodes'], self.params['nb_steps']))
+		print('Training for {} steps ...'.format(self.params['nb_steps']))
 		
-
 	def on_train_end(self, logs):
 		duration = timeit.default_timer() - self.train_start
 		print('done, took {:.3f} seconds'.format(duration))
@@ -117,7 +110,7 @@ class TrainEpisodeLogger(Callback):
 
 	def on_episode_end(self, episode, logs):
 		duration = timeit.default_timer() - self.episode_start[episode]
-		steps = len(self.observations[episode])
+		episode_steps = len(self.observations[episode])
 
 		# Format all metrics.
 		metrics = np.array(self.metrics[episode])
@@ -136,21 +129,25 @@ class TrainEpisodeLogger(Callback):
 					metrics_template += '{}: {}'
 				metrics_variables += [name, value]			
 		metrics_text = metrics_template.format(*metrics_variables)
-		
-		template = 'Episode {episode}: {duration:.3f}s, steps: {steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, reward: {reward:.3f} [{reward_min:.3f}, {reward_max:.3f}], action: {action:.3f} [{action_min:.3f}, {action_max:.3f}], observations: {obs:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
+
+		nb_step_digits = str(int(np.ceil(np.log10(self.params['nb_steps']))) + 1)
+		print nb_step_digits
+		template = '{step: ' + nb_step_digits + 'd}/{nb_steps}: episode: {episode}, duration: {duration:.3f}s, episode steps: {episode_steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, mean reward: {reward_mean:.3f} [{reward_min:.3f}, {reward_max:.3f}], mean action: {action_mean:.3f} [{action_min:.3f}, {action_max:.3f}], mean observation: {obs_mean:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
 		variables = {
+		 	'step': self.step,
+		 	'nb_steps': self.params['nb_steps'],
 			'episode': episode + 1,
 			'duration': duration,
-			'steps': steps,
-			'sps': float(steps) / duration,
+			'episode_steps': episode_steps,
+			'sps': float(episode_steps) / duration,
 			'episode_reward': np.sum(self.rewards[episode]),
-			'reward': np.mean(self.rewards[episode]),
+			'reward_mean': np.mean(self.rewards[episode]),
 			'reward_min': np.min(self.rewards[episode]),
 			'reward_max': np.max(self.rewards[episode]),
-			'action': np.mean(self.actions[episode]),
+			'action_mean': np.mean(self.actions[episode]),
 			'action_min': np.min(self.actions[episode]),
 			'action_max': np.max(self.actions[episode]),
-			'obs': np.mean(self.observations[episode]),
+			'obs_mean': np.mean(self.observations[episode]),
 			'obs_min': np.min(self.observations[episode]),
 			'obs_max': np.max(self.observations[episode]),
 			'metrics': metrics_text,
@@ -166,15 +163,17 @@ class TrainEpisodeLogger(Callback):
 
 	def on_step_end(self, step, logs):
 		episode = logs['episode']
-		self.observations[episode].append(np.concatenate(logs['observation']))
+		self.observations[episode].append(logs['observation'])
 		self.rewards[episode].append(logs['reward'])
 		self.actions[episode].append(logs['action'])
 		self.metrics[episode].append(logs['metrics'])
+		self.step += 1
+
 
 class TrainIntervalLogger(Callback):
 	def __init__(self, interval=10000):
 		self.interval = interval
-		self.steps = 0
+		self.step = 0
 		self.reset()
 
 	def reset(self):
@@ -185,23 +184,16 @@ class TrainIntervalLogger(Callback):
 	def on_train_begin(self, logs):
 		self.train_start = timeit.default_timer()
 		self.metrics_names = self.model.metrics_names
-		if self.params['nb_episodes'] is None and self.params['nb_steps'] is None:
-			print('Training indefinitely since `nb_steps` and `nb_episodes` are both `None` ...')
-		elif self.params['nb_episodes'] is None and self.params['nb_steps'] is not None:
-			print('Training for {} steps ...'.format(self.params['nb_steps']))
-		elif self.params['nb_episodes'] is not None and self.params['nb_steps'] is None:
-			print('Training for {} episodes ...'.format(self.params['nb_episodes']))
-		else:
-			print('Training for {} episodes or {} steps, whichever comes first ...'.format(self.params['nb_episodes'], self.params['nb_steps']))
+		print('Training for {} steps ...'.format(self.params['nb_steps']))
 
 	def on_train_end(self, logs):
 		duration = timeit.default_timer() - self.train_start
 		print('done, took {:.3f} seconds'.format(duration))
 
 	def on_step_begin(self, step, logs):
-		if self.steps % self.interval == 0:
+		if self.step % self.interval == 0:
 			self.reset()
-			print('Interval {} ({} steps performed)'.format(self.steps / self.interval + 1, self.steps))
+			print('Interval {} ({} steps performed)'.format(self.step / self.interval + 1, self.step))
 
 	def on_step_end(self, step, logs):
 		# TODO: work around nan's in metrics. This isn't really great yet and probably not 100% accurate
@@ -222,8 +214,8 @@ class TrainIntervalLogger(Callback):
 		values = [('reward', logs['reward'])]
 		if not np.isnan(filtered_metrics).any():
 			values += list(zip(self.metrics_names, filtered_metrics))
-		self.progbar.update((self.steps % self.interval) + 1, values=values)
-		self.steps += 1
+		self.progbar.update((self.step % self.interval) + 1, values=values)
+		self.step += 1
 		self.metrics.append(logs['metrics'])
 
 

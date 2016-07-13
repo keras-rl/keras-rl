@@ -2,59 +2,15 @@ from collections import deque
 from copy import deepcopy
 
 import numpy as np
-
-from keras.models import model_from_config, Sequential, Graph
 import keras.backend as K
 
 from rl.core import Agent
 from rl.policy import EpsGreedyQPolicy
-
-
-# TODO: move into util
-def clone_model(model, custom_objects={}):
-	config = model.get_config()
-	clone = Sequential.from_config(config, custom_objects)
-	clone.set_weights(model.get_weights())
-	return clone
-
-
-# TODO: do we still need this in Keras 1.x?
-def predict_on_batch(model, input_batch, output_name='output'):
-	output = None
-	if isinstance(model, Graph):
-		output = model.predict_on_batch(input_batch)[output_name]
-	elif isinstance(model, Sequential):
-		output = model.predict_on_batch(input_batch)
-	else:
-		raise RuntimeError('unknown model type')
-	return output
-
-
-# TODO: do we still need this in Keras 1.x?
-def train_on_batch(model, input_batch, target_batch, output_name='output'):
-	metrics = None
-	if isinstance(model, Graph):
-		data = dict(input_batch)  # shallow copy
-		data[output_name] = target_batch
-		metrics = model.train_on_batch(data)
-	elif isinstance(model, Sequential):
-		input_batch = np.array(input_batch)
-		target_batch = np.array(target_batch)
-		assert input_batch.shape[0] == target_batch.shape[0]
-		metrics = model.train_on_batch(input_batch, target_batch)
-	else:
-		raise RuntimeError('unknown model type')
-	assert metrics is not None
-
-	if not isinstance(metrics, list):
-		metrics = [metrics]
-	return metrics
+from rl.util import clone_model
 
 
 def mean_q(y_true, y_pred):
 	return K.mean(K.max(y_pred, axis=-1))
-
-
 
 
 # An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
@@ -132,7 +88,7 @@ class DQNAgent(Agent):
 
 	def compute_q_values(self, state):
 		batch = self.process_state_batch([state])
-		q_values = predict_on_batch(self.model, batch).flatten()
+		q_values = self.model.predict_on_batch(batch).flatten()
 		assert q_values.shape == (self.nb_actions,)
 		return q_values
 
@@ -203,21 +159,21 @@ class DQNAgent(Agent):
 				# According to the paper "Deep Reinforcement Learning with Double Q-learning"
 				# (van Hasselt et al., 2015), in Double DQN, the online network predicts the actions
 				# while the target network is used to estimate the Q value.
-				q_values = predict_on_batch(self.model, state1_batch)
+				q_values = self.model.predict_on_batch(state1_batch)
 				assert q_values.shape == (self.batch_size, self.nb_actions)
 				actions = np.argmax(q_values, axis=1)
 				assert actions.shape == (self.batch_size,)
 
 				# Now, estimate Q values using the target network but select the values with the
 				# highest Q value wrt to the online model (as computed above).
-				target_q_values = predict_on_batch(self.target_model, state1_batch)
+				target_q_values = self.target_model.predict_on_batch(state1_batch)
 				assert target_q_values.shape == (self.batch_size, self.nb_actions)
 				q_batch = target_q_values[xrange(self.batch_size), actions]
 			else:
 				# Compute the q_values given state1, and extract the maximum for each sample in the batch.
 				# We perform this prediction on the target_model instead of the model for reasons
 				# outlined in Mnih (2015). In short: it makes the algorithm more stable.
-				target_q_values = predict_on_batch(self.target_model, state1_batch)
+				target_q_values = self.target_model.predict_on_batch(state1_batch)
 				assert target_q_values.shape == (self.batch_size, self.nb_actions)
 				q_batch = np.max(target_q_values, axis=1).flatten()
 			assert q_batch.shape == (self.batch_size,)
@@ -225,7 +181,7 @@ class DQNAgent(Agent):
 			# Compute the current activations in the output layer given state0. This is hacky
 			# since we do this in the training step anyway, but this is currently the simplest
 			# way to set the gradients of the non-affected output units to zero.
-			ys = predict_on_batch(self.model, state0_batch)
+			ys = self.model.predict_on_batch(state0_batch)
 			assert ys.shape == (self.batch_size, self.nb_actions)
 
 			# Compute r_t + gamma * max_a Q(s_t+1, a) and update the target ys accordingly,
@@ -245,7 +201,7 @@ class DQNAgent(Agent):
 			ys = np.array(ys).astype('float32')
 
 			# Finally, perform a single update on the entire batch.
-			metrics = train_on_batch(self.model, state0_batch, ys)
+			metrics = self.model.train_on_batch(state0_batch, ys)
 			metrics += self.policy.run_metrics()
 
 		if self.step % self.target_model_update_interval == 0:

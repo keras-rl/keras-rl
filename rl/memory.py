@@ -35,7 +35,7 @@ class RingBuffer(object):
 		self.data[(self.start + self.length - 1) % self.maxlen] = v
 
 
-class Memory(object):
+class SequentialMemory(object):
 	def __init__(self, limit):
 		self.limit = limit
 
@@ -55,7 +55,8 @@ class Memory(object):
 		experiences = []
 		for idx in batch_idxs:
 			# This code is slightly complicated by the fact that subsequent observations might be
-			# from different episodes.
+			# from different episodes. We ensure that an experience never spans multiple episodes.
+			# This is probably not that important in practice but it seems cleaner.
 			state0 = [self.observations[idx - 1]]
 			for current_idx in xrange(idx - 2, idx - window_length - 1, -1):
 				if self.terminals[current_idx]:
@@ -81,6 +82,8 @@ class Memory(object):
 		return experiences
 
 	def append(self, observation, action, reward, terminal):
+		# This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
+		# and weather the next state is `terminal` or not.
 		self.observations.append(observation)
 		self.actions.append(action)
 		self.rewards.append(reward)

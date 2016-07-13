@@ -10,6 +10,9 @@ from keras.utils.generic_utils import Progbar
 
 
 class Callback(KerasCallback):
+	def _set_env(self, env):
+		self.env = env
+
 	def on_episode_begin(self, episode, logs={}):
 		pass
 
@@ -24,6 +27,11 @@ class Callback(KerasCallback):
 
 
 class CallbackList(KerasCallbackList):
+	def _set_env(self, env):
+		for callback in self.callbacks:
+			if callable(getattr(callback, '_set_env', None)):
+				callback._set_env(env)
+
 	def on_episode_begin(self, episode, logs={}):
 		for callback in self.callbacks:
 			# Check if callback supports the more appropriate `on_episode_begin` callback.
@@ -292,19 +300,4 @@ class FileLogger(Callback):
 
 class Visualizer(Callback):
 	def on_step_end(self, step, logs):
-		self.params['env'].render(mode='human')
-
-class OpenAIGymLogger(Callback):
-	def __init__(self, api_key, path=None):
-		self.api_key = api_key
-		if path is None:
-			path = mkdtemp()
-		self.path = path
-
-	def on_train_begin(self, logs):
-		self.params['env'].monitor.start(self.path)
-
-	def on_train_end(self, logs):
-		import gym
-		self.params['env'].monitor.close()
-		gym.upload(self.path, api_key=self.api_key)
+		self.env.render(mode='human')

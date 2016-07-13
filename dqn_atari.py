@@ -8,7 +8,7 @@ from keras.optimizers import Nadam
 from keras.callbacks import ModelCheckpoint
 
 from rl.agents.dqn import DQNAgent, AnnealedEpsGreedyQPolicy, AnnealedBoltzmannQPolicy
-from rl.memory import Memory
+from rl.memory import SequentialMemory
 from rl.core import Processor
 from rl.callbacks import FileLogger
 
@@ -56,7 +56,7 @@ print(model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!
-memory = Memory(limit=1000000)
+memory = SequentialMemory(limit=1000000)
 processor = AtariProcessor()
 
 # Select a policy. We use eps-greedy action selection, which means that a random action is selected

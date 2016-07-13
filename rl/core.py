@@ -24,10 +24,10 @@ class Agent(object):
             callbacks += [Visualizer()]
         callbacks = CallbackList(callbacks)
         callbacks._set_model(self)
+        callbacks._set_env(env)
         callbacks._set_params({
             'nb_episodes': nb_episodes,
             'nb_steps': nb_steps,
-            'env': env,
         })
         callbacks.on_train_begin()
 
@@ -123,9 +123,9 @@ class Agent(object):
             callbacks += [Visualizer()]
         callbacks = CallbackList(callbacks)
         callbacks._set_model(self)
+        callbacks._set_env(env)
         callbacks._set_params({
             'nb_episodes': nb_episodes,
-            'env': env,
         })
 
         for episode in xrange(nb_episodes):

@@ -214,7 +214,7 @@ class TrainIntervalLogger(Callback):
 		values = [('reward', logs['reward'])]
 		if not np.isnan(filtered_metrics).any():
 			values += list(zip(self.metrics_names, filtered_metrics))
-		self.progbar.update((self.step % self.interval) + 1, values=values)
+		self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
 		self.step += 1
 		self.metrics.append(logs['metrics'])
 

@@ -7,7 +7,7 @@ from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Vi
 
 class Agent(object):
     def fit(self, env, nb_steps, action_repetition=1, callbacks=[], verbose=1,
-        visualize=False, nb_max_random_start_steps=0, log_interval=10000):
+        visualize=False, nb_max_random_start_steps=0, log_interval=10000, nb_max_episode_steps=None):
         if not self.compiled:
             raise RuntimeError('Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
@@ -88,7 +88,7 @@ class Agent(object):
                 episode_step += 1
                 self.step += 1
 
-                if done:
+                if done or (nb_max_episode_steps and episode_step > nb_max_episode_steps):
                     # This episode is finished, report and reset.
                     episode_logs = {
                         'episode_reward': episode_reward,
@@ -108,7 +108,8 @@ class Agent(object):
             did_abort = True
         callbacks.on_train_end(logs={'did_abort': did_abort})
 
-    def test(self, env, nb_episodes=1, action_repetition=1, callbacks=[], visualize=True):
+    def test(self, env, nb_episodes=1, action_repetition=1, callbacks=[], visualize=True,
+        nb_max_episode_steps=None):
         if not self.compiled:
             raise RuntimeError('Your tried to test your agent but it hasn\'t been compiled yet. Please call `compile()` before `test()`.')
         if action_repetition < 1:
@@ -154,6 +155,8 @@ class Agent(object):
                 
                 callbacks.on_step_end(episode_step)
                 episode_step += 1
+                if nb_max_episode_steps and episode_step > nb_max_episode_steps:
+                    done = True
             episode_logs = {
                 'episode_reward': episode_reward,
                 'nb_steps': episode_step,

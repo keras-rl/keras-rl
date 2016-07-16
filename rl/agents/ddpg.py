@@ -120,7 +120,8 @@ class DDPGAgent(Agent):
 				combined_inputs.append(i)
 				critic_inputs.append(i)
 		combined_output = self.critic(combined_inputs)
-		grads = K.gradients([combined_output], self.actor.trainable_weights)
+		# TODO: implement for Theano (jacobian)
+		grads = K.gradients(combined_output, self.actor.trainable_weights)
 		
 		# We now have the gradients (`grads`) of the combined model wrt to the actor's weights and
 		# the output (`output`). Compute the necessary updates using a clone of the actor's optimizer.

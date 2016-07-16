@@ -30,12 +30,9 @@ class DQNAgent(Agent):
 		
 		super(DQNAgent, self).__init__()
 
-		self.model = model
-		self.target_model = clone_model(self.model, custom_model_objects)
+		# Parameters.
 		self.nb_actions = nb_actions
 		self.window_length = window_length
-
-		# Parameters.
 		self.gamma = gamma
 		self.batch_size = batch_size
 		self.nb_steps_warmup = nb_steps_warmup
@@ -48,6 +45,7 @@ class DQNAgent(Agent):
 		self.custom_model_objects = custom_model_objects
 
 		# Related objects.
+		self.model = model
 		self.memory = memory
 		self.policy = policy
 		self.policy._set_agent(self)
@@ -59,10 +57,13 @@ class DQNAgent(Agent):
 
 	def compile(self, optimizer, metrics=[]):
 		metrics += [mean_q]  # register default metrics
-		self.compiled = True
+		
+		self.target_model = clone_model(self.model, self.custom_model_objects)
 		self.model.compile(optimizer=optimizer, loss='mse', metrics=metrics)
 		# We never train the target model, hence we can set the optimizer and loss arbitrarily.
 		self.target_model.compile(optimizer='sgd', loss='mse')
+
+		self.compiled = True
 
 	# TODO: implement support for pickle
 
@@ -145,7 +146,7 @@ class DQNAgent(Agent):
 				action_batch.append(e.action)
 				terminal_batch.append(0. if e.terminal else 1.)
 
-			# Prepare and validate parameters
+			# Prepare and validate parameters.
 			state0_batch = self.process_state_batch(state0_batch)
 			state1_batch = self.process_state_batch(state1_batch)
 			terminal_batch = np.array(terminal_batch)

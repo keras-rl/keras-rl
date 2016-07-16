@@ -180,7 +180,7 @@ class Agent(object):
 
     @property
     def metrics_names(self):
-        raise NotImplementedError()
+        return []
 
 
 class Processor(object):

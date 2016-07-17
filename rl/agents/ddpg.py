@@ -120,8 +120,15 @@ class DDPGAgent(Agent):
 				combined_inputs.append(i)
 				critic_inputs.append(i)
 		combined_output = self.critic(combined_inputs)
-		# TODO: implement for Theano (jacobian)
-		grads = K.gradients(combined_output, self.actor.trainable_weights)
+		if K._BACKEND == 'tensorflow':
+			grads = K.gradients(combined_output, self.actor.trainable_weights)
+			grads = [g / float(self.batch_size) for g in grads]  # since TF sums over the batch
+		elif K._BACKEND == 'theano':
+			import theano.tensor as T
+			grads = T.jacobian(combined_output.flatten(), self.actor.trainable_weights)
+			grads = [K.mean(g, axis=0) for g in grads]
+		else:
+			raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
 		
 		# We now have the gradients (`grads`) of the combined model wrt to the actor's weights and
 		# the output (`output`). Compute the necessary updates using a clone of the actor's optimizer.

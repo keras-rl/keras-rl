@@ -6,7 +6,7 @@ import keras.backend as K
 
 from rl.core import Agent
 from rl.policy import EpsGreedyQPolicy
-from rl.util import clone_model
+from rl.util import *
 
 
 def mean_q(y_true, y_pred):
@@ -19,7 +19,7 @@ def mean_q(y_true, y_pred):
 class DQNAgent(Agent):
 	def __init__(self, model, nb_actions, memory, window_length=1, policy=EpsGreedyQPolicy(),
 				 gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
-				 target_model_update_interval=10000, reward_range=(-np.inf, np.inf),
+				 target_model_update=10000, reward_range=(-np.inf, np.inf),
 				 delta_range=(-np.inf, np.inf), enable_double_dqn=True,
 				 custom_model_objects={}, processor=None):
 		# Validate (important) input.
@@ -30,6 +30,16 @@ class DQNAgent(Agent):
 		
 		super(DQNAgent, self).__init__()
 
+		# Soft vs hard target model updates.
+		if target_model_update < 0:
+			raise ValueError('`target_model_update` must be >= 0.')
+		elif target_model_update >= 1:
+			# Hard update every `target_model_update` steps.
+			target_model_update = int(target_model_update)
+		else:
+			# Soft update with `(1 - target_model_update) * old + target_model_update * new`.
+			target_model_update = float(target_model_update)
+
 		# Parameters.
 		self.nb_actions = nb_actions
 		self.window_length = window_length
@@ -38,7 +48,7 @@ class DQNAgent(Agent):
 		self.nb_steps_warmup = nb_steps_warmup
 		self.train_interval = train_interval
 		self.memory_interval = memory_interval
-		self.target_model_update_interval = target_model_update_interval
+		self.target_model_update = target_model_update
 		self.reward_range = reward_range
 		self.delta_range = delta_range
 		self.enable_double_dqn = enable_double_dqn
@@ -59,6 +69,10 @@ class DQNAgent(Agent):
 		metrics += [mean_q]  # register default metrics
 		
 		self.target_model = clone_model(self.model, self.custom_model_objects)
+		if self.target_model_update < 1.:
+			# We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
+			updates = get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
+			optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
 		self.model.compile(optimizer=optimizer, loss='mse', metrics=metrics)
 		# We never train the target model, hence we can set the optimizer and loss arbitrarily.
 		self.target_model.compile(optimizer='sgd', loss='mse')
@@ -78,7 +92,7 @@ class DQNAgent(Agent):
 		self.recent_action = None
 		self.recent_observations = deque(maxlen=self.window_length)
 
-	def update_target_model(self):
+	def update_target_model_hard(self):
 		self.target_model.set_weights(self.model.get_weights())
 
 	def process_state_batch(self, batch):
@@ -205,8 +219,8 @@ class DQNAgent(Agent):
 			metrics = self.model.train_on_batch(state0_batch, ys)
 			metrics += self.policy.run_metrics()
 
-		if self.step % self.target_model_update_interval == 0:
-			self.update_target_model()
+		if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
+			self.update_target_model_hard()
 
 		return metrics
 

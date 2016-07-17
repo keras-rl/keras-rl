@@ -23,6 +23,18 @@ def clone_optimizer(optimizer):
 	return clone
 
 
+def get_soft_target_model_updates(target, source, tau):
+	target_weights = target.trainable_weights + sum([l.non_trainable_weights for l in target.layers], [])
+	source_weights = source.trainable_weights + sum([l.non_trainable_weights for l in source.layers], [])
+	assert len(target_weights) == len(source_weights)
+
+	# Create updates.
+	updates = []
+	for tw, sw in zip(target_weights, source_weights):
+		updates.append((tw, tau * sw + (1. - tau) * tw))
+	return updates
+
+
 class AdditionalUpdatesOptimizer(optimizers.Optimizer):
 	def __init__(self, optimizer, additional_updates):
 		super(AdditionalUpdatesOptimizer, self).__init__()

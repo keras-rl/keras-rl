@@ -6,23 +6,11 @@ import keras.backend as K
 
 from rl.core import Agent
 from rl.random import OrnsteinUhlenbeckProcess
-from rl.util import clone_model, clone_optimizer, AdditionalUpdatesOptimizer
+from rl.util import *
 
 
 def mean_q(y_true, y_pred):
 	return K.mean(K.max(y_pred, axis=-1))
-
-
-def get_target_model_updates(target, source, tau):
-	target_weights = target.trainable_weights + sum([l.non_trainable_weights for l in target.layers], [])
-	source_weights = source.trainable_weights + sum([l.non_trainable_weights for l in source.layers], [])
-	assert len(target_weights) == len(source_weights)
-
-	# Create updates.
-	updates = []
-	for tw, sw in zip(target_weights, source_weights):
-		updates.append((tw, tau * sw + (1. - tau) * tw))
-	return updates
 
 
 # Deep DPG as described by Lillicrap et al. (2015)
@@ -32,8 +20,8 @@ class DDPGAgent(Agent):
 	def __init__(self, nb_actions, actor, critic, critic_action_input, memory, window_length=1,
 				 gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
 				 train_interval=1, memory_interval=1, reward_range=(-np.inf, np.inf), processor=None,
-				 tau=.001, random_process=OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=0.3),
-				 custom_model_objects={}):
+				 random_process=OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=0.3),
+				 custom_model_objects={}, target_model_update=.001):
 		if hasattr(actor.output, '__len__') and len(actor.output) > 1:
 			raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
 		if hasattr(actor.input, '__len__') and len(actor.input) != 1:
@@ -49,6 +37,16 @@ class DDPGAgent(Agent):
 
 		super(DDPGAgent, self).__init__()
 
+		# Soft vs hard target model updates.
+		if target_model_update < 0:
+			raise ValueError('`target_model_update` must be >= 0.')
+		elif target_model_update >= 1:
+			# Hard update every `target_model_update` steps.
+			target_model_update = int(target_model_update)
+		else:
+			# Soft update with `(1 - target_model_update) * old + target_model_update * new`.
+			target_model_update = float(target_model_update)
+
 		# Parameters.
 		self.nb_actions = nb_actions
 		self.window_length = window_length
@@ -58,7 +56,7 @@ class DDPGAgent(Agent):
 		self.random_process = random_process
 		self.reward_range = reward_range
 		self.gamma = gamma
-		self.tau = tau
+		self.target_model_update = target_model_update
 		self.batch_size = batch_size
 		self.train_interval = train_interval
 		self.memory_interval = memory_interval
@@ -105,9 +103,11 @@ class DDPGAgent(Agent):
 		# we also compile it with any optimzer and
 		self.actor.compile(optimizer='sgd', loss='mse')
 
-		# Compile the critic. We use the `AdditionalUpdatesOptimizer` to efficiently update the target model.
-		critic_updates = get_target_model_updates(self.target_critic, self.critic, self.tau)
-		critic_optimizer = AdditionalUpdatesOptimizer(critic_optimizer, critic_updates)
+		# Compile the critic.
+		if self.target_model_update < 1.:
+			# We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
+			critic_updates = get_soft_target_model_updates(self.target_critic, self.critic, self.target_model_update)
+			critic_optimizer = AdditionalUpdatesOptimizer(critic_optimizer, critic_updates)
 		self.critic.compile(optimizer=critic_optimizer, loss='mse', metrics=critic_metrics)
 
 		# Combine actor and critic so that we can get the policy gradient.
@@ -147,7 +147,9 @@ class DDPGAgent(Agent):
 			return modified_grads
 		actor_optimizer.get_gradients = get_gradients
 		updates = actor_optimizer.get_updates(self.actor.trainable_weights, self.actor.constraints, None)
-		updates += get_target_model_updates(self.target_actor, self.actor, self.tau)
+		if self.target_model_update < 1.:
+			# Include soft target model updates.
+			updates += get_soft_target_model_updates(self.target_actor, self.actor, self.target_model_update)
 		updates += self.actor.updates  # include other updates of the actor, e.g. for BN
 
 		# Finally, combine it all into a callable function.
@@ -176,6 +178,10 @@ class DDPGAgent(Agent):
 		critic_filepath = filename + '_critic' + extension
 		self.actor.save_weights(actor_filepath, overwrite=overwrite)
 		self.critic.save_weights(critic_filepath, overwrite=overwrite)
+
+	def update_target_models_hard(self):
+		self.target_critic.set_weights(self.critic.get_weights())
+		self.target_actor.set_weights(self.actor.get_weights())
 
 	# TODO: implement pickle
 
@@ -276,7 +282,6 @@ class DDPGAgent(Agent):
 				assert target_actions.shape == (self.batch_size, self.nb_actions)
 				state1_batch_with_action = [state1_batch]
 				state1_batch_with_action.insert(self.critic_action_input_idx, target_actions)
-				#print state1_batch_with_action
 				target_q_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
 				assert target_q_values.shape == (self.batch_size,)
 				
@@ -297,5 +302,8 @@ class DDPGAgent(Agent):
 				# TODO: implement metrics for actor
 				q_values = self.actor_train_fn([state0_batch, state0_batch])[0].flatten()
 				assert q_values.shape == (self.batch_size,)
+
+		if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
+			self.update_target_models_hard()
 
 		return metrics

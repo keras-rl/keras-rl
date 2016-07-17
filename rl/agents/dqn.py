@@ -67,16 +67,21 @@ class DQNAgent(Agent):
 
 	def compile(self, optimizer, metrics=[]):
 		metrics += [mean_q]  # register default metrics
-		
+
+		# We never train the target model, hence we can set the optimizer and loss arbitrarily.
 		self.target_model = clone_model(self.model, self.custom_model_objects)
+		self.target_model.compile(optimizer='sgd', loss='mse')
+		
+		# Compile model.
 		if self.target_model_update < 1.:
 			# We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
 			updates = get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
 			optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
-		self.model.compile(optimizer=optimizer, loss='mse', metrics=metrics)
-		# We never train the target model, hence we can set the optimizer and loss arbitrarily.
-		self.target_model.compile(optimizer='sgd', loss='mse')
-
+		def clipped_mse(y_true, y_pred):
+			delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
+			return K.mean(K.square(delta), axis=-1)
+		self.model.compile(optimizer=optimizer, loss=clipped_mse, metrics=metrics)
+		
 		self.compiled = True
 
 	# TODO: implement support for pickle
@@ -196,27 +201,22 @@ class DQNAgent(Agent):
 			# Compute the current activations in the output layer given state0. This is hacky
 			# since we do this in the training step anyway, but this is currently the simplest
 			# way to set the gradients of the non-affected output units to zero.
-			ys = self.model.predict_on_batch(state0_batch)
-			assert ys.shape == (self.batch_size, self.nb_actions)
+			targets = self.model.predict_on_batch(state0_batch)
+			assert targets.shape == (self.batch_size, self.nb_actions)
 
-			# Compute r_t + gamma * max_a Q(s_t+1, a) and update the target ys accordingly,
+			# Compute r_t + gamma * max_a Q(s_t+1, a) and update the target targets accordingly,
 			# but only for the affected output units (as given by action_batch).
 			discounted_reward_batch = self.gamma * q_batch
 			# Set discounted reward to zero for all states that were terminal.
 			discounted_reward_batch *= terminal_batch
 			assert discounted_reward_batch.shape == reward_batch.shape
-			rs = reward_batch + discounted_reward_batch
-			for y, r, action in zip(ys, rs, action_batch):
-				# This might seem confusing at first. What happens here is simply the following
-				# equation: y[action] = r iff delta_range=(-np.inf, np.inf) since in this case
-				# delta = r - y[action] and y[action] = y[action] + delta = y[action] + r - y[action] = r.
-				# The catch, however, is that we can now clip the delta to a certain range, e.g. (-1, 1).
-				delta = r - y[action]
-				y[action] = y[action] + np.clip(delta, self.delta_range[0], self.delta_range[1])
-			ys = np.array(ys).astype('float32')
+			Rs = reward_batch + discounted_reward_batch
+			for target, R, action in zip(targets, Rs, action_batch):
+				target[action] = R  # update action with estimated accumulated reward
+			targets = np.array(targets).astype('float32')
 
 			# Finally, perform a single update on the entire batch.
-			metrics = self.model.train_on_batch(state0_batch, ys)
+			metrics = self.model.train_on_batch(state0_batch, targets)
 			metrics += self.policy.run_metrics()
 
 		if self.target_model_update >= 1 and self.step % self.target_model_update == 0:

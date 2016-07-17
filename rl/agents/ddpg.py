@@ -19,7 +19,8 @@ def mean_q(y_true, y_pred):
 class DDPGAgent(Agent):
 	def __init__(self, nb_actions, actor, critic, critic_action_input, memory, window_length=1,
 				 gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
-				 train_interval=1, memory_interval=1, reward_range=(-np.inf, np.inf), processor=None,
+				 train_interval=1, memory_interval=1, reward_range=(-np.inf, np.inf),
+				 delta_range=(-np.inf, np.inf), processor=None,
 				 random_process=OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=0.3),
 				 custom_model_objects={}, target_model_update=.001):
 		if hasattr(actor.output, '__len__') and len(actor.output) > 1:
@@ -55,6 +56,7 @@ class DDPGAgent(Agent):
 		self.nb_steps_warmup_critic = nb_steps_warmup_critic
 		self.random_process = random_process
 		self.reward_range = reward_range
+		self.delta_range = delta_range
 		self.gamma = gamma
 		self.target_model_update = target_model_update
 		self.batch_size = batch_size
@@ -91,6 +93,10 @@ class DDPGAgent(Agent):
 		else:
 			actor_metrics = critic_metrics = metrics
 
+		def clipped_mse(y_true, y_pred):
+			delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
+			return K.mean(K.square(delta), axis=-1)
+
 		# Compile target networks. We only use them in feed-forward mode, hence we can pass any
 		# optimizer and loss since we never use it anyway.
 		self.target_actor = clone_model(self.actor, self.custom_model_objects)
@@ -108,7 +114,7 @@ class DDPGAgent(Agent):
 			# We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
 			critic_updates = get_soft_target_model_updates(self.target_critic, self.critic, self.target_model_update)
 			critic_optimizer = AdditionalUpdatesOptimizer(critic_optimizer, critic_updates)
-		self.critic.compile(optimizer=critic_optimizer, loss='mse', metrics=critic_metrics)
+		self.critic.compile(optimizer=critic_optimizer, loss=clipped_mse, metrics=critic_metrics)
 
 		# Combine actor and critic so that we can get the policy gradient.
 		combined_inputs = []

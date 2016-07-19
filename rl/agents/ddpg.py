@@ -76,6 +76,10 @@ class DDPGAgent(Agent):
 		self.compiled = False
 		self.reset_states()
 
+	@property
+	def uses_learning_phase(self):
+		return self.actor.uses_learning_phase or self.critic.uses_learning_phase
+
 	def compile(self, optimizer, metrics=[]):
 		metrics += [mean_q]
 
@@ -164,7 +168,10 @@ class DDPGAgent(Agent):
 			actor_inputs = [self.actor.input]
 		else:
 			actor_inputs = self.actor.input
-		self.actor_train_fn = K.function(actor_inputs + critic_inputs, [self.actor.output], updates=updates)
+		inputs = actor_inputs + critic_inputs
+		if self.uses_learning_phase:
+			inputs += [K.learning_phase()]
+		self.actor_train_fn = K.function(inputs, [self.actor.output], updates=updates)
 		self.actor_optimizer = actor_optimizer
 
 		self.compiled = True
@@ -306,7 +313,10 @@ class DDPGAgent(Agent):
 			# Update actor, if warm up is over.
 			if self.step > self.nb_steps_warmup_actor:
 				# TODO: implement metrics for actor
-				action_values = self.actor_train_fn([state0_batch, state0_batch])[0]
+				inputs = [state0_batch, state0_batch]
+				if self.uses_learning_phase:
+					inputs += [self.training]
+				action_values = self.actor_train_fn(inputs)[0]
 				assert action_values.shape == (self.batch_size, self.nb_actions)
 
 		if self.target_model_update >= 1 and self.step % self.target_model_update == 0:

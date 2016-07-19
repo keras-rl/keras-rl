@@ -306,8 +306,8 @@ class DDPGAgent(Agent):
 			# Update actor, if warm up is over.
 			if self.step > self.nb_steps_warmup_actor:
 				# TODO: implement metrics for actor
-				q_values = self.actor_train_fn([state0_batch, state0_batch])[0].flatten()
-				assert q_values.shape == (self.batch_size,)
+				action_values = self.actor_train_fn([state0_batch, state0_batch])[0]
+				assert action_values.shape == (self.batch_size, self.nb_actions)
 
 		if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
 			self.update_target_models_hard()

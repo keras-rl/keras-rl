@@ -51,7 +51,9 @@ class Agent(object):
                     # This slightly changes the start position between games.
                     nb_random_start_steps = 0 if nb_max_random_start_steps == 0 else np.random.randint(nb_max_random_start_steps)
                     for _ in xrange(nb_random_start_steps):
+                        callbacks.on_action_begin(action)
                         observation, _, done, _ = env.step(env.action_space.sample())
+                        callbacks.on_action_end(action)
                         if done:
                             warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_random_start_steps` parameter.'.format(nb_random_start_steps))
                             observation = env.reset()
@@ -145,7 +147,9 @@ class Agent(object):
                 action = self.forward(observation)
                 reward = 0.
                 for _ in xrange(action_repetition):
+                    callbacks.on_action_begin(action)
                     observation, r, d, _ = env.step(action)
+                    callbacks.on_action_end(action)
                     reward += r
                     if d:
                         done = True

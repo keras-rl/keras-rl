@@ -25,6 +25,12 @@ class Callback(KerasCallback):
 	def on_step_end(self, step, logs={}):
 		pass
 
+	def on_action_begin(self, action, logs={}):
+		pass
+
+	def on_action_end(self, action, logs={}):
+		pass
+
 
 class CallbackList(KerasCallbackList):
 	def _set_env(self, env):
@@ -67,6 +73,16 @@ class CallbackList(KerasCallbackList):
 				callback.on_step_end(step, logs=logs)
 			else:
 				callback.on_batch_end(step, logs=logs)
+
+	def on_action_begin(self, action, logs={}):
+		for callback in self.callbacks:
+			if callable(getattr(callback, 'on_action_begin', None)):
+				callback.on_action_begin(logs=logs)
+
+	def on_action_end(self, action, logs={}):
+		for callback in self.callbacks:
+			if callable(getattr(callback, 'on_action_end', None)):
+				callback.on_action_end(action, logs=logs)
 
 
 class TestLogger(Callback):
@@ -291,5 +307,5 @@ class FileLogger(Callback):
 
 
 class Visualizer(Callback):
-	def on_step_end(self, step, logs):
+	def on_action_end(self, action, logs):
 		self.env.render(mode='human')

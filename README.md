@@ -14,7 +14,7 @@ In a nutshell: `keras-rl` makes it really easy to run state-of-the-art deep rein
 As of today, the following algorithms have been implemented:
 - Deep Q Learning (DQN) [[1]](http://arxiv.org/abs/1312.5602), [[2]](http://home.uchicago.edu/~arij/journalclub/papers/2015_Mnih_et_al.pdf)
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
-- Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/pdf/1509.02971v2.pdf)
+- Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
 
 ## How do I get started?
 Currently, the documentation of `keras-rl` is almost non-existent.
@@ -37,6 +37,12 @@ That's it. However, if you want to run the examples, you'll also need the follow
 ## Acknowledgments
 The foundation for this library was developed during my work at the [High Performance Humanoid Technologies (H²T)](https://h2t.anthropomatik.kit.edu/) lab at the [Karlsruhe Institute of Technologie (KIT)](https://kit.edu).
 It has since been adapted to become a general-purpose library.
+
+## References
+1. *Playing Atari with Deep Reinforcement Learning*, Mnih et al., 2013
+2. *Human-level control through deep reinforcement learning*, Mnih et al., 2015
+3. *Deep Reinforcement Learning with Double Q-learning*, van Hasselt et al., 2015
+4. *Continuous control with deep reinforcement learning*, Lillicrap et al., 2015
 
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.

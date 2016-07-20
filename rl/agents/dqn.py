@@ -88,7 +88,7 @@ class DQNAgent(Agent):
 
 	def load_weights(self, filepath):
 		self.model.load_weights(filepath)
-		self.update_target_model()
+		self.update_target_model_hard()
 
 	def save_weights(self, filepath, overwrite=False):
 		self.model.save_weights(filepath, overwrite=overwrite)

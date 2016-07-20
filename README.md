@@ -16,6 +16,14 @@ As of today, the following algorithms have been implemented:
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/pdf/1509.02971v2.pdf)
 
+## How do I get started?
+Currently, the documentation of `keras-rl` is almost non-existent.
+However, you can find a couple of examples that illustrate the usage of both DQN (for tasks with discrete actions) as well as for DDPG (for tasks with continuous actions).
+While these examples are not replacement for a proper documentation, they should be enough to get started quickly and to see the magic of reinforcement learning yourself.
+We also encourage you to play around with other environments (OpenAI Gym has plenty) and maybe even try to find better hyperparameters for the existing ones.
+
+If you have questions or problems, please file an issue or, even better, fix the problem yourself and submit a pull request!
+
 ## Requirements
 - Python 2.7
 - [Keras](http://keras.io) >= 1.0

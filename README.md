@@ -34,6 +34,19 @@ That's it. However, if you want to run the examples, you'll also need the follow
 
 `keras-rl` also works with [TensorFlow](https://www.tensorflow.org/). To find out how to use TensorFlow instead of [Theano](http://deeplearning.net/software/theano/), please refer to the [Keras documentation](http://keras.io/#switching-from-theano-to-tensorflow).
 
+## Citing
+If you use `keras-rl` in your research, you can cite it as follows:
+```bibtex
+@misc{plappert2016kerasrl,
+	author = {Matthias Plappert},
+	title = {keras-rl},
+	year = {2016},
+	publisher = {GitHub},
+	journal = {GitHub repository},
+	howpublished = {\url{https://github.com/matthiasplappert/keras-rl}},
+}
+```
+
 ## Acknowledgments
 The foundation for this library was developed during my work at the [High Performance Humanoid Technologies (H²T)](https://h2t.anthropomatik.kit.edu/) lab at the [Karlsruhe Institute of Technologie (KIT)](https://kit.edu).
 It has since been adapted to become a general-purpose library.

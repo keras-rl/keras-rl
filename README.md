@@ -16,11 +16,15 @@ As of today, the following algorithms have been implemented:
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
 
+I'm currently working on the following algorithms, which can be found on the `experimental` branch:
+- Asynchronous Advantage Actor-Critic (A3C) [[5]](http://arxiv.org/abs/1602.01783)
+Notice that these are **only experimental** and might currently not even run.
+
 ## How do I get started?
 Currently, the documentation of `keras-rl` is almost non-existent.
 However, you can find a couple of examples that illustrate the usage of both DQN (for tasks with discrete actions) as well as for DDPG (for tasks with continuous actions).
 While these examples are not replacement for a proper documentation, they should be enough to get started quickly and to see the magic of reinforcement learning yourself.
-We also encourage you to play around with other environments (OpenAI Gym has plenty) and maybe even try to find better hyperparameters for the existing ones.
+I also encourage you to play around with other environments (OpenAI Gym has plenty) and maybe even try to find better hyperparameters for the existing ones.
 
 If you have questions or problems, please file an issue or, even better, fix the problem yourself and submit a pull request!
 
@@ -56,6 +60,7 @@ It has since been adapted to become a general-purpose library.
 2. *Human-level control through deep reinforcement learning*, Mnih et al., 2015
 3. *Deep Reinforcement Learning with Double Q-learning*, van Hasselt et al., 2015
 4. *Continuous control with deep reinforcement learning*, Lillicrap et al., 2015
+5. *Asynchronous Methods for Deep Reinforcement Learning*, Mnih et al., 2016
 
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.

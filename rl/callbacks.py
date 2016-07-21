@@ -77,7 +77,7 @@ class CallbackList(KerasCallbackList):
 	def on_action_begin(self, action, logs={}):
 		for callback in self.callbacks:
 			if callable(getattr(callback, 'on_action_begin', None)):
-				callback.on_action_begin(logs=logs)
+				callback.on_action_begin(action, logs=logs)
 
 	def on_action_end(self, action, logs={}):
 		for callback in self.callbacks:

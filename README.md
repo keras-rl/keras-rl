@@ -12,12 +12,15 @@ In a nutshell: `keras-rl` makes it really easy to run state-of-the-art deep rein
 
 ## What is included?
 As of today, the following algorithms have been implemented:
+
 - Deep Q Learning (DQN) [[1]](http://arxiv.org/abs/1312.5602), [[2]](http://home.uchicago.edu/~arij/journalclub/papers/2015_Mnih_et_al.pdf)
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
 
 I'm currently working on the following algorithms, which can be found on the `experimental` branch:
+
 - Asynchronous Advantage Actor-Critic (A3C) [[5]](http://arxiv.org/abs/1602.01783)
+
 Notice that these are **only experimental** and might currently not even run.
 
 ## How do I get started?

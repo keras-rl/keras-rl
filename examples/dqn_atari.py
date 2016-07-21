@@ -4,7 +4,7 @@ import gym
 
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Convolution2D
-from keras.optimizers import RMSprop
+from keras.optimizers import Nadam
 from keras.callbacks import ModelCheckpoint
 
 from rl.agents.dqn import DQNAgent
@@ -75,8 +75,8 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # Feel free to give it a try!
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=WINDOW_LENGTH, memory=memory,
-	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=4, delta_range=(-1., 1.))
-dqn.compile(RMSprop(lr=.00025), metrics=['mae'])
+	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=4, delta_range=(-10., 10.))
+dqn.compile(Nadam(lr=.00025), metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!

@@ -73,7 +73,9 @@ class Agent(object):
                 reward = 0.
                 done = False
                 for _ in xrange(action_repetition):
+                    callbacks.on_action_begin(action)
                     observation, r, done, _ = env.step(action)
+                    callbacks.on_action_end(action)
                     reward += r
                     if done:
                         break

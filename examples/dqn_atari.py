@@ -15,7 +15,7 @@ from rl.callbacks import FileLogger
 
 
 INPUT_SHAPE = (84, 84)
-ENV_NAME = 'Breakout-v0'
+ENV_NAME = 'Pong-v0'
 WINDOW_LENGTH = 4
 
 
@@ -84,11 +84,10 @@ weights_filename = 'dqn_{}_weights.h5f'.format(ENV_NAME)
 log_filename = 'dqn_{}_log.json'.format(ENV_NAME)
 callbacks = [ModelCheckpoint(weights_filename)]
 callbacks += [FileLogger(log_filename, save_continiously=False)]
-dqn.fit(env, callbacks=callbacks, nb_steps=20000000, action_repetition=4,
-	nb_max_random_start_steps=30, log_interval=10000)
+dqn.fit(env, callbacks=callbacks, nb_steps=20000000, nb_max_random_start_steps=30, log_interval=10000)
 
 # After training is done, we save the final weights one more time.
 dqn.save_weights(weights_filename, overwrite=True)
 
 # Finally, evaluate our algorithm for 5 episodes.
-dqn.test(env, nb_episodes=10, action_repetition=4)
+dqn.test(env, nb_episodes=10)

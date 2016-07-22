@@ -12,15 +12,46 @@ In a nutshell: `keras-rl` makes it really easy to run state-of-the-art deep rein
 
 ## What is included?
 As of today, the following algorithms have been implemented:
+
 - Deep Q Learning (DQN) [[1]](http://arxiv.org/abs/1312.5602), [[2]](http://home.uchicago.edu/~arij/journalclub/papers/2015_Mnih_et_al.pdf)
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
 
-## How do I get started?
-Currently, the documentation of `keras-rl` is almost non-existent.
-However, you can find a couple of examples that illustrate the usage of both DQN (for tasks with discrete actions) as well as for DDPG (for tasks with continuous actions).
+I'm currently working on the following algorithms, which can be found on the `experimental` branch:
+
+- Asynchronous Advantage Actor-Critic (A3C) [[5]](http://arxiv.org/abs/1602.01783)
+
+Notice that these are **only experimental** and might currently not even run.
+
+## How do I install it and how do I get started?
+Installing `keras-rl` is easy. Just run the following commands and you should be good to go:
+```bash
+git clone https://github.com/matthiasplappert/keras-rl.git
+cd keras-rl
+python setup.py install
+```
+This will install `keras-rl` and all necessary dependencies.
+
+If you want to run the examples, you'll also have to install `gym` by OpenAI.
+Please refer to [their installation instructions](https://github.com/openai/gym#installation).
+It's quite easy and works nicely on Ubuntu and Mac OS X.
+You'll also need the `h5py` package to load and save model weights, which can be installed using
+the following command:
+```bash
+pip install h5py
+```
+
+Once you have installed everything, you can try out a simple example:
+```bash
+python examples/dqn_cartpole.py
+```
+This is a very simple example and it should converge relatively quickly, so it's a great way to get started!
+It also visualizes the game during training, so you can watch it learn. How cool is that?
+
+Unfortunately, he documentation of `keras-rl` is currently almost non-existent.
+However, you can find a couple of more examples that illustrate the usage of both DQN (for tasks with discrete actions) as well as for DDPG (for tasks with continuous actions).
 While these examples are not replacement for a proper documentation, they should be enough to get started quickly and to see the magic of reinforcement learning yourself.
-We also encourage you to play around with other environments (OpenAI Gym has plenty) and maybe even try to find better hyperparameters for the existing ones.
+I also encourage you to play around with other environments (OpenAI Gym has plenty) and maybe even try to find better hyperparameters for the existing ones.
 
 If you have questions or problems, please file an issue or, even better, fix the problem yourself and submit a pull request!
 
@@ -56,6 +87,7 @@ It has since been adapted to become a general-purpose library.
 2. *Human-level control through deep reinforcement learning*, Mnih et al., 2015
 3. *Deep Reinforcement Learning with Double Q-learning*, van Hasselt et al., 2015
 4. *Continuous control with deep reinforcement learning*, Lillicrap et al., 2015
+5. *Asynchronous Methods for Deep Reinforcement Learning*, Mnih et al., 2016
 
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.

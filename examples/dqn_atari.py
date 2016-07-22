@@ -4,7 +4,7 @@ import gym
 
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Convolution2D
-from keras.optimizers import RMSprop
+from keras.optimizers import Nadam
 from keras.callbacks import ModelCheckpoint
 
 from rl.agents.dqn import DQNAgent
@@ -15,7 +15,7 @@ from rl.callbacks import FileLogger
 
 
 INPUT_SHAPE = (84, 84)
-ENV_NAME = 'Breakout-v0'
+ENV_NAME = 'Pong-v0'
 WINDOW_LENGTH = 4
 
 
@@ -75,8 +75,8 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # Feel free to give it a try!
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=WINDOW_LENGTH, memory=memory,
-	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=4, delta_range=(-1., 1.))
-dqn.compile(RMSprop(lr=.00025), metrics=['mae'])
+	processor=processor, nb_steps_warmup=50000, gamma=.99, train_interval=4, delta_range=(-10., 10.))
+dqn.compile(Nadam(lr=.00025), metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
@@ -84,11 +84,10 @@ weights_filename = 'dqn_{}_weights.h5f'.format(ENV_NAME)
 log_filename = 'dqn_{}_log.json'.format(ENV_NAME)
 callbacks = [ModelCheckpoint(weights_filename)]
 callbacks += [FileLogger(log_filename, save_continiously=False)]
-dqn.fit(env, callbacks=callbacks, nb_steps=20000000, action_repetition=4,
-	nb_max_random_start_steps=30, log_interval=10000)
+dqn.fit(env, callbacks=callbacks, nb_steps=20000000, nb_max_random_start_steps=30, log_interval=10000)
 
 # After training is done, we save the final weights one more time.
 dqn.save_weights(weights_filename, overwrite=True)
 
 # Finally, evaluate our algorithm for 5 episodes.
-dqn.test(env, nb_episodes=10, action_repetition=4)
+dqn.test(env, nb_episodes=10)

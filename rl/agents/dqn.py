@@ -141,7 +141,7 @@ class DQNAgent(Agent):
 			return metrics
 
 		# Clip the reward to be in reward_range.
-		reward = min(max(reward, self.reward_range[0]), self.reward_range[1])
+		reward = np.clip(reward, self.reward_range[0], self.reward_range[1])
 
 		# Store most recent experience in memory.
 		if self.step % self.memory_interval == 0:

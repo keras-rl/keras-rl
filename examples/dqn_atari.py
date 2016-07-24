@@ -74,7 +74,7 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # Feel free to give it a try!
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=WINDOW_LENGTH, memory=memory,
-	processor=processor, nb_steps_warmup=50000, gamma=.995, delta_range=(-1., 1.))
+	processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.), reward_range=(-1., 1.))
 dqn.compile(RMSprop(lr=.00025), metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
@@ -84,7 +84,7 @@ checkpoint_weights_filename = 'dqn_' + ENV_NAME + '_weights_{step}.h5f'
 log_filename = 'dqn_{}_log.json'.format(ENV_NAME)
 callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=100000)]
 callbacks += [FileLogger(log_filename, interval=100)]
-dqn.fit(env, callbacks=callbacks, nb_steps=20000000, nb_max_random_start_steps=10, log_interval=10000)
+dqn.fit(env, callbacks=callbacks, nb_steps=20000000, log_interval=10000)
 
 # After training is done, we save the final weights one more time.
 dqn.save_weights(weights_filename, overwrite=True)

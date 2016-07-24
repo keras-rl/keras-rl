@@ -60,8 +60,10 @@ class ContinuousA3CAgent(Agent):
 
 		self.local_actor = clone_model(self.actor, self.custom_objects)
 		self.local_actor.compile(optimizer='sgd', loss='mse')  # never used for optimization
+		self.local_actor._make_predict_function()
 		self.local_critic = clone_model(self.critic, self.custom_objects)
 		self.local_critic.compile(optimizer='sgd', loss='mse')  # never used for optimization
+		self.local_critic._make_predict_function()
 
 		#TODO: check if critic and actor are already compiled
 		# TODO: this probably doesn't work for multiple instances
@@ -72,6 +74,8 @@ class ContinuousA3CAgent(Agent):
 			delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
 			return K.mean(K.square(delta), axis=-1)
 		self.critic.compile(optimizer=critic_optimizer, loss=clipped_mse, metrics=metrics)
+		self.critic._make_predict_function()
+		self.critic._make_train_function()
 		
 		# Compile the gradient policy function.
 		Vs = K.placeholder(shape=(self.batch_size,))
@@ -96,7 +100,15 @@ class ContinuousA3CAgent(Agent):
 					grads = [g + g_ for g, g_ in zip(gs, grads)]
 			grads = [g / float(self.batch_size) for g in grads]
 		elif K._BACKEND == 'theano':
-			raise NotImplementedError()
+			import theano.tensor as T
+			grads = None
+			for idx in xrange(self.batch_size):
+				gs = [g.flatten() * (Rs[idx] - Vs[idx]) for g in T.jacobian(log_pdf[idx, :], self.actor.trainable_weights)]
+				if grads is None:
+					grads = gs
+				else:
+					grads = [g + g_ for g, g_ in zip(gs, grads)]
+			grads = [g / float(self.batch_size) for g in grads]
 		else:
 			raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
 		assert grads is not None
@@ -108,10 +120,13 @@ class ContinuousA3CAgent(Agent):
 		if K._BACKEND == 'tensorflow':
 			regularizer_grads = K.gradients(regularizer, self.actor.trainable_weights)
 		elif K._BACKEND == 'theano':
-			raise NotImplementedError()
+			import theano.tensor as T
+			regularizer_grads = T.jacobian(regularizer.flatten(), self.actor.trainable_weights)
+			regularizer_grads = [K.mean(g, axis=0) for g in regularizer_grads]
 		else:
 			raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
 		assert regularizer_grads is not None
+		assert len(grads) == len(regularizer_grads)
 		
 		# Combine grads.
 		grads = [g + self.beta * rg for g, rg in zip(grads, regularizer_grads)]

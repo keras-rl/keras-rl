@@ -35,7 +35,7 @@ print(model.summary())
 memory = SequentialMemory(limit=50000)
 policy = BoltzmannQPolicy()
 dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10,
-	target_model_update=1e-2, policy=policy)
+    target_model_update=1e-2, policy=policy)
 dqn.compile(Nadam(lr=1e-3), metrics=['mae'])
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this

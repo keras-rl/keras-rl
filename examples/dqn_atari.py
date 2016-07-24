@@ -1,3 +1,5 @@
+import argparse
+
 from PIL import Image
 import numpy as np
 import gym
@@ -14,7 +16,6 @@ from rl.callbacks import FileLogger, ModelIntervalCheckpoint
 
 
 INPUT_SHAPE = (84, 84)
-ENV_NAME = 'Breakout-v0'
 WINDOW_LENGTH = 4
 
 
@@ -34,9 +35,14 @@ class AtariProcessor(Processor):
 		processed_batch = batch.astype('float32') / 255.
 		return processed_batch
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--mode', choices=['train', 'test'], default='train')
+parser.add_argument('--env-name', type=str, default='Breakout-v0')
+parser.add_argument('--weights', type=str, default=None)
+args = parser.parse_args()
 
 # Get the environment and extract the number of actions.
-env = gym.make(ENV_NAME)
+env = gym.make(args.env_name)
 nb_actions = env.action_space.n
 
 # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
@@ -78,17 +84,24 @@ dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=
 	target_model_update=30000)
 dqn.compile(RMSprop(lr=.00025), metrics=['mae'])
 
-# Okay, now it's time to learn something! We capture the interrupt exception so that training
-# can be prematurely aborted. Notice that you can the built-in Keras callbacks!
-weights_filename = 'dqn_{}_weights.h5f'.format(ENV_NAME)
-checkpoint_weights_filename = 'dqn_' + ENV_NAME + '_weights_{step}.h5f'
-log_filename = 'dqn_{}_log.json'.format(ENV_NAME)
-callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=100000)]
-callbacks += [FileLogger(log_filename, interval=100)]
-dqn.fit(env, callbacks=callbacks, nb_steps=20000000, log_interval=10000)
+if args.mode == 'train':
+	# Okay, now it's time to learn something! We capture the interrupt exception so that training
+	# can be prematurely aborted. Notice that you can the built-in Keras callbacks!
+	weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
+	checkpoint_weights_filename = 'dqn_' + args.env_name + '_weights_{step}.h5f'
+	log_filename = 'dqn_{}_log.json'.format(args.env_name)
+	callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=100000)]
+	callbacks += [FileLogger(log_filename, interval=100)]
+	dqn.fit(env, callbacks=callbacks, nb_steps=20000000, log_interval=10000)
 
-# After training is done, we save the final weights one more time.
-dqn.save_weights(weights_filename, overwrite=True)
+	# After training is done, we save the final weights one more time.
+	dqn.save_weights(weights_filename, overwrite=True)
 
-# Finally, evaluate our algorithm for 10 episodes.
-dqn.test(env, nb_episodes=10, visualize=False)
+	# Finally, evaluate our algorithm for 10 episodes.
+	dqn.test(env, nb_episodes=10, visualize=False)
+elif args.mode == 'test':
+	weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
+	if args.weights:
+		weights_filename = args.weights
+	dqn.load_weights(weights_filename)
+	dqn.test(env, nb_episodes=10, visualize=True)

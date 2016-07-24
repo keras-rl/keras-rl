@@ -75,7 +75,7 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=WINDOW_LENGTH, memory=memory,
 	processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.), reward_range=(-1., 1.),
-	target_update_interval=30000)
+	target_model_update=30000)
 dqn.compile(RMSprop(lr=.00025), metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
@@ -90,5 +90,5 @@ dqn.fit(env, callbacks=callbacks, nb_steps=20000000, log_interval=10000)
 # After training is done, we save the final weights one more time.
 dqn.save_weights(weights_filename, overwrite=True)
 
-# Finally, evaluate our algorithm for 5 episodes.
+# Finally, evaluate our algorithm for 10 episodes.
 dqn.test(env, nb_episodes=10, visualize=False)

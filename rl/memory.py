@@ -68,12 +68,15 @@ class SequentialMemory(object):
 			action = self.actions[idx - 1]
 			reward = self.rewards[idx - 1]
 			terminal = self.terminals[idx - 1]
+
+			# Okay, now we need to create the follow-up state. This is state0 shifted on timestep
+			# to the right. Again, we need to be careful to not include an observation from the next
+			# episode if the last state is terminal.
+			state1 = [np.copy(x) for x in state0[1:]]
 			if terminal:
-				# The next state is part of a new episode, which means that the correct state is
-				# the next state repeated `window_length` times.
-				state1 = [np.copy(self.observations[idx]) for _ in xrange(window_length)]
+				state1.append(np.copy(state1[-1]))
 			else:
-				state1 = [self.observations[i] for i in xrange(idx - window_length + 1, idx + 1)]
+				state1.append(self.observations[idx])
 
 			assert len(state0) == window_length
 			assert len(state1) == len(state0)

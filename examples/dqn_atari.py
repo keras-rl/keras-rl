@@ -64,7 +64,7 @@ processor = AtariProcessor()
 # the agent initially explores the environment (high eps) and then gradually sticks to what it knows
 # (low eps). We also set a dedicated eps value that is used during testing. Note that we set it to 0.05
 # so that the agent still performs some random actions. This ensures that the agent cannot get stuck.
-policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
+policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.01, value_test=.001,
 	nb_steps=1000000)
 
 # The trade-off between exploration and exploitation is difficult and an on-going research topic.
@@ -74,7 +74,8 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # Feel free to give it a try!
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=WINDOW_LENGTH, memory=memory,
-	processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.), reward_range=(-1., 1.))
+	processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.), reward_range=(-1., 1.),
+	target_update_interval=30000)
 dqn.compile(RMSprop(lr=.00025), metrics=['mae'])
 
 # Okay, now it's time to learn something! We capture the interrupt exception so that training

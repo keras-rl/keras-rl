@@ -80,8 +80,9 @@ dqn.compile(RMSprop(lr=.00025), metrics=['mae'])
 # Okay, now it's time to learn something! We capture the interrupt exception so that training
 # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
 weights_filename = 'dqn_{}_weights.h5f'.format(ENV_NAME)
+checkpoint_weights_filename = 'dqn_' + ENV_NAME + '_weights_{step}.h5f'
 log_filename = 'dqn_{}_log.json'.format(ENV_NAME)
-callbacks = [ModelIntervalCheckpoint(weights_filename, interval=100000)]
+callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=100000)]
 callbacks += [FileLogger(log_filename, interval=100)]
 dqn.fit(env, callbacks=callbacks, nb_steps=20000000, nb_max_random_start_steps=10, log_interval=10000)
 

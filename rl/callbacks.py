@@ -236,9 +236,9 @@ class TrainIntervalLogger(Callback):
 
 
 class FileLogger(Callback):
-	def __init__(self, filename, save_continiously=False):
+	def __init__(self, filename, interval=None):
 		self.filename = filename
-		self.save_continiously = save_continiously
+		self.interval = interval
 
 		# Some algorithms compute multiple episodes at once since they are multi-threaded.
 		# We therefore use a dict that maps from episode to metrics array.
@@ -278,7 +278,7 @@ class FileLogger(Callback):
 				self.data[key] = []
 			self.data[key].append(value)
 
-		if self.save_continiously:
+		if self.interval is not None and episode % self.interval == 0:
 			self.save_data()
 
 		# Clean up.
@@ -309,3 +309,21 @@ class FileLogger(Callback):
 class Visualizer(Callback):
 	def on_action_end(self, action, logs):
 		self.env.render(mode='human')
+
+
+class ModelIntervalCheckpoint(Callback):
+	def __init__(self, filepath, interval, verbose=0):
+		super(ModelIntervalCheckpoint, self).__init__()
+        self.filepath = filepath
+        self.interval = interval
+        self.verbose = verbose
+
+    def on_step_end(self, step, logs={}):
+    	if step % self.interval != 0:
+    		# Nothing to do.
+    		return
+
+        filepath = self.filepath.format(step=step, **logs)
+        if self.verbose > 0:
+        	print('Step {}: saving model to {}'.format(step, filepath))
+        self.model.save_weights(filepath, overwrite=True)

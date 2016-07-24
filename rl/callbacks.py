@@ -236,8 +236,8 @@ class TrainIntervalLogger(Callback):
 
 
 class FileLogger(Callback):
-    def __init__(self, filename, interval=None):
-        self.filename = filename
+    def __init__(self, filepath, interval=None):
+        self.filepath = filepath
         self.interval = interval
 
         # Some algorithms compute multiple episodes at once since they are multi-threaded.
@@ -248,11 +248,9 @@ class FileLogger(Callback):
 
     def on_train_begin(self, logs):
         self.metrics_names = self.model.metrics_names
-        self.file = open(self.filename, 'w')
 
     def on_train_end(self, logs):
         self.save_data()
-        self.file.close()
 
     def on_episode_begin(self, episode, logs):
         assert episode not in self.metrics
@@ -302,8 +300,8 @@ class FileLogger(Callback):
 
         # Overwrite already open file. We can simply seek to the beginning since the file will
         # grow strictly monotonously.
-        self.file.seek(0)
-        json.dump(sorted_data, self.file)
+        with open(self.filepath, 'w') as f:
+            json.dump(sorted_data, f)
 
 
 class Visualizer(Callback):

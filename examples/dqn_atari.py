@@ -1,7 +1,7 @@
 import argparse
 
 from PIL import Image
-import numpy as np
+import numpy as np; np.random.seed(123)
 import gym
 
 from keras.models import Sequential
@@ -43,7 +43,22 @@ args = parser.parse_args()
 
 # Get the environment and extract the number of actions.
 env = gym.make(args.env_name)
+env.seed(123)
 nb_actions = env.action_space.n
+
+# We patch the environment to be closer to what Mnih et al. actually do: The environment
+# repeats the action 4 times and a game is considered to be over during training as soon as a live
+# is lost.
+def _step(a):
+    reward = 0.0
+    action = env._action_set[a]
+    lives_before = env.ale.lives()
+    for _ in range(4):
+        reward += env.ale.act(action)
+    ob = env._get_obs()
+    done = env.ale.game_over() or (args.mode == 'train' and lives_before != env.ale.lives())
+    return ob, reward, done, {}
+env._step = _step
 
 # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
 model = Sequential()
@@ -70,7 +85,7 @@ processor = AtariProcessor()
 # the agent initially explores the environment (high eps) and then gradually sticks to what it knows
 # (low eps). We also set a dedicated eps value that is used during testing. Note that we set it to 0.05
 # so that the agent still performs some random actions. This ensures that the agent cannot get stuck.
-policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.01, value_test=.001,
+policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
     nb_steps=1000000)
 
 # The trade-off between exploration and exploitation is difficult and an on-going research topic.
@@ -81,7 +96,7 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=WINDOW_LENGTH, memory=memory,
     processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.), reward_range=(-1., 1.),
-    target_model_update=30000)
+    target_model_update=10000)
 dqn.compile(RMSprop(lr=.00025), metrics=['mae'])
 
 if args.mode == 'train':

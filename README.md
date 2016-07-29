@@ -1,6 +1,6 @@
 # Deep Reinforcement Learning for Keras
 
-![cartpole](/assets/cartpole.gif?raw=true) ![pendulum](/assets/pendulum.gif?raw=true)
+![breakout](/assets/breakout.gif?raw=true) ![cartpole](/assets/cartpole.gif?raw=true) ![pendulum](/assets/pendulum.gif?raw=true)
 
 ## What is it?
 `keras-rl` implements some state-of-the art deep reinforcement learning algorithms in Python and seamlessly integrates with the deep learning library [Keras](http://keras.io). Just like Keras, it works with either [Theano](http://deeplearning.net/software/theano/) or [TensorFlow](https://www.tensorflow.org/), which means that you can train your algorithm efficiently either on CPU or GPU.
@@ -69,12 +69,12 @@ That's it. However, if you want to run the examples, you'll also need the follow
 If you use `keras-rl` in your research, you can cite it as follows:
 ```bibtex
 @misc{plappert2016kerasrl,
-	author = {Matthias Plappert},
-	title = {keras-rl},
-	year = {2016},
-	publisher = {GitHub},
-	journal = {GitHub repository},
-	howpublished = {\url{https://github.com/matthiasplappert/keras-rl}},
+    author = {Matthias Plappert},
+    title = {keras-rl},
+    year = {2016},
+    publisher = {GitHub},
+    journal = {GitHub repository},
+    howpublished = {\url{https://github.com/matthiasplappert/keras-rl}},
 }
 ```
 

@@ -96,8 +96,8 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=WINDOW_LENGTH, memory=memory,
     processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.), reward_range=(-1., 1.),
-    target_model_update=10000, enable_double_dqn=False, train_interval=4)
-dqn.compile(Adam(lr=.00025, clipvalue=1.), metrics=['mae'])
+    target_model_update=10000, train_interval=4)
+dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
 if args.mode == 'train':
     # Okay, now it's time to learn something! We capture the interrupt exception so that training

@@ -74,7 +74,11 @@ class SequentialMemory(object):
             # episode if the last state is terminal.
             state1 = [np.copy(x) for x in state0[1:]]
             if terminal:
-                state1.append(np.copy(state1[-1]))
+                if len(state1) > 0:
+                    state1.append(np.copy(state1[-1]))
+                else:
+                    # Can happen if `window_length == 1`.
+                    state1.append(np.copy(state0[-1]))
             else:
                 state1.append(self.observations[idx])
 

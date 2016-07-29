@@ -1,6 +1,6 @@
 # Deep Reinforcement Learning for Keras
 
-![breakout](/assets/breakout.gif?raw=true) ![cartpole](/assets/cartpole.gif?raw=true) ![pendulum](/assets/pendulum.gif?raw=true)
+<img src="/assets/breakout.gif?raw=true" width="100"> <img src="/assets/cartpole.gif?raw=true" width="100"> <img src="/assets/pendulum.gif?raw=true" width="100">
 
 ## What is it?
 `keras-rl` implements some state-of-the art deep reinforcement learning algorithms in Python and seamlessly integrates with the deep learning library [Keras](http://keras.io). Just like Keras, it works with either [Theano](http://deeplearning.net/software/theano/) or [TensorFlow](https://www.tensorflow.org/), which means that you can train your algorithm efficiently either on CPU or GPU.

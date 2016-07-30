@@ -22,6 +22,7 @@ As of today, the following algorithms have been implemented:
 - Deep Q Learning (DQN) [[1]](http://arxiv.org/abs/1312.5602), [[2]](http://home.uchicago.edu/~arij/journalclub/papers/2015_Mnih_et_al.pdf)
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
+- Continuous DQN (CDQN) [[5]][http://arxiv.org/abs/1603.00748]
 
 I'm currently working on the following algorithms, which can be found on the `experimental` branch:
 
@@ -94,6 +95,7 @@ It has since been adapted to become a general-purpose library.
 3. *Deep Reinforcement Learning with Double Q-learning*, van Hasselt et al., 2015
 4. *Continuous control with deep reinforcement learning*, Lillicrap et al., 2015
 5. *Asynchronous Methods for Deep Reinforcement Learning*, Mnih et al., 2016
+6. *Continuous Deep Q-Learning with Model-based Acceleration*, Gu et al., 2016
 
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.

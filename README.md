@@ -22,7 +22,7 @@ As of today, the following algorithms have been implemented:
 - Deep Q Learning (DQN) [[1]](http://arxiv.org/abs/1312.5602), [[2]](http://home.uchicago.edu/~arij/journalclub/papers/2015_Mnih_et_al.pdf)
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
-- Continuous DQN (CDQN) [[5]](http://arxiv.org/abs/1603.00748)
+- Continuous DQN (CDQN) [[6]](http://arxiv.org/abs/1603.00748)
 
 I'm currently working on the following algorithms, which can be found on the `experimental` branch:
 

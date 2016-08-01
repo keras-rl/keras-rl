@@ -16,6 +16,7 @@ gym.undo_logger_setup()
 
 # Get the environment and extract the number of actions.
 env = gym.make(ENV_NAME)
+env.seed(123)
 assert len(env.action_space.shape) == 1
 nb_actions = env.action_space.shape[0]
 
@@ -64,8 +65,8 @@ memory = SequentialMemory(limit=100000)
 random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3, size=nb_actions)
 agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
     memory=memory, nb_steps_warmup=100, random_process=random_process,
-    gamma=.99, target_model_update=1e-3, delta_range=(-10., 10.))
-agent.compile(Adam(lr=.001), metrics=['mae'])
+    gamma=.99, target_model_update=1e-3)
+agent.compile(Adam(lr=.001, clipnorm=1.), metrics=['mae'])
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this
 # slows down training quite a lot. You can always safely abort the training prematurely using

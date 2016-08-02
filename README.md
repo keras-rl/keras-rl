@@ -10,7 +10,7 @@
 
 ## What is it?
 `keras-rl` implements some state-of-the art deep reinforcement learning algorithms in Python and seamlessly integrates with the deep learning library [Keras](http://keras.io). Just like Keras, it works with either [Theano](http://deeplearning.net/software/theano/) or [TensorFlow](https://www.tensorflow.org/), which means that you can train your algorithm efficiently either on CPU or GPU.
-Furthermore, `keras-rl` works with [OpenAI Gym]() out of the box. This means that evaluating and playing around with different algorithms is easy.
+Furthermore, `keras-rl` works with [OpenAI Gym](https://gym.openai.com/) out of the box. This means that evaluating and playing around with different algorithms is easy.
 Of course you can extend `keras-rl` according to your own needs. You can use built-in Keras callbacks and metrics or define your own.
 Even more so, it is easy to implement your own environments and even algorithms by simply extending some simple abstract classes.
 

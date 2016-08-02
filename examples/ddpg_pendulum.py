@@ -3,7 +3,7 @@ import gym
 
 from keras.models import Sequential, Model
 from keras.layers import Dense, Activation, Flatten, Input, merge
-from keras.optimizers import Nadam, RMSprop
+from keras.optimizers import RMSprop
 
 from rl.agents import DDPGAgent
 from rl.memory import SequentialMemory
@@ -52,8 +52,8 @@ print(critic.summary())
 memory = SequentialMemory(limit=100000)
 random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3)
 agent = DDPGAgent(nb_actions=nb_actions, actor=actor, critic=critic, critic_action_input=action_input,
-	memory=memory, nb_steps_warmup_critic=100, nb_steps_warmup_actor=100, random_process=random_process,
-	gamma=.99, target_model_update=1e-3, delta_range=(-10., 10.))
+    memory=memory, nb_steps_warmup_critic=100, nb_steps_warmup_actor=100, random_process=random_process,
+    gamma=.99, target_model_update=1e-3, delta_range=(-10., 10.))
 agent.compile([RMSprop(lr=.001), RMSprop(lr=.001)], metrics=['mae'])
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this

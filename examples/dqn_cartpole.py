@@ -3,7 +3,7 @@ import gym
 
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten
-from keras.optimizers import Nadam
+from keras.optimizers import Adam
 
 from rl.agents.dqn import DQNAgent
 from rl.policy import BoltzmannQPolicy
@@ -36,7 +36,7 @@ memory = SequentialMemory(limit=50000)
 policy = BoltzmannQPolicy()
 dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10,
     target_model_update=1e-2, policy=policy)
-dqn.compile(Nadam(lr=1e-3), metrics=['mae'])
+dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this
 # slows down training quite a lot. You can always safely abort the training prematurely using

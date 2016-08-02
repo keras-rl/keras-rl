@@ -190,7 +190,7 @@ class DQNAgent(Agent):
                 # highest Q value wrt to the online model (as computed above).
                 target_q_values = self.target_model.predict_on_batch(state1_batch)
                 assert target_q_values.shape == (self.batch_size, self.nb_actions)
-                q_batch = target_q_values[xrange(self.batch_size), actions]
+                q_batch = target_q_values[range(self.batch_size), actions]
             else:
                 # Compute the q_values given state1, and extract the maximum for each sample in the batch.
                 # We perform this prediction on the target_model instead of the model for reasons
@@ -319,7 +319,7 @@ class ContinuousDQNAgent(DQNAgent):
             # Create L and L^T matrix, which we use to construct the positive-definite matrix P.
             Ls = []
             LTs = []
-            for idx in xrange(self.batch_size):
+            for idx in range(self.batch_size):
                 L = K.zeros((self.nb_actions, self.nb_actions)) 
                 L = T.set_subtensor(L[np.tril_indices(self.nb_actions)], L_flat[idx, :])
                 diag = K.exp(T.diag(L))

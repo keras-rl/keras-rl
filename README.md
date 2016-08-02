@@ -62,6 +62,11 @@ I also encourage you to play around with other environments (OpenAI Gym has plen
 
 If you have questions or problems, please file an issue or, even better, fix the problem yourself and submit a pull request!
 
+## Do I have to train the models myself?
+Training times can be very long depending on the complexity of the environment.
+[This repo](https://github.com/matthiasplappert/keras-rl-weights) provides some weights that were obtained by running (at least some) of the examples that are included in `keras-rl`.
+You can load the weights using the `load_weights` method on the respective agents.
+
 ## Requirements
 - Python 2.7
 - [Keras](http://keras.io) >= 1.0

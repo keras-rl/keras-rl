@@ -1,3 +1,4 @@
+from __future__ import division
 from collections import deque
 from copy import deepcopy
 
@@ -190,7 +191,7 @@ class DQNAgent(Agent):
                 # highest Q value wrt to the online model (as computed above).
                 target_q_values = self.target_model.predict_on_batch(state1_batch)
                 assert target_q_values.shape == (self.batch_size, self.nb_actions)
-                q_batch = target_q_values[xrange(self.batch_size), actions]
+                q_batch = target_q_values[range(self.batch_size), actions]
             else:
                 # Compute the q_values given state1, and extract the maximum for each sample in the batch.
                 # We perform this prediction on the target_model instead of the model for reasons
@@ -240,8 +241,8 @@ class NAFLayer(Layer):
         # The input of this layer is [L, mu, a] in concatenated form. We first split
         # those up.
         idx = 0
-        L_flat = x[:, idx:idx + (self.nb_actions * self.nb_actions + self.nb_actions) / 2]
-        idx += (self.nb_actions * self.nb_actions + self.nb_actions) / 2
+        L_flat = x[:, idx:idx + (self.nb_actions * self.nb_actions + self.nb_actions) // 2]
+        idx += (self.nb_actions * self.nb_actions + self.nb_actions) // 2
         mu = x[:, idx:idx + self.nb_actions]
         idx += self.nb_actions
         a = x[:, idx:idx + self.nb_actions]
@@ -262,7 +263,7 @@ class NAFLayer(Layer):
                 return x_, x_.T
             outputs_info = [
                 K.zeros((self.nb_actions, self.nb_actions)),
-                K.zeros((self.nb_actions, self.nb_actions))
+                K.zeros((self.nb_actions, self.nb_actions)),
             ]
             results, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
             L, LT = results
@@ -270,12 +271,12 @@ class NAFLayer(Layer):
             import tensorflow as tf
 
             # Number of elements in a triangular matrix.
-            nb_elems = (self.nb_actions * self.nb_actions + self.nb_actions) / 2
+            nb_elems = (self.nb_actions * self.nb_actions + self.nb_actions) // 2
 
             # Create mask for the diagonal elements in L_flat. This is used to exponentiate
             # only the diagonal elements, which is done before gathering.
             diag_indeces = [0]
-            for row in xrange(1, self.nb_actions):
+            for row in range(1, self.nb_actions):
                 diag_indeces.append(diag_indeces[-1] + (row + 1))
             diag_mask = np.zeros(1 + nb_elems)  # +1 for the leading zero
             diag_mask[np.array(diag_indeces) + 1] = 1
@@ -293,7 +294,10 @@ class NAFLayer(Layer):
             tril_mask[np.tril_indices(self.nb_actions)] = range(1, nb_elems + 1)
             
             # Finally, process each element of the batch.
-            init = [K.zeros((self.nb_actions, self.nb_actions)) for _ in xrange(2)]
+            init = [
+                K.zeros((self.nb_actions, self.nb_actions)),
+                K.zeros((self.nb_actions, self.nb_actions)),
+            ]
             def fn(a, x):
                 # Exponentiate everything. This is much easier than only exponentiating
                 # the diagonal elements, and, usually, the action space is relatively low.
@@ -330,7 +334,7 @@ class NAFLayer(Layer):
         shape = list(input_shape)
         if len(shape) != 2:
             raise RuntimeError('Input tensor must be 2D, has shape {} instead.'.format(input_shape))
-        expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) / 2 + self.nb_actions + self.nb_actions
+        expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) // 2 + self.nb_actions + self.nb_actions
         if shape[-1] != expected_elements:
             raise RuntimeError(('Last dimension of input tensor must have exactly {} elements, ' +
                                 'has {} elements instead. This layer expects the input in the ' + 

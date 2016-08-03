@@ -1,3 +1,4 @@
+from __future__ import division
 import pytest
 import numpy as np
 from numpy.testing import assert_allclose
@@ -13,7 +14,7 @@ def test_naf_layer():
     for nb_actions in (1, 3):
         # Construct single model with NAF as the only layer, hence it is fully deterministic
         # since no weights are used, which would be randomly initialized.
-        L_flat_input = Input(shape=((nb_actions * nb_actions + nb_actions) / 2,))
+        L_flat_input = Input(shape=((nb_actions * nb_actions + nb_actions) // 2,))
         mu_input = Input(shape=(nb_actions,))
         action_input = Input(shape=(nb_actions,))
         x = merge([L_flat_input, mu_input, action_input], mode='concat')
@@ -22,7 +23,7 @@ def test_naf_layer():
         model.compile(loss='mse', optimizer='sgd')
         
         # Create random test data.
-        L_flat = np.random.random((batch_size, (nb_actions * nb_actions + nb_actions) / 2)).astype('float32')
+        L_flat = np.random.random((batch_size, (nb_actions * nb_actions + nb_actions) // 2)).astype('float32')
         mu = np.random.random((batch_size, nb_actions)).astype('float32')
         action = np.random.random((batch_size, nb_actions)).astype('float32')
 

@@ -1,3 +1,4 @@
+from __future__ import division
 import warnings
 import timeit
 import json
@@ -208,7 +209,7 @@ class TrainIntervalLogger(Callback):
     def on_step_begin(self, step, logs):
         if self.step % self.interval == 0:
             self.reset()
-            print('Interval {} ({} steps performed)'.format(self.step / self.interval + 1, self.step))
+            print('Interval {} ({} steps performed)'.format(self.step // self.interval + 1, self.step))
 
     def on_step_end(self, step, logs):
         # TODO: work around nan's in metrics. This isn't really great yet and probably not 100% accurate

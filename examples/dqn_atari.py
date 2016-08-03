@@ -1,3 +1,4 @@
+from __future__ import division
 import argparse
 
 from PIL import Image

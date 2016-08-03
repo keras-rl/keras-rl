@@ -82,7 +82,7 @@ That's it. However, if you want to run the examples, you'll also need the follow
 ## Running the Tests
 To run the tests locally, you'll first have to install the following dependencies:
 ```bash
-pip install pytest pytest-xdist pep8 pytest-pep8
+pip install pytest pytest-xdist pep8 pytest-pep8 pytest-cov python-coveralls
 ```
 You can then run all tests using this command:
 ```bash

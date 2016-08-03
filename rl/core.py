@@ -7,7 +7,8 @@ from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Vi
 
 class Agent(object):
     def fit(self, env, nb_steps, action_repetition=1, callbacks=[], verbose=1,
-        visualize=False, nb_max_random_start_steps=0, log_interval=10000, nb_max_episode_steps=None):
+        visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
+        nb_max_episode_steps=None):
         if not self.compiled:
             raise RuntimeError('Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
@@ -49,14 +50,17 @@ class Agent(object):
 
                     # Perform random starts at beginning of episode and do not record them into the experience.
                     # This slightly changes the start position between games.
-                    nb_random_start_steps = 0 if nb_max_random_start_steps == 0 else np.random.randint(nb_max_random_start_steps)
-                    for _ in xrange(nb_random_start_steps):
-                        action = env.action_space.sample()
+                    nb_random_start_steps = 0 if nb_max_start_steps == 0 else np.random.randint(nb_max_start_steps)
+                    for _ in range(nb_random_start_steps):
+                        if start_step_policy is None:
+                            action = env.action_space.sample()
+                        else:
+                            action = start_step_policy(observation)
                         callbacks.on_action_begin(action)
                         observation, _, done, _ = env.step(action)
                         callbacks.on_action_end(action)
                         if done:
-                            warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_random_start_steps` parameter.'.format(nb_random_start_steps))
+                            warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(nb_random_start_steps))
                             observation = env.reset()
                             break
 
@@ -72,7 +76,7 @@ class Agent(object):
                 action = self.forward(observation)
                 reward = 0.
                 done = False
-                for _ in xrange(action_repetition):
+                for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
                     observation, r, done, _ = env.step(action)
                     callbacks.on_action_end(action)
@@ -114,7 +118,7 @@ class Agent(object):
         callbacks.on_train_end(logs={'did_abort': did_abort})
 
     def test(self, env, nb_episodes=1, action_repetition=1, callbacks=[], visualize=True,
-        nb_max_episode_steps=None, nb_max_random_start_steps=0):
+        nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None):
         if not self.compiled:
             raise RuntimeError('Your tried to test your agent but it hasn\'t been compiled yet. Please call `compile()` before `test()`.')
         if action_repetition < 1:
@@ -132,7 +136,7 @@ class Agent(object):
             'nb_episodes': nb_episodes,
         })
 
-        for episode in xrange(nb_episodes):
+        for episode in range(nb_episodes):
             callbacks.on_episode_begin(episode)
             episode_reward = 0.
             episode_step = 0
@@ -144,14 +148,17 @@ class Agent(object):
 
             # Perform random starts at beginning of episode and do not record them into the experience.
             # This slightly changes the start position between games.
-            nb_random_start_steps = 0 if nb_max_random_start_steps == 0 else np.random.randint(nb_max_random_start_steps)
-            for _ in xrange(nb_random_start_steps):
-                action = env.action_space.sample()
+            nb_random_start_steps = 0 if nb_max_start_steps == 0 else np.random.randint(nb_max_start_steps)
+            for _ in range(nb_random_start_steps):
+                if start_step_policy is None:
+                    action = env.action_space.sample()
+                else:
+                    action = start_step_policy(observation)
                 callbacks.on_action_begin(action)
                 observation, _, done, _ = env.step(action)
                 callbacks.on_action_end(action)
                 if done:
-                    warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_random_start_steps` parameter.'.format(nb_random_start_steps))
+                    warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(nb_random_start_steps))
                     observation = env.reset()
                     break
 
@@ -162,7 +169,7 @@ class Agent(object):
 
                 action = self.forward(observation)
                 reward = 0.
-                for _ in xrange(action_repetition):
+                for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
                     observation, r, d, _ = env.step(action)
                     callbacks.on_action_end(action)

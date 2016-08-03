@@ -143,15 +143,14 @@ class TrainEpisodeLogger(Callback):
 				except Warning:
 					value = '--'
 					metrics_template += '{}: {}'
-				metrics_variables += [name, value]			
+				metrics_variables += [name, value]          
 		metrics_text = metrics_template.format(*metrics_variables)
 
 		nb_step_digits = str(int(np.ceil(np.log10(self.params['nb_steps']))) + 1)
-		print nb_step_digits
 		template = '{step: ' + nb_step_digits + 'd}/{nb_steps}: episode: {episode}, duration: {duration:.3f}s, episode steps: {episode_steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, mean reward: {reward_mean:.3f} [{reward_min:.3f}, {reward_max:.3f}], mean action: {action_mean:.3f} [{action_min:.3f}, {action_max:.3f}], mean observation: {obs_mean:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
 		variables = {
-		 	'step': self.step,
-		 	'nb_steps': self.params['nb_steps'],
+			'step': self.step,
+			'nb_steps': self.params['nb_steps'],
 			'episode': episode + 1,
 			'duration': duration,
 			'episode_steps': episode_steps,
@@ -236,9 +235,9 @@ class TrainIntervalLogger(Callback):
 
 
 class FileLogger(Callback):
-	def __init__(self, filename, save_continiously=False):
-		self.filename = filename
-		self.save_continiously = save_continiously
+	def __init__(self, filepath, interval=None):
+		self.filepath = filepath
+		self.interval = interval
 
 		# Some algorithms compute multiple episodes at once since they are multi-threaded.
 		# We therefore use a dict that maps from episode to metrics array.
@@ -248,11 +247,9 @@ class FileLogger(Callback):
 
 	def on_train_begin(self, logs):
 		self.metrics_names = self.model.metrics_names
-		self.file = open(self.filename, 'w')
 
 	def on_train_end(self, logs):
 		self.save_data()
-		self.file.close()
 
 	def on_episode_begin(self, episode, logs):
 		assert episode not in self.metrics
@@ -278,7 +275,7 @@ class FileLogger(Callback):
 				self.data[key] = []
 			self.data[key].append(value)
 
-		if self.save_continiously:
+		if self.interval is not None and episode % self.interval == 0:
 			self.save_data()
 
 		# Clean up.
@@ -302,10 +299,30 @@ class FileLogger(Callback):
 
 		# Overwrite already open file. We can simply seek to the beginning since the file will
 		# grow strictly monotonously.
-		self.file.seek(0)
-		json.dump(sorted_data, self.file)
+		with open(self.filepath, 'w') as f:
+			json.dump(sorted_data, f)
 
 
 class Visualizer(Callback):
 	def on_action_end(self, action, logs):
 		self.env.render(mode='human')
+
+
+class ModelIntervalCheckpoint(Callback):
+	def __init__(self, filepath, interval, verbose=0):
+		super(ModelIntervalCheckpoint, self).__init__()
+		self.filepath = filepath
+		self.interval = interval
+		self.verbose = verbose
+		self.total_steps = 0
+
+	def on_step_end(self, step, logs={}):
+		self.total_steps += 1
+		if self.total_steps % self.interval != 0:
+			# Nothing to do.
+			return
+
+		filepath = self.filepath.format(step=self.total_steps, **logs)
+		if self.verbose > 0:
+			print('Step {}: saving model to {}'.format(self.total_steps, filepath))
+		self.model.save_weights(filepath, overwrite=True)

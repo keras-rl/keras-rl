@@ -1,10 +1,16 @@
 # Deep Reinforcement Learning for Keras
 
-![cartpole](/assets/cartpole.gif?raw=true) ![pendulum](/assets/pendulum.gif?raw=true)
+<table>
+  <tr>
+    <td><img src="/assets/breakout.gif?raw=true" width="200"></td>
+    <td><img src="/assets/cartpole.gif?raw=true" width="200"></td>
+    <td><img src="/assets/pendulum.gif?raw=true" width="200"></td>
+  </tr>
+</table>
 
 ## What is it?
 `keras-rl` implements some state-of-the art deep reinforcement learning algorithms in Python and seamlessly integrates with the deep learning library [Keras](http://keras.io). Just like Keras, it works with either [Theano](http://deeplearning.net/software/theano/) or [TensorFlow](https://www.tensorflow.org/), which means that you can train your algorithm efficiently either on CPU or GPU.
-Furthermore, `keras-rl` works with [OpenAI Gym]() out of the box. This means that evaluating and playing around with different algorithms is easy.
+Furthermore, `keras-rl` works with [OpenAI Gym](https://gym.openai.com/) out of the box. This means that evaluating and playing around with different algorithms is easy.
 Of course you can extend `keras-rl` according to your own needs. You can use built-in Keras callbacks and metrics or define your own.
 Even more so, it is easy to implement your own environments and even algorithms by simply extending some simple abstract classes.
 
@@ -16,6 +22,7 @@ As of today, the following algorithms have been implemented:
 - Deep Q Learning (DQN) [[1]](http://arxiv.org/abs/1312.5602), [[2]](http://home.uchicago.edu/~arij/journalclub/papers/2015_Mnih_et_al.pdf)
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
+- Continuous DQN (CDQN or NAF) [[6]](http://arxiv.org/abs/1603.00748)
 
 I'm currently working on the following algorithms, which can be found on the `experimental` branch:
 
@@ -55,6 +62,11 @@ I also encourage you to play around with other environments (OpenAI Gym has plen
 
 If you have questions or problems, please file an issue or, even better, fix the problem yourself and submit a pull request!
 
+## Do I have to train the models myself?
+Training times can be very long depending on the complexity of the environment.
+[This repo](https://github.com/matthiasplappert/keras-rl-weights) provides some weights that were obtained by running (at least some) of the examples that are included in `keras-rl`.
+You can load the weights using the `load_weights` method on the respective agents.
+
 ## Requirements
 - Python 2.7
 - [Keras](http://keras.io) >= 1.0
@@ -69,12 +81,12 @@ That's it. However, if you want to run the examples, you'll also need the follow
 If you use `keras-rl` in your research, you can cite it as follows:
 ```bibtex
 @misc{plappert2016kerasrl,
-	author = {Matthias Plappert},
-	title = {keras-rl},
-	year = {2016},
-	publisher = {GitHub},
-	journal = {GitHub repository},
-	howpublished = {\url{https://github.com/matthiasplappert/keras-rl}},
+    author = {Matthias Plappert},
+    title = {keras-rl},
+    year = {2016},
+    publisher = {GitHub},
+    journal = {GitHub repository},
+    howpublished = {\url{https://github.com/matthiasplappert/keras-rl}},
 }
 ```
 
@@ -88,6 +100,7 @@ It has since been adapted to become a general-purpose library.
 3. *Deep Reinforcement Learning with Double Q-learning*, van Hasselt et al., 2015
 4. *Continuous control with deep reinforcement learning*, Lillicrap et al., 2015
 5. *Asynchronous Methods for Deep Reinforcement Learning*, Mnih et al., 2016
+6. *Continuous Deep Q-Learning with Model-based Acceleration*, Gu et al., 2016
 
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.

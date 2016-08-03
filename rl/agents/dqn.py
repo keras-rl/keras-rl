@@ -3,7 +3,7 @@ from copy import deepcopy
 
 import numpy as np
 import keras.backend as K
-from keras.layers import Lambda, Input, merge
+from keras.layers import Lambda, Input, merge, Layer
 from keras.models import Model
 
 from rl.core import Agent
@@ -231,6 +231,114 @@ class DQNAgent(Agent):
         return self.model.metrics_names[:] + self.policy.metrics_names[:]
 
 
+class NAFLayer(Layer):
+    def __init__(self, nb_actions, **kwargs):
+        self.nb_actions = nb_actions
+        super(NAFLayer, self).__init__(**kwargs)
+
+    def call(self, x, mask=None):
+        # The input of this layer is [L, mu, a] in concatenated form. We first split
+        # those up.
+        idx = 0
+        L_flat = x[:, idx:idx + (self.nb_actions * self.nb_actions + self.nb_actions) / 2]
+        idx += (self.nb_actions * self.nb_actions + self.nb_actions) / 2
+        mu = x[:, idx:idx + self.nb_actions]
+        idx += self.nb_actions
+        a = x[:, idx:idx + self.nb_actions]
+        idx += self.nb_actions
+
+        # Create L and L^T matrix, which we use to construct the positive-definite matrix P.
+        L = None
+        LT = None
+        if K._BACKEND == 'theano':
+            import theano.tensor as T
+            import theano
+
+            def fn(x, L_acc, LT_acc):
+                x_ = K.zeros((self.nb_actions, self.nb_actions))
+                x_ = T.set_subtensor(x_[np.tril_indices(self.nb_actions)], x)
+                diag = K.exp(T.diag(x_))
+                x_ = T.set_subtensor(x_[np.diag_indices(self.nb_actions)], diag)
+                return x_, x_.T
+            outputs_info = [
+                K.zeros((self.nb_actions, self.nb_actions)),
+                K.zeros((self.nb_actions, self.nb_actions))
+            ]
+            results, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
+            L, LT = results
+        elif K._BACKEND == 'tensorflow':
+            import tensorflow as tf
+
+            # Number of elements in a triangular matrix.
+            nb_elems = (self.nb_actions * self.nb_actions + self.nb_actions) / 2
+
+            # Create mask for the diagonal elements in L_flat. This is used to exponentiate
+            # only the diagonal elements, which is done before gathering.
+            diag_indeces = [0]
+            for row in xrange(1, self.nb_actions):
+                diag_indeces.append(diag_indeces[-1] + (row + 1))
+            diag_mask = np.zeros(1 + nb_elems)  # +1 for the leading zero
+            diag_mask[np.array(diag_indeces) + 1] = 1
+            diag_mask = K.variable(diag_mask)
+
+            # Add leading zero element to each element in the L_flat. We use this zero
+            # element when gathering L_flat into a lower triangular matrix L.
+            nb_rows = tf.shape(L_flat)[0]
+            zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
+            L_flat = tf.concat(1, [zeros, L_flat])
+            
+            # Create mask that can be used to gather elements from L_flat and put them
+            # into a lower triangular matrix.
+            tril_mask = np.zeros((self.nb_actions, self.nb_actions), dtype='int32')
+            tril_mask[np.tril_indices(self.nb_actions)] = range(1, nb_elems + 1)
+            
+            # Finally, process each element of the batch.
+            init = [K.zeros((self.nb_actions, self.nb_actions)) for _ in xrange(2)]
+            def fn(a, x):
+                # Exponentiate everything. This is much easier than only exponentiating
+                # the diagonal elements, and, usually, the action space is relatively low.
+                x_ = K.exp(x)
+                # Only keep the diagonal elements.
+                x_ *= diag_mask
+                # Add the original, non-diagonal elements.
+                x_ += x * (1. - diag_mask)
+                # Finally, gather everything into a lower triangular matrix.
+                L_ = tf.gather(x_, tril_mask)
+                return [L_, tf.transpose(L_)]
+            tmp = tf.scan(fn, L_flat, initializer=init)
+            L = tmp[:, 0, :, :]
+            LT = tmp[:, 1, :, :]
+        else:
+            raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
+        assert L is not None
+        assert LT is not None
+        P = K.batch_dot(L, LT)
+        assert K.ndim(P) == 3
+
+        # Combine a, mu and P into a scalar (over the batches). What we compute here is
+        # -.5 * (a - mu)^T * P * (a - mu), where * denotes the dot-product. Unfortunately
+        # TensorFlow handles vector * P slightly suboptimal, hence we convert the vectors to
+        # 1xd/dx1 matrices and finally flatten the resulting 1x1 matrix into a scalar. All
+        # operations happen over the batch size, which is dimension 0.
+        prod = K.batch_dot(K.expand_dims(a - mu, dim=1), P)
+        prod = K.batch_dot(prod, K.expand_dims(a - mu, dim=-1))
+        A = -.5 * K.batch_flatten(prod)
+        assert K.ndim(A) == 2
+        return A
+
+    def get_output_shape_for(self, input_shape):
+        shape = list(input_shape)
+        if len(shape) != 2:
+            raise RuntimeError('Input tensor must be 2D, has shape {} instead.'.format(input_shape))
+        expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) / 2 + self.nb_actions + self.nb_actions
+        if shape[-1] != expected_elements:
+            raise RuntimeError(('Last dimension of input tensor must have exactly {} elements, ' +
+                                'has {} elements instead. This layer expects the input in the ' + 
+                                'following order: [L_flat, mu, action].').format(expected_elements, shape[-1]))
+        shape[-1] = 1
+        return tuple(shape)
+
+
 class ContinuousDQNAgent(DQNAgent):
     def __init__(self, V_model, L_model, mu_model, nb_actions, memory, window_length=1,
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
@@ -279,8 +387,6 @@ class ContinuousDQNAgent(DQNAgent):
 
     def update_target_model_hard(self):
         self.target_V_model.set_weights(self.V_model.get_weights())
-        self.target_L_model.set_weights(self.L_model.get_weights())
-        self.target_mu_model.set_weights(self.mu_model.get_weights())
 
     def load_weights(self, filepath):
         self.combined_model.load_weights(filepath)  # updates V, L and mu model since the weights are shared
@@ -292,56 +398,9 @@ class ContinuousDQNAgent(DQNAgent):
     def compile(self, optimizer, metrics=[]):
         metrics += [mean_q]  # register default metrics
 
-        # Create target models.
-        self.target_L_model = clone_model(self.L_model, self.custom_model_objects)
-        self.target_L_model.compile(optimizer='sgd', loss='mse')
+        # Create target V model. We don't need targets for mu or L.
         self.target_V_model = clone_model(self.V_model, self.custom_model_objects)
         self.target_V_model.compile(optimizer='sgd', loss='mse')
-        self.target_mu_model = clone_model(self.mu_model, self.custom_model_objects)
-        self.target_mu_model.compile(optimizer='sgd', loss='mse')
-
-        if K._BACKEND == 'tensorflow':
-            raise RuntimeError('currently only implemented for Theano')
-        import theano.tensor as T
-        # TODO: get observation_space.shape
-
-        def A_network_output(x):
-            # The input of this layer is [L, mu, a] in concatenated form. We first split
-            # those up.
-            idx = 0
-            L_flat = x[:, idx:idx + (self.nb_actions * self.nb_actions + self.nb_actions) / 2]
-            idx += (self.nb_actions * self.nb_actions + self.nb_actions) / 2
-            mu = x[:, idx:idx + self.nb_actions]
-            idx += self.nb_actions
-            a = x[:, idx:idx + self.nb_actions]
-            idx += self.nb_actions
-
-            # Create L and L^T matrix, which we use to construct the positive-definite matrix P.
-            Ls = []
-            LTs = []
-            for idx in xrange(self.batch_size):
-                L = K.zeros((self.nb_actions, self.nb_actions)) 
-                L = T.set_subtensor(L[np.tril_indices(self.nb_actions)], L_flat[idx, :])
-                diag = K.exp(T.diag(L))
-                L = T.set_subtensor(L[np.diag_indices(self.nb_actions)], diag)
-                Ls.append(L)
-                LTs.append(K.transpose(L))
-                # TODO: diagonal elements exp
-            L = K.pack(Ls)
-            LT = K.pack(LTs)
-            P = K.batch_dot(L, LT, axes=(1, 2))
-            assert K.ndim(P) == 3
-
-            # Combine a, mu and P into a scalar (over the batches).
-            A = -.5 * K.batch_dot(K.batch_dot(a - mu, P, axes=(1, 2)), a - mu, axes=1)
-            assert K.ndim(A) == 2
-            return A
-
-        def A_network_output_shape(input_shape):
-            shape = list(input_shape)
-            assert len(shape) == 2  # only valid for 2D tensors
-            shape[-1] = 1
-            return tuple(shape)
 
         # Build combined model.
         observation_shape = self.V_model.input._keras_shape[1:]
@@ -350,7 +409,7 @@ class ContinuousDQNAgent(DQNAgent):
         L_out = self.L_model([a_in, o_in])
         V_out = self.V_model(o_in)
         mu_out = self.mu_model(o_in)
-        A_out = Lambda(A_network_output, output_shape=A_network_output_shape)(merge([L_out, mu_out, a_in], mode='concat'))
+        A_out = NAFLayer(self.nb_actions)(merge([L_out, mu_out, a_in], mode='concat'))
         combined_out = merge([A_out, V_out], mode='sum')
         combined = Model(input=[a_in, o_in], output=combined_out)
 
@@ -358,8 +417,6 @@ class ContinuousDQNAgent(DQNAgent):
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             updates = get_soft_target_model_updates(self.target_V_model, self.V_model, self.target_model_update)
-            updates += get_soft_target_model_updates(self.target_L_model, self.L_model, self.target_model_update)
-            updates += get_soft_target_model_updates(self.target_mu_model, self.mu_model, self.target_model_update)
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
         def clipped_mse(y_true, y_pred):
             delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])

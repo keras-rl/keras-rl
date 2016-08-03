@@ -1,4 +1,6 @@
 # Deep Reinforcement Learning for Keras
+[![Build Status](https://api.travis-ci.org/matthiasplappert/keras-rl.svg?branch=master)](https://travis-ci.org/matthiasplappert/keras-rl)
+[![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/matthiasplappert/keras-rl/blob/master/LICENSE)
 
 <table>
   <tr>
@@ -76,6 +78,20 @@ That's it. However, if you want to run the examples, you'll also need the follow
 - [h5py](https://pypi.python.org/pypi/h5py)
 
 `keras-rl` also works with [TensorFlow](https://www.tensorflow.org/). To find out how to use TensorFlow instead of [Theano](http://deeplearning.net/software/theano/), please refer to the [Keras documentation](http://keras.io/#switching-from-theano-to-tensorflow).
+
+## Running the Tests
+To run the tests locally, you'll first have to install the following dependencies:
+```bash
+pip install pytest pytest-xdist pep8 pytest-pep8
+```
+You can then run all tests using this command:
+```bash
+py.test tests/.
+```
+If you want to check if the files conform to the PEP8 style guidelines, run the following command:
+```bash
+py.test --pep8
+```
 
 ## Citing
 If you use `keras-rl` in your research, you can cite it as follows:

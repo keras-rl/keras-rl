@@ -12,7 +12,7 @@ class RingBuffer(object):
         self.maxlen = maxlen
         self.start = 0
         self.length = 0
-        self.data = [None for _ in xrange(maxlen)]
+        self.data = [None for _ in range(maxlen)]
 
     def __len__(self):
         return self.length
@@ -58,7 +58,7 @@ class SequentialMemory(object):
             # from different episodes. We ensure that an experience never spans multiple episodes.
             # This is probably not that important in practice but it seems cleaner.
             state0 = [self.observations[idx - 1]]
-            for current_idx in xrange(idx - 2, idx - window_length - 1, -1):
+            for current_idx in range(idx - 2, idx - window_length - 1, -1):
                 if self.terminals[current_idx]:
                     break
                 state0.insert(0, self.observations[current_idx])

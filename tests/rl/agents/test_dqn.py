@@ -38,7 +38,8 @@ def test_naf_layer():
         A_ref = np.array([np.dot(np.dot(a - m, p), a - m) for a, m, p in zip(action, mu, P)]).astype('float32')
         A_ref *= -.5
 
-        # Finally, compute the output of the net output, which should be identical.
+        # Finally, compute the output of the net, which should be identical to the previously
+        # computed reference.
         A_net = model.predict([L_flat, mu, action]).flatten()
         assert_allclose(A_net, A_ref, rtol=1e-5)
 

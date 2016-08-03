@@ -51,7 +51,7 @@ class Agent(object):
                     # Perform random starts at beginning of episode and do not record them into the experience.
                     # This slightly changes the start position between games.
                     nb_random_start_steps = 0 if nb_max_start_steps == 0 else np.random.randint(nb_max_start_steps)
-                    for _ in xrange(nb_random_start_steps):
+                    for _ in range(nb_random_start_steps):
                         if start_step_policy is None:
                             action = env.action_space.sample()
                         else:
@@ -76,7 +76,7 @@ class Agent(object):
                 action = self.forward(observation)
                 reward = 0.
                 done = False
-                for _ in xrange(action_repetition):
+                for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
                     observation, r, done, _ = env.step(action)
                     callbacks.on_action_end(action)
@@ -136,7 +136,7 @@ class Agent(object):
             'nb_episodes': nb_episodes,
         })
 
-        for episode in xrange(nb_episodes):
+        for episode in range(nb_episodes):
             callbacks.on_episode_begin(episode)
             episode_reward = 0.
             episode_step = 0
@@ -149,7 +149,7 @@ class Agent(object):
             # Perform random starts at beginning of episode and do not record them into the experience.
             # This slightly changes the start position between games.
             nb_random_start_steps = 0 if nb_max_start_steps == 0 else np.random.randint(nb_max_start_steps)
-            for _ in xrange(nb_random_start_steps):
+            for _ in range(nb_random_start_steps):
                 if start_step_policy is None:
                     action = env.action_space.sample()
                 else:
@@ -169,7 +169,7 @@ class Agent(object):
 
                 action = self.forward(observation)
                 reward = 0.
-                for _ in xrange(action_repetition):
+                for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
                     observation, r, d, _ = env.step(action)
                     callbacks.on_action_end(action)

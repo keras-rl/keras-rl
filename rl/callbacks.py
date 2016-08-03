@@ -147,7 +147,6 @@ class TrainEpisodeLogger(Callback):
 		metrics_text = metrics_template.format(*metrics_variables)
 
 		nb_step_digits = str(int(np.ceil(np.log10(self.params['nb_steps']))) + 1)
-		print(nb_step_digits)
 		template = '{step: ' + nb_step_digits + 'd}/{nb_steps}: episode: {episode}, duration: {duration:.3f}s, episode steps: {episode_steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, mean reward: {reward_mean:.3f} [{reward_min:.3f}, {reward_max:.3f}], mean action: {action_mean:.3f} [{action_min:.3f}, {action_max:.3f}], mean observation: {obs_mean:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
 		variables = {
 			'step': self.step,

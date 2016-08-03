@@ -56,3 +56,5 @@ script:
     else
        PYTHONPATH=$PWD:$PYTHONPATH py.test tests/;
     fi
+after_success:
+  - coveralls

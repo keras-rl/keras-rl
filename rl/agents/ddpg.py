@@ -235,7 +235,7 @@ class DDPGAgent(Agent):
         assert len(state) == self.window_length
         action = self.select_action(state)  # TODO: move this into policy
         if self.processor is not None:
-        	action = self.processor.process_action(action)
+            action = self.processor.process_action(action)
         
         # Book-keeping.
         self.recent_observations.append(observation)
@@ -255,7 +255,7 @@ class DDPGAgent(Agent):
             return metrics
 
         if self.processor is not None:
-        	reward = self.processor.process_reward(reward)
+            reward = self.processor.process_reward(reward)
         
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:

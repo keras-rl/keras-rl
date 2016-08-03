@@ -144,6 +144,7 @@ class DDPGAgent(Agent):
         # the output (`output`). Compute the necessary updates using a clone of the actor's optimizer.
         clipnorm = getattr(actor_optimizer, 'clipnorm', 0.)
         clipvalue = getattr(actor_optimizer, 'clipvalue', 0.)
+        
         def get_gradients(loss, params):
             # We want to follow the gradient, but the optimizer goes in the opposite direction to
             # minimize loss. Hence the double inversion.
@@ -155,6 +156,7 @@ class DDPGAgent(Agent):
             if clipvalue > 0.:
                 modified_grads = [K.clip(g, -clipvalue, clipvalue) for g in modified_grads]
             return modified_grads
+        
         actor_optimizer.get_gradients = get_gradients
         updates = actor_optimizer.get_updates(self.actor.trainable_weights, self.actor.constraints, None)
         if self.target_model_update < 1.:

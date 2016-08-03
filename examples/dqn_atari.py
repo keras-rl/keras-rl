@@ -1,7 +1,7 @@
 import argparse
 
 from PIL import Image
-import numpy as np; np.random.seed(123)
+import numpy as np
 import gym
 
 from keras.models import Sequential
@@ -43,6 +43,7 @@ args = parser.parse_args()
 
 # Get the environment and extract the number of actions.
 env = gym.make(args.env_name)
+np.random.seed(123)
 env.seed(123)
 nb_actions = env.action_space.n
 
@@ -86,7 +87,7 @@ processor = AtariProcessor()
 # (low eps). We also set a dedicated eps value that is used during testing. Note that we set it to 0.05
 # so that the agent still performs some random actions. This ensures that the agent cannot get stuck.
 policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.1, value_test=.05,
-    nb_steps=1000000)
+                              nb_steps=1000000)
 
 # The trade-off between exploration and exploitation is difficult and an on-going research topic.
 # If you want, you can experiment with the parameters or use a different policy. Another popular one
@@ -95,8 +96,8 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # Feel free to give it a try!
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=WINDOW_LENGTH, memory=memory,
-    processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.), reward_range=(-1., 1.),
-    target_model_update=10000, train_interval=4)
+               processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.),
+               reward_range=(-1., 1.), target_model_update=10000, train_interval=4)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
 if args.mode == 'train':

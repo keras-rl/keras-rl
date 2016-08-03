@@ -80,9 +80,11 @@ class DQNAgent(Agent):
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             updates = get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
+        
         def clipped_mse(y_true, y_pred):
             delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
             return K.mean(K.square(delta), axis=-1)
+        
         self.model.compile(optimizer=optimizer, loss=clipped_mse, metrics=metrics)
         
         self.compiled = True
@@ -261,6 +263,7 @@ class NAFLayer(Layer):
                 diag = K.exp(T.diag(x_))
                 x_ = T.set_subtensor(x_[np.diag_indices(self.nb_actions)], diag)
                 return x_, x_.T
+
             outputs_info = [
                 K.zeros((self.nb_actions, self.nb_actions)),
                 K.zeros((self.nb_actions, self.nb_actions)),
@@ -298,6 +301,7 @@ class NAFLayer(Layer):
                 K.zeros((self.nb_actions, self.nb_actions)),
                 K.zeros((self.nb_actions, self.nb_actions)),
             ]
+            
             def fn(a, x):
                 # Exponentiate everything. This is much easier than only exponentiating
                 # the diagonal elements, and, usually, the action space is relatively low.
@@ -309,6 +313,7 @@ class NAFLayer(Layer):
                 # Finally, gather everything into a lower triangular matrix.
                 L_ = tf.gather(x_, tril_mask)
                 return [L_, tf.transpose(L_)]
+
             tmp = tf.scan(fn, L_flat, initializer=init)
             L = tmp[:, 0, :, :]
             LT = tmp[:, 1, :, :]
@@ -352,7 +357,6 @@ class ContinuousDQNAgent(DQNAgent):
         # TODO: Validate (important) input.
         
         # TODO: call super of abstract DQN agent
-        #super(DQNAgent, self).__init__()
 
         # Soft vs hard target model updates.
         if target_model_update < 0:
@@ -422,9 +426,11 @@ class ContinuousDQNAgent(DQNAgent):
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             updates = get_soft_target_model_updates(self.target_V_model, self.V_model, self.target_model_update)
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
+        
         def clipped_mse(y_true, y_pred):
             delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
             return K.mean(K.square(delta), axis=-1)
+        
         combined.compile(loss=clipped_mse, optimizer=optimizer, metrics=metrics)
         self.combined_model = combined
 

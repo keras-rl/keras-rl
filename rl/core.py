@@ -7,8 +7,8 @@ from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Vi
 
 class Agent(object):
     def fit(self, env, nb_steps, action_repetition=1, callbacks=[], verbose=1,
-        visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
-        nb_max_episode_steps=None):
+            visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
+            nb_max_episode_steps=None):
         if not self.compiled:
             raise RuntimeError('Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
@@ -118,7 +118,7 @@ class Agent(object):
         callbacks.on_train_end(logs={'did_abort': did_abort})
 
     def test(self, env, nb_episodes=1, action_repetition=1, callbacks=[], visualize=True,
-        nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None):
+             nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None):
         if not self.compiled:
             raise RuntimeError('Your tried to test your agent but it hasn\'t been compiled yet. Please call `compile()` before `test()`.')
         if action_repetition < 1:

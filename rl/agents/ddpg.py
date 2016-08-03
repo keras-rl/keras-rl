@@ -19,8 +19,7 @@ def mean_q(y_true, y_pred):
 class DDPGAgent(Agent):
     def __init__(self, nb_actions, actor, critic, critic_action_input, memory, window_length=1,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
-                 train_interval=1, memory_interval=1, reward_range=(-np.inf, np.inf),
-                 delta_range=(-np.inf, np.inf), processor=None,
+                 train_interval=1, memory_interval=1, delta_range=(-np.inf, np.inf), processor=None,
                  random_process=OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=0.3),
                  custom_model_objects={}, target_model_update=.001):
         if hasattr(actor.output, '__len__') and len(actor.output) > 1:
@@ -55,7 +54,6 @@ class DDPGAgent(Agent):
         self.nb_steps_warmup_actor = nb_steps_warmup_actor
         self.nb_steps_warmup_critic = nb_steps_warmup_critic
         self.random_process = random_process
-        self.reward_range = reward_range
         self.delta_range = delta_range
         self.gamma = gamma
         self.target_model_update = target_model_update
@@ -236,6 +234,8 @@ class DDPGAgent(Agent):
         state = np.array(list(self.recent_observations)[1:] + [observation])
         assert len(state) == self.window_length
         action = self.select_action(state)  # TODO: move this into policy
+        if self.processor is not None:
+        	action = self.processor.process_action(action)
         
         # Book-keeping.
         self.recent_observations.append(observation)
@@ -254,9 +254,9 @@ class DDPGAgent(Agent):
             # memory to obtain the state over the most recent observations.
             return metrics
 
-        # Clip the reward to be in reward_range.
-        reward = min(max(reward, self.reward_range[0]), self.reward_range[1])
-
+        if self.processor is not None:
+        	reward = self.processor.process_reward(reward)
+        
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observations[-1], self.recent_action, reward, terminal)

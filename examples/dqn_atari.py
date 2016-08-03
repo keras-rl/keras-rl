@@ -35,6 +35,9 @@ class AtariProcessor(Processor):
         processed_batch = batch.astype('float32') / 255.
         return processed_batch
 
+    def process_reward(self, reward):
+        return np.clip(reward, -1., 1.)
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', choices=['train', 'test'], default='train')
 parser.add_argument('--env-name', type=str, default='Breakout-v0')
@@ -97,7 +100,7 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=WINDOW_LENGTH, memory=memory,
                processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.),
-               reward_range=(-1., 1.), target_model_update=10000, train_interval=4)
+               target_model_update=10000, train_interval=4)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
 if args.mode == 'train':

@@ -224,6 +224,12 @@ class Processor(object):
         """
         return batch
 
+    def process_action(self, action):
+        return action
+
+    def process_reward(self, reward):
+        return reward
+
 
 # Note: the API of the `Env` and `Space` classes are taken from the OpenAI Gym implementation.
 # https://github.com/openai/gym/blob/master/gym/core.py

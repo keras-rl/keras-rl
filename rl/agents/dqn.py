@@ -22,8 +22,7 @@ def mean_q(y_true, y_pred):
 class DQNAgent(Agent):
     def __init__(self, model, nb_actions, memory, window_length=1, policy=EpsGreedyQPolicy(),
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
-                 target_model_update=10000, reward_range=(-np.inf, np.inf),
-                 delta_range=(-np.inf, np.inf), enable_double_dqn=True,
+                 target_model_update=10000, delta_range=(-np.inf, np.inf), enable_double_dqn=True,
                  custom_model_objects={}, processor=None):
         # Validate (important) input.
         if hasattr(model.output, '__len__') and len(model.output) > 1:
@@ -52,7 +51,6 @@ class DQNAgent(Agent):
         self.train_interval = train_interval
         self.memory_interval = memory_interval
         self.target_model_update = target_model_update
-        self.reward_range = reward_range
         self.delta_range = delta_range
         self.enable_double_dqn = enable_double_dqn
         self.custom_model_objects = custom_model_objects
@@ -131,6 +129,8 @@ class DQNAgent(Agent):
         assert len(state) == self.window_length
         q_values = self.compute_q_values(state)
         action = self.policy.select_action(q_values=q_values)
+        if self.processor is not None:
+            action = self.processor.process_action(action)
 
         # Book-keeping.
         self.recent_observations.append(observation)
@@ -145,8 +145,8 @@ class DQNAgent(Agent):
             # memory to obtain the state over the most recent observations.
             return metrics
 
-        # Clip the reward to be in reward_range.
-        reward = np.clip(reward, self.reward_range[0], self.reward_range[1])
+        if self.processor is not None:
+            reward = self.processor.process_reward(reward)
 
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
@@ -351,9 +351,8 @@ class NAFLayer(Layer):
 class ContinuousDQNAgent(DQNAgent):
     def __init__(self, V_model, L_model, mu_model, nb_actions, memory, window_length=1,
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
-                 target_model_update=10000, reward_range=(-np.inf, np.inf),
-                 delta_range=(-np.inf, np.inf), custom_model_objects={}, processor=None,
-                 random_process=None):
+                 target_model_update=10000, delta_range=(-np.inf, np.inf), custom_model_objects={},
+                 processor=None, random_process=None):
         # TODO: Validate (important) input.
         
         # TODO: call super of abstract DQN agent
@@ -377,7 +376,6 @@ class ContinuousDQNAgent(DQNAgent):
         self.train_interval = train_interval
         self.memory_interval = memory_interval
         self.target_model_update = target_model_update
-        self.reward_range = reward_range
         self.delta_range = delta_range
         self.custom_model_objects = custom_model_objects
         self.random_process = random_process
@@ -462,6 +460,8 @@ class ContinuousDQNAgent(DQNAgent):
         state = np.array(list(self.recent_observations)[1:] + [observation])
         assert len(state) == self.window_length
         action = self.select_action(state)
+        if self.processor is not None:
+            action = self.processor.process_action(action)
 
         # Book-keeping.
         self.recent_observations.append(observation)
@@ -476,8 +476,8 @@ class ContinuousDQNAgent(DQNAgent):
             # memory to obtain the state over the most recent observations.
             return metrics
 
-        # Clip the reward to be in reward_range.
-        reward = np.clip(reward, self.reward_range[0], self.reward_range[1])
+        if self.processor is not None:
+            reward = self.processor.process_reward(reward)
 
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:

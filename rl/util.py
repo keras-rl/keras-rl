@@ -1,13 +1,19 @@
+import warnings
+
 from keras.models import model_from_config, Sequential, Model
 import keras.optimizers as optimizers
 
 
 def clone_model(model, custom_objects={}):
+    if len(custom_objects) > 0:
+        warnings.warn('Due to an API problem with Keras, custom_objects is currently ignored. Sorry about that.')
     config = model.get_config()
     try:
-        clone = Sequential.from_config(config, custom_objects)
+        # TODO: re-enable custom_objects
+        clone = Sequential.from_config(config)
     except:
-        clone = Model.from_config(config, custom_objects)
+        # TODO: re-enable custom_objects
+        clone = Model.from_config(config)
     clone.set_weights(model.get_weights())
     return clone
 

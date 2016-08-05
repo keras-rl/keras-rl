@@ -15,6 +15,8 @@ class Agent(object):
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
         self.training = True
+        
+        callbacks = callbacks[:]
 
         if verbose == 1:
             callbacks += [TrainIntervalLogger(interval=log_interval)]
@@ -125,7 +127,9 @@ class Agent(object):
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
         self.training = False
-
+        
+        callbacks = callbacks[:]
+        
         callbacks += [TestLogger()]
         if visualize:
             callbacks += [Visualizer()]

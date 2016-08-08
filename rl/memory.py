@@ -49,7 +49,7 @@ class SequentialMemory(object):
         # Draw random indexes such that we have at least `window_length` entries before each index.
         batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
         assert len(batch_idxs) == batch_size
-        
+
         # Create experiences
         experiences = []
         for idx in batch_idxs:
@@ -99,6 +99,41 @@ class SequentialMemory(object):
     def nb_entries(self):
         return len(self.observations)
 
+
+class EpisodeParameterMemory(object):
+    def __init__(self,limit):
+        self.limit = limit
+
+        self.params = RingBuffer(limit)
+        self.intermediate_rewards = RingBuffer(200) # max episode steps : TODO make dynamic
+        self.reward_totals = RingBuffer(limit)
+
+    def sample(self,batch_size):
+        batch_idxs = np.random.random_integers(0, self.nb_entries - 1, size=batch_size)
+        assert len(batch_idxs) == batch_size
+        params = []
+        reward_totals = []
+
+        for idx in batch_idxs:
+            params.append(self.params[idx])
+            reward_totals.append(self.reward_totals[idx])
+
+        return params, reward_totals
+
+    def append(self,reward):
+        self.intermediate_rewards.append(reward)
+
+    def finalise_episode(self,params):
+        total_reward = sum([d for d in self.intermediate_rewards.data if d])
+        self.reward_totals.append(total_reward)
+        self.params.append(params)
+        self.intermediate_rewards = RingBuffer(200)
+
+    @property
+    def nb_entries(self):
+        return len(self.reward_totals)
+
+
 class SequentialMemoryWithParams(object):
     def __init__(self, limit):
         self.limit = limit
@@ -111,13 +146,15 @@ class SequentialMemoryWithParams(object):
         self.observations = RingBuffer(limit)
         self.params = RingBuffer(limit)
 
+
     def sample(self, batch_size, window_length):
         # Draw random indexes such that we have at least `window_length` entries before each index.
         batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
         assert len(batch_idxs) == batch_size
-        
+
         # Create experiences
         experiences = []
+        params=[]
         for idx in batch_idxs:
             # This code is slightly complicated by the fact that subsequent observations might be
             # from different episodes. We ensure that an experience never spans multiple episodes.
@@ -151,6 +188,7 @@ class SequentialMemoryWithParams(object):
             assert len(state0) == window_length
             assert len(state1) == len(state0)
             experiences.append(Experience(state0, action, reward, terminal, state1))
+            params.append(param)
         assert len(experiences) == batch_size
         return params , experiences
 

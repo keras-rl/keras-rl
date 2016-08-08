@@ -34,7 +34,6 @@ class RingBuffer(object):
             raise RuntimeError()
         self.data[(self.start + self.length - 1) % self.maxlen] = v
 
-
 class SequentialMemory(object):
     def __init__(self, limit):
         self.limit = limit
@@ -95,6 +94,74 @@ class SequentialMemory(object):
         self.actions.append(action)
         self.rewards.append(reward)
         self.terminals.append(terminal)
+
+    @property
+    def nb_entries(self):
+        return len(self.observations)
+
+class SequentialMemoryWithParams(object):
+    def __init__(self, limit):
+        self.limit = limit
+
+        # Do not use deque to implement the memory. This data structure may seem convenient but
+        # it is way too slow on random access. Instead, we use our own ring buffer implementation.
+        self.actions = RingBuffer(limit)
+        self.rewards = RingBuffer(limit)
+        self.terminals = RingBuffer(limit)
+        self.observations = RingBuffer(limit)
+        self.params = RingBuffer(limit)
+
+    def sample(self, batch_size, window_length):
+        # Draw random indexes such that we have at least `window_length` entries before each index.
+        batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
+        assert len(batch_idxs) == batch_size
+        
+        # Create experiences
+        experiences = []
+        for idx in batch_idxs:
+            # This code is slightly complicated by the fact that subsequent observations might be
+            # from different episodes. We ensure that an experience never spans multiple episodes.
+            # This is probably not that important in practice but it seems cleaner.
+            state0 = [self.observations[idx - 1]]
+            for current_idx in range(idx - 2, idx - window_length - 1, -1):
+                if self.terminals[current_idx]:
+                    break
+                state0.insert(0, self.observations[current_idx])
+            while len(state0) < window_length:
+                state0.insert(0, np.copy(state0[0]))
+
+            action = self.actions[idx - 1]
+            reward = self.rewards[idx - 1]
+            param = self.params[idx - 1]
+            terminal = self.terminals[idx - 1]
+
+            # Okay, now we need to create the follow-up state. This is state0 shifted on timestep
+            # to the right. Again, we need to be careful to not include an observation from the next
+            # episode if the last state is terminal.
+            state1 = [np.copy(x) for x in state0[1:]]
+            if terminal:
+                if len(state1) > 0:
+                    state1.append(np.copy(state1[-1]))
+                else:
+                    # Can happen if `window_length == 1`.
+                    state1.append(np.copy(state0[-1]))
+            else:
+                state1.append(self.observations[idx])
+
+            assert len(state0) == window_length
+            assert len(state1) == len(state0)
+            experiences.append(Experience(state0, action, reward, terminal, state1))
+        assert len(experiences) == batch_size
+        return params , experiences
+
+    def append(self, observation, action, reward, terminal,param):
+        # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
+        # and weather the next state is `terminal` or not.
+        self.observations.append(observation)
+        self.actions.append(action)
+        self.rewards.append(reward)
+        self.terminals.append(terminal)
+        self.params.append(param)
 
     @property
     def nb_entries(self):

@@ -4,10 +4,10 @@ import keras.optimizers as optimizers
 
 def clone_model(model, custom_objects={}):
     config = model.get_config()
-    try:
-        clone = Sequential.from_config(config, custom_objects)
-    except:
-        clone = Model.from_config(config, custom_objects)
+    #try:
+    clone = Sequential.from_config(config)
+    #except:
+    #    clone = Model.from_config(config, custom_objects)
     clone.set_weights(model.get_weights())
     return clone
 

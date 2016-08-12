@@ -26,19 +26,29 @@ class CEMAgent(Agent):
         self.memory_interval = memory_interval
         self.window_length = window_length
 
-        self.theta = model.get_params()
+
         self.episode=0
 
 
         # Related objects.
-        self.model = model
         self.memory = memory
+
+        self.model = model
+        self.shapes =  [w.shape for w in model.get_weights()]
+        self.sizes = [w.size for w in model.get_weights()]
+        self.num_weights = sum(self.sizes)
+
+        print(self.sizes)
+
+        self.update_theta(None)
+
 
         # State.
         self.compiled = False
         self.reset_states()
 
-    def compile(self, optimizer, metrics=[]):
+    def compile(self):
+        self.model.compile(optimizer='sgd', loss='mse')
         self.compiled = True
 
 
@@ -47,7 +57,7 @@ class CEMAgent(Agent):
         self.update_target_model_hard()
 
     def save_weights(self, filepath, overwrite=False):
-        pass#self.model.save_weights(filepath, overwrite=overwrite)
+        self.model.save_weights(filepath, overwrite=overwrite)
 
     def reset_states(self):
         self.recent_action = None
@@ -56,15 +66,30 @@ class CEMAgent(Agent):
 
     def select_action(self,state):
         batch = state.copy()
-        return self.model.select_action(batch)
+        action = self.model.predict_on_batch(batch).flatten()
+
+        return np.argmax(action)
 
     def update_theta(self,theta):
-        self.theta = theta
+        if (theta is not None):
+            self.theta = theta
+        else:
+            self.theta = np.random.randn(self.num_weights*2)
 
     def choose_weights(self):
-        cov = np.diag(np.ones(self.theta.shape[0]))
-        params = np.random.multivariate_normal(self.theta,cov)
-        self.model.update_params(params)
+
+        mean = self.theta[:self.num_weights]
+        cov = self.theta[self.num_weights:]
+        params = np.square(cov) * np.random.randn(self.num_weights) +  mean
+
+        sampled_weights = []
+        pos=0
+        for i_layer, size in enumerate(self.sizes):
+            arr = params[pos:pos+size].reshape(self.shapes[i_layer])
+            sampled_weights.append(arr)
+            pos += size
+
+        self.model.set_weights(sampled_weights)
 
     def forward(self, observation):
         # Select an action.
@@ -80,8 +105,7 @@ class CEMAgent(Agent):
         # Book-keeping.
         self.recent_observations.append(observation)
         self.recent_action = action
-        self.recent_params.append(self.model.get_params())
-
+        self.recent_params.append(self.theta)
 
         return action
 
@@ -94,7 +118,6 @@ class CEMAgent(Agent):
 
 
         # Store most recent experience in memory.
-
         self.memory.append(reward)
 
         if (terminal):
@@ -108,34 +131,8 @@ class CEMAgent(Agent):
                 new_params = np.mean(np.vstack(params[i] for i in best_idx),axis=0)
                 assert new_params.shape == params[0].shape
                 self.update_theta(new_params)
-                print("UPDATED MODEL , NEW PARAMS")
-                print(new_params)
 
             self.choose_weights()
-        return metrics
-
-        # Train the network on a single stochastic batch.
-        # if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
-        #
-        #     params , experiences = self.memory.sample(self.batch_size, self.window_length)
-        #
-        #     assert len(experiences) == self.batch_size == 32 == len(params)
-        #     best_idx = np.argsort(rewards)[:10]
-        #
-        #     new_params = np.mean(np.vstack(params[i] for i in best_idx),axis=0)
-        #     print("new mean")
-        #     print(new_params)
-        #     assert new_params.shape == params[0].shape
-        #     #print("new params")
-            #print(new_params)
-
-        #    self.update_model(new_params)
-
-        ## get the rewards for a stochastic sample
-
-
-
-        #    metrics += [np.nan]
 
         return metrics
 

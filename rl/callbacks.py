@@ -1,4 +1,5 @@
 from __future__ import division
+from __future__ import print_function
 import warnings
 import timeit
 import json
@@ -269,7 +270,7 @@ class FileLogger(Callback):
         assert len(mean_metrics) == len(self.metrics_names)
 
         data = list(zip(self.metrics_names, mean_metrics))
-        data += list(logs.iteritems())
+        data += list(logs.items())
         data += [('episode', episode), ('duration', duration)]
         for key, value in data:
             if key not in self.data:
@@ -294,7 +295,7 @@ class FileLogger(Callback):
         assert 'episode' in self.data
         sorted_indexes = np.argsort(self.data['episode'])
         sorted_data = {}
-        for key, values in self.data.iteritems():
+        for key, values in self.data.items():
             assert len(self.data[key]) == len(sorted_indexes)
             sorted_data[key] = [self.data[key][idx] for idx in sorted_indexes]
 

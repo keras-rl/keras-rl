@@ -13,6 +13,10 @@ matrix:
           env: KERAS_BACKEND=tensorflow
         - python: 2.7
           env: KERAS_BACKEND=theano TEST_MODE=PEP8
+        - python: 2.7
+          env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
+        - python: 3.4
+          env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
 install:
   # Adopted from https://github.com/fchollet/keras/blob/master/.travis.yml.
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
@@ -52,7 +56,9 @@ script:
   # Set up keras backend
   - sed -i -e 's/"backend":[[:space:]]*"[^"]*/"backend":\ "'$KERAS_BACKEND'/g' ~/.keras/keras.json;
   - echo -e "Running tests with the following config:\n$(cat ~/.keras/keras.json)"
-  - if [[ "$TEST_MODE" == "PEP8" ]]; then
+   - if [[ "$TEST_MODE" == "INTEGRATION" ]]; then
+       PYTHONPATH=$PWD:$PYTHONPATH py.test tests/integration;
+    elif [[ "$TEST_MODE" == "PEP8" ]]; then
        PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8 -m pep8 -n0;
     else
        PYTHONPATH=$PWD:$PYTHONPATH py.test tests/;

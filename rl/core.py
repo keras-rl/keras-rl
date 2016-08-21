@@ -1,6 +1,7 @@
 import warnings
 
 import numpy as np
+from keras.callbacks import History
 
 from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Visualizer, CallbackList
 
@@ -24,6 +25,8 @@ class Agent(object):
             callbacks += [TrainEpisodeLogger()]
         if visualize:
             callbacks += [Visualizer()]
+        history = History()
+        callbacks += [history]
         callbacks = CallbackList(callbacks)
         callbacks._set_model(self)
         callbacks._set_env(env)
@@ -119,8 +122,10 @@ class Agent(object):
             did_abort = True
         callbacks.on_train_end(logs={'did_abort': did_abort})
 
+        return history
+
     def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
-             nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None):
+             nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1):
         if not self.compiled:
             raise RuntimeError('Your tried to test your agent but it hasn\'t been compiled yet. Please call `compile()` before `test()`.')
         if action_repetition < 1:
@@ -129,10 +134,13 @@ class Agent(object):
         self.training = False
         
         callbacks = [] if not callbacks else callbacks[:]
-        
-        callbacks += [TestLogger()]
+
+        if verbose >= 1:
+            callbacks += [TestLogger()]
         if visualize:
             callbacks += [Visualizer()]
+        history = History()
+        callbacks += [history]
         callbacks = CallbackList(callbacks)
         callbacks._set_model(self)
         callbacks._set_env(env)
@@ -140,6 +148,7 @@ class Agent(object):
             'nb_episodes': nb_episodes,
         })
 
+        callbacks.on_train_begin()
         for episode in range(nb_episodes):
             callbacks.on_episode_begin(episode)
             episode_reward = 0.
@@ -193,6 +202,9 @@ class Agent(object):
                 'nb_steps': episode_step,
             }
             callbacks.on_episode_end(episode, episode_logs)
+        callbacks.on_train_end()
+
+        return history
 
     def reset_states(self):
         pass

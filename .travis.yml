@@ -57,7 +57,7 @@ script:
   # Set up keras backend
   - sed -i -e 's/"backend":[[:space:]]*"[^"]*/"backend":\ "'$KERAS_BACKEND'/g' ~/.keras/keras.json;
   - echo -e "Running tests with the following config:\n$(cat ~/.keras/keras.json)"
-   - if [[ "$TEST_MODE" == "INTEGRATION" ]]; then
+  - if [[ "$TEST_MODE" == "INTEGRATION" ]]; then
        PYTHONPATH=$PWD:$PYTHONPATH py.test tests/integration;
     elif [[ "$TEST_MODE" == "PEP8" ]]; then
        PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8 -m pep8 -n0;

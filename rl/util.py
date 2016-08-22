@@ -18,6 +18,17 @@ def clone_model(model, custom_objects={}):
     return clone
 
 
+def clone_optimizer(optimizer):
+    params = dict([(k, v) for k, v in optimizer.get_config().items()])
+    name = params.pop('name')
+    clone = optimizers.get(name, params)
+    if hasattr(optimizer, 'clipnorm'):
+        clone.clipnorm = optimizer.clipnorm
+    if hasattr(optimizer, 'clipvalue'):
+        clone.clipvalue = optimizer.clipvalue
+    return clone
+
+
 def get_soft_target_model_updates(target, source, tau):
     target_weights = target.trainable_weights + sum([l.non_trainable_weights for l in target.layers], [])
     source_weights = source.trainable_weights + sum([l.non_trainable_weights for l in source.layers], [])

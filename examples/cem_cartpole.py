@@ -22,7 +22,7 @@ obs_dim = env.observation_space.shape[0]
 # Option 1 : Simple linear model
 model = Sequential()
 model.add(Dense(nb_actions,input_dim=obs_dim))
-model.add(Activation('linear'))
+model.add(Activation('softmax'))
 
 # Option 2: deep network
 # model = Sequential()
@@ -33,7 +33,7 @@ model.add(Activation('linear'))
 # model.add(Dense(16))
 # model.add(Activation('relu'))
 # model.add(Dense(nb_actions))
-# model.add(Activation('linear'))
+# model.add(Activation('softmax'))
 
 
 print(model.summary())
@@ -44,7 +44,7 @@ print(model.summary())
 memory = EpisodeParameterMemory(limit=1000)
 
 cem = CEMAgent(model=model, nb_actions=nb_actions, memory=memory,
-          batch_size=50, nb_steps_warmup=2000, train_interval=50, elite_frac=0.05)
+               batch_size=50, nb_steps_warmup=2000, train_interval=50, elite_frac=0.05)
 cem.compile()
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this

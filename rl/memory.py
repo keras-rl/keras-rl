@@ -132,4 +132,3 @@ class EpisodeParameterMemory(object):
     @property
     def nb_entries(self):
         return len(self.reward_totals)
-

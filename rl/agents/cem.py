@@ -12,8 +12,7 @@ from rl.util import *
 
 class CEMAgent(Agent):
     def __init__(self, model, nb_actions, memory, window_length=1,
-                 gamma=.99, batch_size=50, nb_steps_warmup=1000, train_interval=50, elite_frac=0.05,memory_interval=1 ):
-
+                 gamma=.99, batch_size=50, nb_steps_warmup=1000, train_interval=50, elite_frac=0.05, memory_interval=1):
 
         super(CEMAgent, self).__init__()
 
@@ -27,19 +26,15 @@ class CEMAgent(Agent):
         self.train_interval = train_interval
         self.memory_interval = memory_interval
         self.window_length = window_length
-
-
         self.episode=0
-
 
         # Related objects.
         self.memory = memory
 
         self.model = model
-        self.shapes =  [w.shape for w in model.get_weights()]
+        self.shapes = [w.shape for w in model.get_weights()]
         self.sizes = [w.size for w in model.get_weights()]
         self.num_weights = sum(self.sizes)
-
 
         self.update_theta(None)
 
@@ -51,7 +46,6 @@ class CEMAgent(Agent):
         self.model.compile(optimizer='sgd', loss='mse')
         self.compiled = True
 
-
     def load_weights(self, filepath):
         self.model.load_weights(filepath)
         self.update_target_model_hard()
@@ -60,40 +54,39 @@ class CEMAgent(Agent):
         self.model.save_weights(filepath, overwrite=overwrite)
 
     def get_flat_weights(self):
-        flat_weights = np.zeros(self.num_weights)
+        weights_flat = np.zeros(self.num_weights)
         weights = self.model.get_weights()
         pos=0
         for i_layer, size in enumerate(self.sizes):
-            flat_weights[pos:pos+size] = weights[i_layer].flatten()
+            weights_flat[pos:pos+size] = weights[i_layer].flatten()
             pos += size
 
-        return flat_weights
+        return weights_flat
 
     def reset_states(self):
         self.recent_action = None
         self.recent_observations = deque(maxlen=self.window_length)
         self.recent_params = deque(maxlen=self.window_length)
 
-    def select_action(self,state):
+    def select_action(self,state,stochastic=True):
         batch = state.copy()
         action = self.model.predict_on_batch(batch).flatten()
-
+        if (stochastic):
+            return np.random.choice(np.arange(self.nb_actions),p=action/np.sum(action))
         return np.argmax(action)
 
     def update_theta(self,theta):
         if (theta is not None):
             self.theta = theta
         else:
-            self.theta = np.hstack( (
-              np.random.randn(self.num_weights), # means
-              np.random.randn(self.num_weights)  # covariances
-            ))
+            # theta = (means,covariances)
+            self.theta = np.hstack((np.random.randn(self.num_weights),np.random.randn(self.num_weights)))
 
     def choose_weights(self):
 
         mean = self.theta[:self.num_weights]
         cov = self.theta[self.num_weights:]
-        weights_flat = np.square(cov) * np.random.randn(self.num_weights) +  mean
+        weights_flat = np.square(cov) * np.random.randn(self.num_weights) + mean
 
         sampled_weights = []
         pos=0
@@ -130,7 +123,6 @@ class CEMAgent(Agent):
             # memory to obtain the state over the most recent observations.
             return metrics
 
-
         # Store most recent experience in memory.
         self.memory.append(reward)
 
@@ -140,7 +132,7 @@ class CEMAgent(Agent):
             self.episode += 1
 
             if (self.step > self.nb_steps_warmup and self.episode % self.train_interval == 0):
-                params , reward_totals = self.memory.sample(self.batch_size)
+                params, reward_totals = self.memory.sample(self.batch_size)
                 best_idx = np.argsort(np.array(reward_totals))[-self.num_best:]
                 best = np.vstack(params[i] for i in best_idx)
 

@@ -71,7 +71,7 @@ You can load the weights using the `load_weights` method on the respective agent
 
 ## Requirements
 - Python 2.7
-- [Keras](http://keras.io) >= 1.0
+- [Keras](http://keras.io) >= 1.0.7
 
 That's it. However, if you want to run the examples, you'll also need the following dependencies:
 - [OpenAI Gym](https://github.com/openai/gym)

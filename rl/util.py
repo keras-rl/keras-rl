@@ -1,31 +1,27 @@
-import warnings
-
-from keras.models import model_from_config, Sequential, Model
+from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
+from keras.optimizers import optimizer_from_config
 
 
 def clone_model(model, custom_objects={}):
-    if len(custom_objects) > 0:
-        warnings.warn('Due to an API problem with Keras, custom_objects is currently ignored. Sorry about that.')
-    config = model.get_config()
-    try:
-        # TODO: re-enable custom_objects
-        clone = Sequential.from_config(config)
-    except:
-        # TODO: re-enable custom_objects
-        clone = Model.from_config(config)
+    # Requires Keras 1.0.7 since get_config has breaking changes.
+    config = {
+        'class_name': model.__class__.__name__,
+        'config': model.get_config(),
+    }
+    clone = model_from_config(config, custom_objects=custom_objects)
     clone.set_weights(model.get_weights())
     return clone
 
 
 def clone_optimizer(optimizer):
+    # Requires Keras 1.0.7 since get_config has breaking changes.
     params = dict([(k, v) for k, v in optimizer.get_config().items()])
-    name = params.pop('name')
-    clone = optimizers.get(name, params)
-    if hasattr(optimizer, 'clipnorm'):
-        clone.clipnorm = optimizer.clipnorm
-    if hasattr(optimizer, 'clipvalue'):
-        clone.clipvalue = optimizer.clipvalue
+    config = {
+        'class_name': optimizer.__class__.__name__,
+        'config': params,
+    }
+    clone = optimizer_from_config(config)
     return clone
 
 

@@ -41,7 +41,7 @@ print(model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!
-memory = EpisodeParameterMemory(limit=1000)
+memory = EpisodeParameterMemory(limit=1000,max_episode_steps=200)
 
 cem = CEMAgent(model=model, nb_actions=nb_actions, memory=memory,
                batch_size=50, nb_steps_warmup=2000, train_interval=50, elite_frac=0.05)
@@ -54,7 +54,7 @@ cem.fit(env, nb_steps=100000, visualize=False, verbose=2)
 
 # After training is done, we save the best weights.
 print("highest reward total seen : {0}".format(cem.best_seen[0]))
-cem.model.set_weights(cem.weights_list(cem.best_seen[1]))
+cem.model.set_weights(cem.get_weights_list(cem.best_seen[1]))
 cem.save_weights('cem_{}_params.h5f'.format(ENV_NAME), overwrite=True)
 
 # Finally, evaluate our algorithm for 5 episodes.

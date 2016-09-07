@@ -101,11 +101,12 @@ class SequentialMemory(object):
 
 
 class EpisodeParameterMemory(object):
-    def __init__(self,limit):
+    def __init__(self,limit,max_episode_steps):
         self.limit = limit
+        self.max_episode_steps = max_episode_steps
 
         self.params = RingBuffer(limit)
-        self.intermediate_rewards = RingBuffer(200) # max episode steps : TODO make dynamic
+        self.intermediate_rewards = RingBuffer(self.max_episode_steps)
         self.reward_totals = RingBuffer(limit)
 
     def sample(self,batch_size):
@@ -127,7 +128,7 @@ class EpisodeParameterMemory(object):
         total_reward = sum([d for d in self.intermediate_rewards.data if d])
         self.reward_totals.append(total_reward)
         self.params.append(params)
-        self.intermediate_rewards = RingBuffer(200)
+        self.intermediate_rewards = RingBuffer(self.max_episode_steps)
 
     @property
     def nb_entries(self):

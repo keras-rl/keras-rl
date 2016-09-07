@@ -72,7 +72,7 @@ You can load the weights using the `load_weights` method on the respective agent
 
 ## Requirements
 - Python 2.7
-- [Keras](http://keras.io) >= 1.0
+- [Keras](http://keras.io) >= 1.0.7
 
 That's it. However, if you want to run the examples, you'll also need the following dependencies:
 - [OpenAI Gym](https://github.com/openai/gym)
@@ -124,4 +124,4 @@ It has since been adapted to become a general-purpose library.
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.
 - Documentation: Currently, the documentation is pretty much non-existent.
-- TROP, priority-based memory, dueling DQN, A3C, async DQN, ...
+- TRPO, priority-based memory, dueling DQN, A3C, async DQN, ...

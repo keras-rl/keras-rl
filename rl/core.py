@@ -1,12 +1,13 @@
 import warnings
 
 import numpy as np
+from keras.callbacks import History
 
 from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Visualizer, CallbackList
 
 
 class Agent(object):
-    def fit(self, env, nb_steps, action_repetition=1, callbacks=[], verbose=1,
+    def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
             nb_max_episode_steps=None):
         if not self.compiled:
@@ -15,6 +16,8 @@ class Agent(object):
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
         self.training = True
+        
+        callbacks = [] if not callbacks else callbacks[:]
 
         if verbose == 1:
             callbacks += [TrainIntervalLogger(interval=log_interval)]
@@ -22,6 +25,8 @@ class Agent(object):
             callbacks += [TrainEpisodeLogger()]
         if visualize:
             callbacks += [Visualizer()]
+        history = History()
+        callbacks += [history]
         callbacks = CallbackList(callbacks)
         callbacks._set_model(self)
         callbacks._set_env(env)
@@ -117,18 +122,25 @@ class Agent(object):
             did_abort = True
         callbacks.on_train_end(logs={'did_abort': did_abort})
 
-    def test(self, env, nb_episodes=1, action_repetition=1, callbacks=[], visualize=True,
-             nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None):
+        return history
+
+    def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
+             nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1):
         if not self.compiled:
             raise RuntimeError('Your tried to test your agent but it hasn\'t been compiled yet. Please call `compile()` before `test()`.')
         if action_repetition < 1:
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
         self.training = False
+        
+        callbacks = [] if not callbacks else callbacks[:]
 
-        callbacks += [TestLogger()]
+        if verbose >= 1:
+            callbacks += [TestLogger()]
         if visualize:
             callbacks += [Visualizer()]
+        history = History()
+        callbacks += [history]
         callbacks = CallbackList(callbacks)
         callbacks._set_model(self)
         callbacks._set_env(env)
@@ -136,6 +148,7 @@ class Agent(object):
             'nb_episodes': nb_episodes,
         })
 
+        callbacks.on_train_begin()
         for episode in range(nb_episodes):
             callbacks.on_episode_begin(episode)
             episode_reward = 0.
@@ -189,6 +202,9 @@ class Agent(object):
                 'nb_steps': episode_step,
             }
             callbacks.on_episode_end(episode, episode_logs)
+        callbacks.on_train_end()
+
+        return history
 
     def reset_states(self):
         pass

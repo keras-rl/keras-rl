@@ -46,6 +46,7 @@ class CEMAgent(Agent):
         # store the best result seen during training, as a tuple (reward, flat_weights)
         self.best_seen = (None,np.zeros(self.num_weights))
 
+        self.theta = np.zeros(self.num_weights*2)
         self.update_theta(theta_init)
 
         # State.
@@ -95,7 +96,7 @@ class CEMAgent(Agent):
     
     def update_theta(self,theta):
         if (theta is not None):
-            assert theta.shape == self.theta.shape, "Invalid theta, wrong shape"
+            assert theta.shape == self.theta.shape, "Invalid theta, shape is {0} but should be {1}".format(theta.shape,self.theta.shape)
             assert (not np.isnan(theta).any()), "Invalid theta, NaN encountered"
             assert (theta[self.num_weights:] >= 0.).all(), "Invalid theta, standard deviations must be nonnegative"            
             self.theta = theta

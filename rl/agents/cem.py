@@ -12,13 +12,13 @@ from rl.util import *
 
 class CEMAgent(Agent):
     def __init__(self, model, nb_actions, memory, window_length=1,
-                 gamma=.99, batch_size=50, nb_steps_warmup=1000, train_interval=50, elite_frac=0.05, memory_interval=1):
+                 batch_size=50, nb_steps_warmup=1000, train_interval=50,
+                 elite_frac=0.05, memory_interval=1, theta_init=None):
 
         super(CEMAgent, self).__init__()
 
         # Parameters.
         self.nb_actions = nb_actions
-        self.gamma = gamma
         self.batch_size = batch_size
         self.elite_frac = elite_frac
         self.num_best = int(self.batch_size*self.elite_frac)
@@ -27,6 +27,11 @@ class CEMAgent(Agent):
         self.memory_interval = memory_interval
         self.window_length = window_length
         self.episode=0
+        
+        # default initial mean & cov, override this by passing an theta_init argument
+        self.init_mean = 0.0
+        self.init_stdev = 1.0
+ 
 
         # Related objects.
         self.memory = memory
@@ -35,8 +40,11 @@ class CEMAgent(Agent):
         self.shapes = [w.shape for w in model.get_weights()]
         self.sizes = [w.size for w in model.get_weights()]
         self.num_weights = sum(self.sizes)
+        
+        # store the best result seen during training, as a tuple (reward, flat_weights)
+        self.best_seen = (None,np.zeros(self.num_weights))
 
-        self.update_theta(None)
+        self.update_theta(theta_init)
 
         # State.
         self.compiled = False
@@ -48,53 +56,59 @@ class CEMAgent(Agent):
 
     def load_weights(self, filepath):
         self.model.load_weights(filepath)
-        self.update_target_model_hard()
 
     def save_weights(self, filepath, overwrite=False):
         self.model.save_weights(filepath, overwrite=overwrite)
 
-    def get_flat_weights(self):
+    def get_weights_flat(self,weights):
         weights_flat = np.zeros(self.num_weights)
-        weights = self.model.get_weights()
+
         pos=0
         for i_layer, size in enumerate(self.sizes):
             weights_flat[pos:pos+size] = weights[i_layer].flatten()
             pos += size
 
         return weights_flat
+        
+    def get_weights_list(self,weights_flat):
+        weights = []
+        pos=0
+        for i_layer, size in enumerate(self.sizes):
+            arr = weights_flat[pos:pos+size].reshape(self.shapes[i_layer])
+            weights.append(arr)
+            pos += size
+        return weights          
 
     def reset_states(self):
         self.recent_action = None
         self.recent_observations = deque(maxlen=self.window_length)
         self.recent_params = deque(maxlen=self.window_length)
 
-    def select_action(self,state,stochastic=True):
+    def select_action(self,state,stochastic=False):
         batch = state.copy()
         action = self.model.predict_on_batch(batch).flatten()
-        if (stochastic):
+        if (stochastic or self.training):
             return np.random.choice(np.arange(self.nb_actions),p=action/np.sum(action))
         return np.argmax(action)
-
+    
     def update_theta(self,theta):
         if (theta is not None):
+            assert theta.shape == self.theta.shape, "Invalid theta, wrong shape"
+            assert (not np.isnan(theta).any()), "Invalid theta, NaN encountered"
+            assert (theta[self.num_weights:] >= 0.).all(), "Invalid theta, standard deviations must be nonnegative"            
             self.theta = theta
         else:
-            # theta = (means,covariances)
-            self.theta = np.hstack((np.random.randn(self.num_weights),np.random.randn(self.num_weights)))
+            means = np.ones(self.num_weights) * self.init_mean
+            stdevs = np.ones(self.num_weights) * self.init_stdev
+            self.theta = np.hstack((means,stdevs))
 
     def choose_weights(self):
 
         mean = self.theta[:self.num_weights]
-        cov = self.theta[self.num_weights:]
-        weights_flat = np.square(cov) * np.random.randn(self.num_weights) + mean
+        std = self.theta[self.num_weights:]
+        weights_flat = std * np.random.randn(self.num_weights) + mean
 
-        sampled_weights = []
-        pos=0
-        for i_layer, size in enumerate(self.sizes):
-            arr = weights_flat[pos:pos+size].reshape(self.shapes[i_layer])
-            sampled_weights.append(arr)
-            pos += size
-
+        sampled_weights = self.get_weights_list(weights_flat)
         self.model.set_weights(sampled_weights)
 
     def forward(self, observation):
@@ -112,10 +126,10 @@ class CEMAgent(Agent):
         # Book-keeping.
         self.recent_observations.append(observation)
         self.recent_action = action
-        self.recent_params.append(self.get_flat_weights())
+        self.recent_params.append(self.get_weights_flat(self.model.get_weights()))
 
         return action
-
+         
     def backward(self, reward, terminal):
         metrics = [np.nan for _ in ['mse']]
         if not self.training:
@@ -134,20 +148,16 @@ class CEMAgent(Agent):
             if (self.step > self.nb_steps_warmup and self.episode % self.train_interval == 0):
                 params, reward_totals = self.memory.sample(self.batch_size)
                 best_idx = np.argsort(np.array(reward_totals))[-self.num_best:]
-                best = np.vstack(params[i] for i in best_idx)
+                best = np.vstack([params[i] for i in best_idx])
 
-                assert (not np.isnan(best).any())
+                if (reward_totals[best_idx[-1]] > self.best_seen[0]):
+                    self.best_seen = (reward_totals[best_idx[-1]],params[best_idx[-1]])
+
+                min_std = 1.0 * np.exp(-self.step*2e-5)
                 mean = np.mean(best,axis=0)
-                print("new mean")
-                print(mean)
-                print("rewards")
-                print([reward_totals[i] for i in best_idx])
-                cov = np.std(best,axis=0)
-                print("new cov")
-                print(cov)
-                new_params = np.hstack((mean,cov))
-                assert new_params.shape == self.theta.shape
-                self.update_theta(new_params)
+                std = np.std(best,axis=0) + min_std
+                new_theta = np.hstack((mean,std))
+                self.update_theta(new_theta)
 
             self.choose_weights()
 

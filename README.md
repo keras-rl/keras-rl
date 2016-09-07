@@ -25,7 +25,7 @@ As of today, the following algorithms have been implemented:
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
 - Continuous DQN (CDQN or NAF) [[6]](http://arxiv.org/abs/1603.00748)
-- Cross-Entropy Method (CEM) [[7]](http://learning.mpi-sws.org/mlss2016/slides/2016-MLSS-RL.pdf)
+- Cross-Entropy Method (CEM) [[7]](http://learning.mpi-sws.org/mlss2016/slides/2016-MLSS-RL.pdf)[[8]](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.81.6579&rep=rep1&type=pdf)
 
 I'm currently working on the following algorithms, which can be found on the `experimental` branch:
 
@@ -118,6 +118,8 @@ It has since been adapted to become a general-purpose library.
 4. *Continuous control with deep reinforcement learning*, Lillicrap et al., 2015
 5. *Asynchronous Methods for Deep Reinforcement Learning*, Mnih et al., 2016
 6. *Continuous Deep Q-Learning with Model-based Acceleration*, Gu et al., 2016
+7. *Learning Tetris Using the Noisy Cross-Entropy Method*, Szita et al., 2006
+8. *Deep Reinforcement Learning (MLSS lecture notes)*, John Schulman, 2016.
 
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.

@@ -19,7 +19,7 @@ env.seed(123)
 nb_actions = env.action_space.n
 obs_dim = env.observation_space.shape[0]
 
-# Option 1 : Simple linear model
+# Option 1 : Simple model
 model = Sequential()
 model.add(Dense(nb_actions,input_dim=obs_dim))
 model.add(Activation('softmax'))
@@ -52,7 +52,9 @@ cem.compile()
 # Ctrl + C.
 cem.fit(env, nb_steps=100000, visualize=False, verbose=2)
 
-# After training is done, we save the final weights.
+# After training is done, we save the best weights.
+print("highest reward total seen : {0}".format(cem.best_seen[0]))
+cem.model.set_weights(cem.weights_list(cem.best_seen[1]))
 cem.save_weights('cem_{}_params.h5f'.format(ENV_NAME), overwrite=True)
 
 # Finally, evaluate our algorithm for 5 episodes.

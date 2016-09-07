@@ -9,11 +9,10 @@ from keras.models import Model
 from rl.core import Agent
 from rl.util import *
 
-
 class CEMAgent(Agent):
     def __init__(self, model, nb_actions, memory, window_length=1,
                  batch_size=50, nb_steps_warmup=1000, train_interval=50,
-                 elite_frac=0.05, memory_interval=1, theta_init=None):
+                 elite_frac=0.05, memory_interval=1, theta_init=None,noise_decay_const=0.0,noise_ampl=0.0):
 
         super(CEMAgent, self).__init__()
 
@@ -26,13 +25,16 @@ class CEMAgent(Agent):
         self.train_interval = train_interval
         self.memory_interval = memory_interval
         self.window_length = window_length
-        self.episode=0
         
+        # if using noisy CEM, the minimum standard deviation will be ampl * exp (- decay_const * step )
+        self.noise_decay_const = noise_decay_const
+        self.noise_ampl = noise_ampl
+                
         # default initial mean & cov, override this by passing an theta_init argument
         self.init_mean = 0.0
         self.init_stdev = 1.0
  
-
+        self.episode=0
         # Related objects.
         self.memory = memory
 
@@ -103,7 +105,6 @@ class CEMAgent(Agent):
             self.theta = np.hstack((means,stdevs))
 
     def choose_weights(self):
-
         mean = self.theta[:self.num_weights]
         std = self.theta[self.num_weights:]
         weights_flat = std * np.random.randn(self.num_weights) + mean
@@ -131,7 +132,7 @@ class CEMAgent(Agent):
         return action
          
     def backward(self, reward, terminal):
-        metrics = [np.nan for _ in ['mse']]
+        metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
@@ -152,8 +153,11 @@ class CEMAgent(Agent):
 
                 if (reward_totals[best_idx[-1]] > self.best_seen[0]):
                     self.best_seen = (reward_totals[best_idx[-1]],params[best_idx[-1]])
+                    
+                metrics = [np.mean(np.array(reward_totals)[best_idx])]
 
-                min_std = 1.0 * np.exp(-self.step*2e-5)
+                min_std = self.noise_ampl * np.exp(-self.step*self.noise_decay_const)
+                
                 mean = np.mean(best,axis=0)
                 std = np.std(best,axis=0) + min_std
                 new_theta = np.hstack((mean,std))
@@ -165,4 +169,4 @@ class CEMAgent(Agent):
 
     @property
     def metrics_names(self):
-        return self.model.metrics_names[:]
+        return ['mean_best_reward']

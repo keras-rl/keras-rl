@@ -6,8 +6,9 @@ import numpy as np
 import gym
 
 from keras.models import Sequential
-from keras.layers import Dense, Activation, Flatten, Convolution2D
+from keras.layers import Dense, Activation, Flatten, Convolution2D, Permute
 from keras.optimizers import Adam
+import keras.backend as K
 
 from rl.agents.dqn import DQNAgent
 from rl.policy import LinearAnnealedPolicy, BoltzmannQPolicy, EpsGreedyQPolicy
@@ -66,8 +67,17 @@ def _step(a):
 env._step = _step
 
 # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
+input_shape = (WINDOW_LENGTH,) + INPUT_SHAPE
 model = Sequential()
-model.add(Convolution2D(32, 8, 8, subsample=(4, 4), input_shape=(WINDOW_LENGTH,) + INPUT_SHAPE))
+if K.image_dim_ordering() == 'tf':
+    # (width, height, channels)
+    model.add(Permute((2, 3, 1), input_shape=input_shape))
+elif K.image_dim_ordering() == 'th':
+    # (channels, width, height)
+    model.add(Permute((1, 2, 3), input_shape=input_shape))
+else:
+    raise RuntimeError('Unknown image_dim_ordering.')
+model.add(Convolution2D(32, 8, 8, subsample=(4, 4)))
 model.add(Activation('relu'))
 model.add(Convolution2D(64, 4, 4, subsample=(2, 2)))
 model.add(Activation('relu'))

@@ -72,18 +72,32 @@ class DQNAgent(Agent):
         # We never train the target model, hence we can set the optimizer and loss arbitrarily.
         self.target_model = clone_model(self.model, self.custom_model_objects)
         self.target_model.compile(optimizer='sgd', loss='mse')
+        self.model.compile(optimizer='sgd', loss='mse')
         
         # Compile model.
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             updates = get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
-        
-        def clipped_mse(y_true, y_pred):
+
+        def clipped_masked_mse(args):
+            y_true, y_pred, mask = args
             delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
+            delta *= mask  # apply element-wise mask
             return K.mean(K.square(delta), axis=-1)
-        
-        self.model.compile(optimizer=optimizer, loss=clipped_mse, metrics=metrics)
+
+        # Create trainable model. The problem is that we need to mask the output since we only
+        # ever want to update the Q values for a certain action. The way we achieve this is by
+        # using a custom Lambda layer that computes the loss. This gives us the necessary flexibility
+        # to mask out certain parameters by passing in multiple inputs to the Lambda layer.
+        y_pred = self.model.output
+        y_true = Input(name='y_true', shape=(self.nb_actions,))
+        mask = Input(name='mask', shape=(self.nb_actions,))
+        loss_out = Lambda(clipped_masked_mse, output_shape=(1,), name='loss')([y_pred, y_true, mask])
+        trainable_model = Model(input=[self.model.input, y_true, mask], output=[loss_out])
+        # TOOD: does this break metrics?
+        trainable_model.compile(optimizer=optimizer, loss=lambda y_true, y_pred: y_pred, metrics=metrics)
+        self.trainable_model = trainable_model
         
         self.compiled = True
 
@@ -203,12 +217,9 @@ class DQNAgent(Agent):
                 q_batch = np.max(target_q_values, axis=1).flatten()
             assert q_batch.shape == (self.batch_size,)
 
-            # Compute the current activations in the output layer given state0. This is hacky
-            # since we do this in the training step anyway, but this is currently the simplest
-            # way to set the gradients of the non-affected output units to zero.
-            targets = self.model.predict_on_batch(state0_batch)
-            assert targets.shape == (self.batch_size, self.nb_actions)
-
+            targets = np.zeros((self.batch_size, self.nb_actions))
+            masks = np.zeros((self.batch_size, self.nb_actions))
+            
             # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target targets accordingly,
             # but only for the affected output units (as given by action_batch).
             discounted_reward_batch = self.gamma * q_batch
@@ -216,13 +227,20 @@ class DQNAgent(Agent):
             discounted_reward_batch *= terminal_batch
             assert discounted_reward_batch.shape == reward_batch.shape
             Rs = reward_batch + discounted_reward_batch
-            for target, R, action in zip(targets, Rs, action_batch):
+            for target, mask, R, action in zip(targets, masks, Rs, action_batch):
                 target[action] = R  # update action with estimated accumulated reward
+                mask[action] = 1.  # enable loss for this specific action
             targets = np.array(targets).astype('float32')
+            masks = np.array(masks).astype('float32')
 
-            # Finally, perform a single update on the entire batch.
-            metrics = self.model.train_on_batch(state0_batch, targets)
-            metrics += self.policy.run_metrics()
+            # Finally, perform a single update on the entire batch. We use a dummy target since
+            # the actual loss is computed in a Lambda layer that needs more complex input.
+            dummy_targets = np.zeros((self.batch_size,))
+            self.trainable_model.train_on_batch([state0_batch, targets, masks], dummy_targets)
+            
+            # TODO: re-implement metrics for this new case
+            #metrics = self.trainable_model.train_on_batch([state0_batch, targets, masks], np.zeros((self.batch_size,)))
+            #metrics += self.policy.run_metrics()
 
         if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
             self.update_target_model_hard()

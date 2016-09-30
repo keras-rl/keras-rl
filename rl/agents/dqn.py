@@ -113,6 +113,12 @@ class DQNAgent(Agent):
     def reset_states(self):
         self.recent_action = None
         self.recent_observations = deque(maxlen=self.window_length)
+        self.model.reset_states()
+        if hasattr(self, 'target_model'):
+            for layer, target_layer in zip(self.model.layers, self.target_model.layers):
+                if hasattr(target_layer, 'stateful_mask'):
+                    K.set_value(target_layer.is_target_network, np.array([1]))
+                    K.set_value(target_layer.stateful_mask, K.get_value(layer.stateful_mask))
 
     def update_target_model_hard(self):
         self.target_model.set_weights(self.model.get_weights())
@@ -235,7 +241,7 @@ class DQNAgent(Agent):
 
             # Finally, perform a single update on the entire batch. We use a dummy target since
             # the actual loss is computed in a Lambda layer that needs more complex input.
-            dummy_targets = np.zeros((self.batch_size,))
+            dummy_targets = np.zeros((self.batch_size, 1))
             self.trainable_model.train_on_batch([state0_batch, targets, masks], dummy_targets)
             
             # TODO: re-implement metrics for this new case

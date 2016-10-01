@@ -1,3 +1,5 @@
+import argparse
+
 import numpy as np
 from gym import core, spaces
 import gym
@@ -90,24 +92,34 @@ class AlwaysOnDropout(Dropout):
         return x
 
 
-dropout_mode = 1
-chain_length = 50
-for _ in xrange(10):
+parser = argparse.ArgumentParser()
+parser.add_argument('--mode', type=int, default=1)
+parser.add_argument('--n', type=int, default=20)
+args = parser.parse_args()
+
+
+np.random.seed(42)
+
+
+print('Running experiment with mode = {} and n = {}'.format(args.mode, args.n))
+print('')
+for idx in range(10):
+    print('Round {}'.format(idx + 1))
     env = ChainEnvFig3()
-    env.n = chain_length
+    env.n = args.n
     nb_actions = env.action_space.n
 
     model = Sequential()
     model.add(Flatten(input_shape=(1,) + env.observation_space.shape))
     model.add(Dense(64))
     model.add(Activation('relu'))
-    model.add(AlwaysOnDropout(.2, mode=dropout_mode))
+    model.add(AlwaysOnDropout(.2, mode=args.mode))
     model.add(Dense(64))
     model.add(Activation('relu'))
-    model.add(AlwaysOnDropout(.2, mode=dropout_mode))
+    model.add(AlwaysOnDropout(.2, mode=args.mode))
     model.add(Dense(64))
     model.add(Activation('relu'))
-    model.add(AlwaysOnDropout(.2, mode=dropout_mode))
+    model.add(AlwaysOnDropout(.2, mode=args.mode))
     model.add(Dense(nb_actions))
     model.add(Activation('linear'))
 
@@ -118,3 +130,5 @@ for _ in xrange(10):
     dqn.compile(Adam(lr=1e-3), metrics=['mae'])
     dqn.fit(env, nb_steps=2000, visualize=False, verbose=1)
     dqn.test(env, nb_episodes=5, visualize=False)
+    print('')
+    print('')

@@ -211,30 +211,22 @@ class TrainIntervalLogger(Callback):
     def on_step_begin(self, step, logs):
         if self.step % self.interval == 0:
             if len(self.episode_rewards) > 0:
-                print('performed {} episodes, episode_reward={:.3f} [{:.3f}, {:.3f}]'.format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards)))
+                metrics = np.array(self.metrics)
+                assert metrics.shape == (self.interval, len(self.metrics_names))
+
+                formatted_metrics = ''
+                if not np.isnan(metrics).all():  # not all values are means
+                    means = np.nanmean(self.metrics, axis=0)
+                    assert means.shape == (len(self.metrics_names),)
+                    for name, mean in zip(self.metrics_names, means):
+                        formatted_metrics += ' - {}: {:.3f}'.format(name, mean)
+                print('{} episodes - episode_reward: {:.3f} [{:.3f}, {:.3f}]{}'.format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards), formatted_metrics))
                 print('')
             self.reset()
             print('Interval {} ({} steps performed)'.format(self.step // self.interval + 1, self.step))
 
     def on_step_end(self, step, logs):
-        # TODO: work around nan's in metrics. This isn't really great yet and probably not 100% accurate
-        filtered_metrics = []
-        means = None
-        for idx, value in enumerate(logs['metrics']):
-            if not np.isnan(value):
-                filtered_metrics.append(value)
-            else:
-                mean = np.nan
-                if len(self.metrics) > 0 and not np.isnan(self.metrics).all():
-                    if means is None:
-                        means = np.nanmean(self.metrics, axis=0)
-                        assert means.shape == (len(self.metrics_names),)
-                    mean = means[idx]
-                filtered_metrics.append(mean)
-
         values = [('reward', logs['reward'])]
-        if not np.isnan(filtered_metrics).any():
-            values += list(zip(self.metrics_names, filtered_metrics))
         self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
         self.step += 1
         self.metrics.append(logs['metrics'])

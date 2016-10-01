@@ -16,6 +16,13 @@ def mean_q(y_true, y_pred):
     return K.mean(K.max(y_pred, axis=-1))
 
 
+def mean_q_new(y_true, loss):
+    # loss = K.square(y_true - y_pred). Solving for y_pred yields:
+    # K.sqrt(loss) = y_true - y_pred <=> y_pred = y_true - K.sqrt(loss).
+    y_pred = y_true - K.sqrt(loss)
+    return K.mean(y_pred)
+
+
 # An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
@@ -67,7 +74,7 @@ class DQNAgent(Agent):
         self.reset_states()
 
     def compile(self, optimizer, metrics=[]):
-        metrics += [mean_q]  # register default metrics
+        metrics += [mean_q_new]  # register default metrics
 
         # We never train the target model, hence we can set the optimizer and loss arbitrarily.
         self.target_model = clone_model(self.model, self.custom_model_objects)
@@ -224,6 +231,7 @@ class DQNAgent(Agent):
             assert q_batch.shape == (self.batch_size,)
 
             targets = np.zeros((self.batch_size, self.nb_actions))
+            dummy_targets = np.zeros((self.batch_size,))
             masks = np.zeros((self.batch_size, self.nb_actions))
             
             # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target targets accordingly,
@@ -233,20 +241,18 @@ class DQNAgent(Agent):
             discounted_reward_batch *= terminal_batch
             assert discounted_reward_batch.shape == reward_batch.shape
             Rs = reward_batch + discounted_reward_batch
-            for target, mask, R, action in zip(targets, masks, Rs, action_batch):
+            for idx, (target, mask, R, action) in enumerate(zip(targets, masks, Rs, action_batch)):
                 target[action] = R  # update action with estimated accumulated reward
+                dummy_targets[idx] = R
                 mask[action] = 1.  # enable loss for this specific action
             targets = np.array(targets).astype('float32')
             masks = np.array(masks).astype('float32')
 
             # Finally, perform a single update on the entire batch. We use a dummy target since
-            # the actual loss is computed in a Lambda layer that needs more complex input.
-            dummy_targets = np.zeros((self.batch_size, 1))
-            self.trainable_model.train_on_batch([state0_batch, targets, masks], dummy_targets)
-            
-            # TODO: re-implement metrics for this new case
-            #metrics = self.trainable_model.train_on_batch([state0_batch, targets, masks], np.zeros((self.batch_size,)))
-            #metrics += self.policy.run_metrics()
+            # the actual loss is computed in a Lambda layer that needs more complex input. However,
+            # it is still useful to know the actual target to compute metrics properly.
+            metrics = self.trainable_model.train_on_batch([state0_batch, targets, masks], dummy_targets)
+            metrics += self.policy.run_metrics()
 
         if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
             self.update_target_model_hard()
@@ -255,7 +261,7 @@ class DQNAgent(Agent):
 
     @property
     def metrics_names(self):
-        return self.model.metrics_names[:] + self.policy.metrics_names[:]
+        return self.trainable_model.metrics_names[:] + self.policy.metrics_names[:]
 
 
 class NAFLayer(Layer):

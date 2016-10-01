@@ -197,6 +197,7 @@ class TrainIntervalLogger(Callback):
         self.interval_start = timeit.default_timer()
         self.progbar = Progbar(target=self.interval)
         self.metrics = []
+        self.episode_rewards = []
 
     def on_train_begin(self, logs):
         self.train_start = timeit.default_timer()
@@ -209,6 +210,9 @@ class TrainIntervalLogger(Callback):
 
     def on_step_begin(self, step, logs):
         if self.step % self.interval == 0:
+            if len(self.episode_rewards) > 0:
+                print('performed {} episodes, episode_reward={:.3f} [{:.3f}, {:.3f}]'.format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards)))
+                print('')
             self.reset()
             print('Interval {} ({} steps performed)'.format(self.step // self.interval + 1, self.step))
 
@@ -234,6 +238,9 @@ class TrainIntervalLogger(Callback):
         self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
         self.step += 1
         self.metrics.append(logs['metrics'])
+
+    def on_episode_end(self, episode, logs):
+        self.episode_rewards.append(logs['episode_reward'])
 
 
 class FileLogger(Callback):

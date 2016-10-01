@@ -19,7 +19,7 @@ def mean_q(y_true, y_pred):
 def mean_q_new(y_true, loss):
     # loss = K.square(y_true - y_pred). Solving for y_pred yields:
     # K.sqrt(loss) = y_true - y_pred <=> y_pred = y_true - K.sqrt(loss).
-    y_pred = y_true - K.sqrt(loss)
+    y_pred = K.flatten(y_true) - K.sqrt(K.flatten(loss))
     return K.mean(y_pred)
 
 
@@ -91,7 +91,10 @@ class DQNAgent(Agent):
             y_true, y_pred, mask = args
             delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
             delta *= mask  # apply element-wise mask
-            return K.mean(K.square(delta), axis=-1)
+            loss = K.mean(K.square(delta), axis=-1)
+            # Multiply by the number of actions to reverse the effect of the mean.
+            loss *= float(self.nb_actions)
+            return loss
 
         # Create trainable model. The problem is that we need to mask the output since we only
         # ever want to update the Q values for a certain action. The way we achieve this is by

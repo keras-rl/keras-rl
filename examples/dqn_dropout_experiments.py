@@ -74,10 +74,16 @@ class AlwaysOnDropout(Dropout):
         self.is_target_network = K.zeros((1,))
         self.reset_states()
 
+    def get_config(self):
+        config = super(AlwaysOnDropout, self).get_config()
+        config['mode'] = self.mode
+        return config
+
     def reset_states(self):
-        K.set_value(self.stateful_mask, np.random.binomial(1, p=self.p, size=self.mask_shape))
+        K.set_value(self.stateful_mask, np.random.binomial(1, p=1. - self.p, size=self.mask_shape))
 
     def call(self, x, mask=None):
+        print('dropout: p = {}, mode = {}'.format(self.p, self.mode))
         noise_shape = self._get_noise_shape(x)
         if self.mode == 0:
             x = x * self.stateful_mask
@@ -88,7 +94,7 @@ class AlwaysOnDropout(Dropout):
         elif self.mode == 3:
             target_mode = K.dropout(x, self.p, noise_shape)
             non_target_mode = K.in_train_phase(K.dropout(x, self.p, noise_shape), x * self.stateful_mask)
-            x = K.switch(self.is_target_network[0], target_mode, non_target_mode)
+            x = K.switch(K.cast(self.is_target_network[0], 'uint8'), target_mode, non_target_mode)
         return x
 
 

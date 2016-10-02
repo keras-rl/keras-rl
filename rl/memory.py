@@ -124,13 +124,13 @@ class EpisodeParameterMemory(object):
         if batch_idxs is None:
             if self.nb_entries >= batch_size:
                 # We have enough data. Draw without replacement, that is each index is unique in the batch.
-                batch_idxs = np.random.choice(self.nb_entries - window_length, batch_size, replace=False) + window_length
+                batch_idxs = np.random.choice(self.nb_entries, batch_size, replace=False)
             else:
                 # Not enough data. Help ourselves with sampling from the range, but the same index
                 # can occur multiple times. This is not good and should be avoided by picking a
                 # large enough warm-up phase.
                 warnings.warn('Not enough entries to sample without replacement. Consider increasing your warm-up phase to avoid oversampling!')
-                batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
+                batch_idxs = np.random.random_integers(0, self.nb_entries - 1, size=batch_size)
         assert len(batch_idxs) == batch_size
 
         params = []

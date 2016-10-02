@@ -1,4 +1,6 @@
 from collections import deque, namedtuple
+import warnings
+
 import numpy as np
 
 
@@ -49,7 +51,15 @@ class SequentialMemory(object):
     def sample(self, batch_size, window_length, batch_idxs=None):
         # Draw random indexes such that we have at least `window_length` entries before each index.
         if batch_idxs is None:
-            batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
+            if self.nb_entries >= batch_size:
+                # We have enough data. Draw without replacement, that is each index is unique in the batch.
+                batch_idxs = np.random.choice(self.nb_entries - window_length, batch_size, replace=False) + window_length
+            else:
+                # Not enough data. Help ourselves with sampling from the range, but the same index
+                # can occur multiple times. This is not good and should be avoided by picking a
+                # large enough warm-up phase.
+                warnings.warn('Not enough entries to sample without replacement. Consider increasing your warm-up phase to avoid oversampling!')
+                batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
         assert len(batch_idxs) == batch_size
 
         # Create experiences
@@ -131,16 +141,24 @@ class EpisodeParameterMemory(object):
         self.intermediate_rewards = RingBuffer(self.max_episode_steps)
         self.reward_totals = RingBuffer(limit)
 
-    def sample(self,batch_size):
-        batch_idxs = np.random.random_integers(0, self.nb_entries - 1, size=batch_size)
+    def sample(self, batch_size, batch_idxs=None):
+        if batch_idxs is None:
+            if self.nb_entries >= batch_size:
+                # We have enough data. Draw without replacement, that is each index is unique in the batch.
+                batch_idxs = np.random.choice(self.nb_entries - window_length, batch_size, replace=False) + window_length
+            else:
+                # Not enough data. Help ourselves with sampling from the range, but the same index
+                # can occur multiple times. This is not good and should be avoided by picking a
+                # large enough warm-up phase.
+                warnings.warn('Not enough entries to sample without replacement. Consider increasing your warm-up phase to avoid oversampling!')
+                batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
         assert len(batch_idxs) == batch_size
+
         params = []
         reward_totals = []
-
         for idx in batch_idxs:
             params.append(self.params[idx])
             reward_totals.append(self.reward_totals[idx])
-
         return params, reward_totals
 
     def append(self,reward):

@@ -123,8 +123,11 @@ class DQNAgent(Agent):
     def reset_states(self):
         self.recent_action = None
         self.recent_observations = deque(maxlen=self.window_length)
-        self.model.reset_states()
-        if hasattr(self, 'target_model'):
+        if self.compiled:
+            self.model.reset_states()
+            self.target_model.reset_states()
+
+            # TODO: remove this hack, maybe add a callback that can be used for this sort of stuff.
             for layer, target_layer in zip(self.model.layers, self.target_model.layers):
                 if hasattr(target_layer, 'stateful_mask'):
                     K.set_value(target_layer.is_target_network, np.array([1]))
@@ -348,8 +351,13 @@ class NAFLayer(Layer):
                 return [L_, tf.transpose(L_)]
 
             tmp = tf.scan(fn, L_flat, initializer=init)
-            L = tmp[:, 0, :, :]
-            LT = tmp[:, 1, :, :]
+            if isinstance(tmp, (list, tuple)):
+                # TensorFlow 0.10 now returns a tuple of tensors.
+                L, LT = tmp
+            else:
+                # Old TensorFlow < 0.10 returns a shared tensor.
+                L = tmp[:, 0, :, :]
+                LT = tmp[:, 1, :, :]
         else:
             raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
         assert L is not None
@@ -433,6 +441,11 @@ class ContinuousDQNAgent(DQNAgent):
 
     def save_weights(self, filepath, overwrite=False):
         self.combined_model.save_weights(filepath, overwrite=overwrite)
+
+    def reset_states(self):
+        super(ContinuousDQNAgent, self).reset_states()
+        if self.compiled:
+            self.combined_model.reset_states()
 
     def compile(self, optimizer, metrics=[]):
         metrics += [mean_q]  # register default metrics

@@ -11,6 +11,23 @@ import numpy as np
 Experience = namedtuple('Experience', 'state0, action, reward, terminal, state1')
 
 
+def sample_batch_indexes(low, high, size, nb_entries):
+    if nb_entries >= batch_size:
+        # We have enough data. Draw without replacement, that is each index is unique in the
+        # batch. We cannot use `np.random.choice` here because it is horribly inefficient as
+        # the memory grows. See https://github.com/numpy/numpy/issues/2764 for a discussion.
+        # `random.sample` does the same thing (drawing without replacement) and is way faster.
+        batch_idxs = random.sample(xrange(low, high), batch_size)
+    else:
+        # Not enough data. Help ourselves with sampling from the range, but the same index
+        # can occur multiple times. This is not good and should be avoided by picking a
+        # large enough warm-up phase.
+        warnings.warn('Not enough entries to sample without replacement. Consider increasing your warm-up phase to avoid oversampling!')
+        batch_idxs = np.random.random_integers(low, high - 1, size=batch_size)
+    assert len(batch_idxs) == size
+    return batch_idxs
+
+
 class RingBuffer(object):
     def __init__(self, maxlen):
         self.maxlen = maxlen
@@ -51,20 +68,9 @@ class SequentialMemory(object):
         self.observations = RingBuffer(limit)
 
     def sample(self, batch_size, window_length, batch_idxs=None):
-        # Draw random indexes such that we have at least `window_length` entries before each index.
         if batch_idxs is None:
-            if self.nb_entries >= batch_size:
-                # We have enough data. Draw without replacement, that is each index is unique in the
-                # batch. We cannot use `np.random.choice` here because it is horribly inefficient as
-                # the memory grows. See https://github.com/numpy/numpy/issues/2764 for a discussion.
-                # `random.sample` does the same thing (drawing without replacement) and is way faster.
-                batch_idxs = random.sample(xrange(window_length, self.nb_entries), batch_size)
-            else:
-                # Not enough data. Help ourselves with sampling from the range, but the same index
-                # can occur multiple times. This is not good and should be avoided by picking a
-                # large enough warm-up phase.
-                warnings.warn('Not enough entries to sample without replacement. Consider increasing your warm-up phase to avoid oversampling!')
-                batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
+            # Draw random indexes such that we have at least `window_length` entries before each index.
+            batch_idxs = sample_batch_indexes(window_length, self.nb_entries, size=batch_size, nb_entries=nb_entries)
         assert len(batch_idxs) == batch_size
 
         # Create experiences
@@ -148,15 +154,7 @@ class EpisodeParameterMemory(object):
 
     def sample(self, batch_size, batch_idxs=None):
         if batch_idxs is None:
-            if self.nb_entries >= batch_size:
-                # We have enough data. Draw without replacement, that is each index is unique in the batch.
-                batch_idxs = random.sample(xrange(self.nb_entries), batch_size)
-            else:
-                # Not enough data. Help ourselves with sampling from the range, but the same index
-                # can occur multiple times. This is not good and should be avoided by picking a
-                # large enough warm-up phase.
-                warnings.warn('Not enough entries to sample without replacement. Consider increasing your warm-up phase to avoid oversampling!')
-                batch_idxs = np.random.random_integers(0, self.nb_entries - 1, size=batch_size)
+            batch_idxs = sample_batch_indexes(0, self.nb_entries, size=batch_size, nb_entries=nb_entries)
         assert len(batch_idxs) == batch_size
 
         params = []

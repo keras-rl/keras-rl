@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from collections import deque, namedtuple
 import warnings
 import random
@@ -56,7 +57,7 @@ class SequentialMemory(object):
                 # batch. We cannot use `np.random.choice` here because it is horribly inefficient as
                 # the memory grows. See https://github.com/numpy/numpy/issues/2764 for a discussion.
                 # `random.sample` does the same thing (drawing without replacement) and is way faster.
-                batch_idxs = random.sample(range(window_length, self.nb_entries), batch_size)
+                batch_idxs = random.sample(xrange(window_length, self.nb_entries), batch_size)
             else:
                 # Not enough data. Help ourselves with sampling from the range, but the same index
                 # can occur multiple times. This is not good and should be avoided by picking a
@@ -128,7 +129,7 @@ class EpisodeParameterMemory(object):
         if batch_idxs is None:
             if self.nb_entries >= batch_size:
                 # We have enough data. Draw without replacement, that is each index is unique in the batch.
-                batch_idxs = random.sample(range(self.nb_entries), batch_size)
+                batch_idxs = random.sample(xrange(self.nb_entries), batch_size)
             else:
                 # Not enough data. Help ourselves with sampling from the range, but the same index
                 # can occur multiple times. This is not good and should be avoided by picking a

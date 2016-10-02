@@ -1,5 +1,6 @@
 from collections import deque, namedtuple
 import warnings
+import random
 
 import numpy as np
 
@@ -51,8 +52,11 @@ class SequentialMemory(object):
         # Draw random indexes such that we have at least `window_length` entries before each index.
         if batch_idxs is None:
             if self.nb_entries >= batch_size:
-                # We have enough data. Draw without replacement, that is each index is unique in the batch.
-                batch_idxs = np.random.choice(self.nb_entries - window_length, size=batch_size, replace=False) + window_length
+                # We have enough data. Draw without replacement, that is each index is unique in the
+                # batch. We cannot use `np.random.choice` here because it is horribly inefficient as
+                # the memory grows. See https://github.com/numpy/numpy/issues/2764 for a discussion.
+                # `random.sample` does the same thing (drawing without replacement) and is way faster.
+                batch_idxs = random.sample(range(window_length, self.nb_entries), batch_size)
             else:
                 # Not enough data. Help ourselves with sampling from the range, but the same index
                 # can occur multiple times. This is not good and should be avoided by picking a
@@ -124,7 +128,7 @@ class EpisodeParameterMemory(object):
         if batch_idxs is None:
             if self.nb_entries >= batch_size:
                 # We have enough data. Draw without replacement, that is each index is unique in the batch.
-                batch_idxs = np.random.choice(self.nb_entries, size=batch_size, replace=False)
+                batch_idxs = random.sample(range(self.nb_entries), batch_size)
             else:
                 # Not enough data. Help ourselves with sampling from the range, but the same index
                 # can occur multiple times. This is not good and should be avoided by picking a

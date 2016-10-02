@@ -132,9 +132,14 @@ class DQNAgent(Agent):
             return batch
         return self.processor.process_state_batch(batch)
 
+    def compute_batch_q_values(self, state_batch):
+        batch = self.process_state_batch(state_batch)
+        q_values = self.model.predict_on_batch(batch)
+        assert q_values.shape == (len(state_batch), self.nb_actions)
+        return q_values
+
     def compute_q_values(self, state):
-        batch = self.process_state_batch([state])
-        q_values = self.model.predict_on_batch(batch).flatten()
+        q_values = self.compute_batch_q_values([state]).flatten()
         assert q_values.shape == (self.nb_actions,)
         return q_values
 

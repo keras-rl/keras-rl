@@ -70,7 +70,7 @@ class SequentialMemory(object):
     def sample(self, batch_size, window_length, batch_idxs=None):
         if batch_idxs is None:
             # Draw random indexes such that we have at least `window_length` entries before each index.
-            batch_idxs = sample_batch_indexes(window_length, self.nb_entries, size=batch_size, nb_entries=nb_entries)
+            batch_idxs = sample_batch_indexes(window_length, self.nb_entries, size=batch_size, nb_entries=self.nb_entries)
         assert len(batch_idxs) == batch_size
 
         # Create experiences
@@ -154,7 +154,7 @@ class EpisodeParameterMemory(object):
 
     def sample(self, batch_size, batch_idxs=None):
         if batch_idxs is None:
-            batch_idxs = sample_batch_indexes(0, self.nb_entries, size=batch_size, nb_entries=nb_entries)
+            batch_idxs = sample_batch_indexes(0, self.nb_entries, size=batch_size, nb_entries=self.nb_entries)
         assert len(batch_idxs) == batch_size
 
         params = []

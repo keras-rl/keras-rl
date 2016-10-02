@@ -45,9 +45,10 @@ class SequentialMemory(object):
         self.terminals = RingBuffer(limit)
         self.observations = RingBuffer(limit)
 
-    def sample(self, batch_size, window_length):
+    def sample(self, batch_size, window_length, batch_idxs=None):
         # Draw random indexes such that we have at least `window_length` entries before each index.
-        batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
+        if batch_idxs is None:
+            batch_idxs = np.random.random_integers(window_length, self.nb_entries - 1, size=batch_size)
         assert len(batch_idxs) == batch_size
 
         # Create experiences

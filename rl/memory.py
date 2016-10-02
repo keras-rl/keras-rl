@@ -53,7 +53,7 @@ class SequentialMemory(object):
         if batch_idxs is None:
             if self.nb_entries >= batch_size:
                 # We have enough data. Draw without replacement, that is each index is unique in the batch.
-                batch_idxs = np.random.choice(self.nb_entries - window_length, batch_size, replace=False) + window_length
+                batch_idxs = np.random.choice(self.nb_entries - window_length, size=batch_size, replace=False) + window_length
             else:
                 # Not enough data. Help ourselves with sampling from the range, but the same index
                 # can occur multiple times. This is not good and should be avoided by picking a
@@ -145,7 +145,7 @@ class EpisodeParameterMemory(object):
         if batch_idxs is None:
             if self.nb_entries >= batch_size:
                 # We have enough data. Draw without replacement, that is each index is unique in the batch.
-                batch_idxs = np.random.choice(self.nb_entries, batch_size, replace=False)
+                batch_idxs = np.random.choice(self.nb_entries, size=batch_size, replace=False)
             else:
                 # Not enough data. Help ourselves with sampling from the range, but the same index
                 # can occur multiple times. This is not good and should be avoided by picking a

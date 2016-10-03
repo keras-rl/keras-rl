@@ -410,9 +410,11 @@ class ContinuousDQNAgent(DQNAgent):
         self.combined_model.save_weights(filepath, overwrite=overwrite)
 
     def reset_states(self):
-        super(ContinuousDQNAgent, self).reset_states()
+        self.recent_action = None
+        self.recent_observations = deque(maxlen=self.window_length)
         if self.compiled:
             self.combined_model.reset_states()
+            self.target_V_model.reset_states()
 
     def compile(self, optimizer, metrics=[]):
         metrics += [mean_q]  # register default metrics

@@ -62,7 +62,7 @@ class SequentialMemory(object):
                     break
                 state0.insert(0, self.observations[current_idx])
             while len(state0) < window_length:
-                state0.insert(0, np.copy(state0[0]))
+                state0.insert(0, np.zeros(state0[0].shape))
 
             action = self.actions[idx - 1]
             reward = self.rewards[idx - 1]
@@ -73,11 +73,7 @@ class SequentialMemory(object):
             # episode if the last state is terminal.
             state1 = [np.copy(x) for x in state0[1:]]
             if terminal:
-                if len(state1) > 0:
-                    state1.append(np.copy(state1[-1]))
-                else:
-                    # Can happen if `window_length == 1`.
-                    state1.append(np.copy(state0[-1]))
+                state1.append(np.zeros(state0[-1].shape))
             else:
                 state1.append(self.observations[idx])
 

@@ -122,7 +122,7 @@ class DQNAgent(Agent):
 
     def reset_states(self):
         self.recent_action = None
-        self.recent_observations = deque(maxlen=self.window_length)
+        self.recent_observation = None
         if self.compiled:
             self.model.reset_states()
             self.target_model.reset_states()
@@ -158,12 +158,7 @@ class DQNAgent(Agent):
             observation = self.processor.process_observation(observation)
 
         # Select an action.
-        while len(self.recent_observations) < self.recent_observations.maxlen:
-            # Not enough data, fill the recent_observations queue with copies of the current input.
-            # This allows us to immediately perform a policy action instead of falling back to random
-            # actions.
-            self.recent_observations.append(np.zeros(observation.shape))
-        state = np.array(list(self.recent_observations)[1:] + [observation])
+        state = self.memory.get_recent_state(observation, self.window_length)
         assert len(state) == self.window_length
         q_values = self.compute_q_values(state)
         action = self.policy.select_action(q_values=q_values)
@@ -171,7 +166,7 @@ class DQNAgent(Agent):
             action = self.processor.process_action(action)
 
         # Book-keeping.
-        self.recent_observations.append(observation)
+        self.recent_observation = observation
         self.recent_action = action
         
         return action
@@ -188,7 +183,7 @@ class DQNAgent(Agent):
 
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observations[-1], self.recent_action, reward, terminal)
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
         
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
@@ -449,7 +444,7 @@ class ContinuousDQNAgent(DQNAgent):
 
     def reset_states(self):
         self.recent_action = None
-        self.recent_observations = deque(maxlen=self.window_length)
+        self.recent_observation = None
         if self.compiled:
             self.combined_model.reset_states()
             self.target_V_model.reset_states()
@@ -505,19 +500,14 @@ class ContinuousDQNAgent(DQNAgent):
             observation = self.processor.process_observation(observation)
 
         # Select an action.
-        while len(self.recent_observations) < self.recent_observations.maxlen:
-            # Not enough data, fill the recent_observations queue with copies of the current input.
-            # This allows us to immediately perform a policy action instead of falling back to random
-            # actions.
-            self.recent_observations.append(np.zeros(observation.shape))
-        state = np.array(list(self.recent_observations)[1:] + [observation])
+        state = self.memory.get_recent_state(observation, self.window_length)
         assert len(state) == self.window_length
         action = self.select_action(state)
         if self.processor is not None:
             action = self.processor.process_action(action)
 
         # Book-keeping.
-        self.recent_observations.append(observation)
+        self.recent_observation = observation
         self.recent_action = action
         
         return action
@@ -534,7 +524,7 @@ class ContinuousDQNAgent(DQNAgent):
 
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observations[-1], self.recent_action, reward, terminal)
+            self.memory.append(recent_observation, self.recent_action, reward, terminal)
         
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:

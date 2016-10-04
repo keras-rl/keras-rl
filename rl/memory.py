@@ -105,6 +105,23 @@ class SequentialMemory(object):
         assert len(experiences) == batch_size
         return experiences
 
+    def get_recent_state(self, current_observation, window_length):
+        # This code is slightly complicated by the fact that subsequent observations might be
+        # from different episodes. We ensure that an experience never spans multiple episodes.
+        # This is probably not that important in practice but it seems cleaner.
+        state = [current_observation]
+        idx = self.nb_entries - 1
+        for offset in range(0, window_length - 1):
+            current_idx = idx - offset
+            if current_idx < 0 or self.terminals[current_idx]:
+                break
+            state.insert(0, self.observations[current_idx])
+        while len(state) < window_length:
+            state.insert(0, np.zeros(state[0].shape))
+        state = np.array(state)
+        assert state.shape[0] == window_length
+        return state
+
     def append(self, observation, action, reward, terminal):
         # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
         # and weather the next state is `terminal` or not.

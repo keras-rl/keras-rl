@@ -231,7 +231,7 @@ class DDPGAgent(Agent):
             # Not enough data, fill the recent_observations queue with copies of the current input.
             # This allows us to immediately perform a policy action instead of falling back to random
             # actions.
-            self.recent_observations.append(np.copy(observation))
+            self.recent_observations.append(np.zeros(observation.shape))
         state = np.array(list(self.recent_observations)[1:] + [observation])
         assert len(state) == self.window_length
         action = self.select_action(state)  # TODO: move this into policy

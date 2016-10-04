@@ -524,7 +524,7 @@ class ContinuousDQNAgent(DQNAgent):
 
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
-            self.memory.append(recent_observation, self.recent_action, reward, terminal)
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
         
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:

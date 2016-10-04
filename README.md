@@ -25,7 +25,7 @@ As of today, the following algorithms have been implemented:
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
 - Continuous DQN (CDQN or NAF) [[6]](http://arxiv.org/abs/1603.00748)
-- Cross-Entropy Method (CEM) [[7]](http://learning.mpi-sws.org/mlss2016/slides/2016-MLSS-RL.pdf)[[8]](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.81.6579&rep=rep1&type=pdf)
+- Cross-Entropy Method (CEM) [[7]](http://learning.mpi-sws.org/mlss2016/slides/2016-MLSS-RL.pdf), [[8]](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.81.6579&rep=rep1&type=pdf)
 
 I'm currently working on the following algorithms, which can be found on the `experimental` branch:
 

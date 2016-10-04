@@ -56,8 +56,9 @@ class RingBuffer(object):
         self.data[(self.start + self.length - 1) % self.maxlen] = v
 
 class SequentialMemory(object):
-    def __init__(self, limit):
+    def __init__(self, limit, ignore_episode_boundaries=False):
         self.limit = limit
+        self.ignore_episode_boundaries = ignore_episode_boundaries
 
         # Do not use deque to implement the memory. This data structure may seem convenient but
         # it is way too slow on random access. Instead, we use our own ring buffer implementation.
@@ -80,7 +81,7 @@ class SequentialMemory(object):
             # This is probably not that important in practice but it seems cleaner.
             state0 = [self.observations[idx - 1]]
             for current_idx in range(idx - 2, idx - window_length - 1, -1):
-                if self.terminals[current_idx]:
+                if not self.ignore_episode_boundaries and self.terminals[current_idx]:
                     break
                 state0.insert(0, self.observations[current_idx])
             while len(state0) < window_length:
@@ -94,7 +95,7 @@ class SequentialMemory(object):
             # to the right. Again, we need to be careful to not include an observation from the next
             # episode if the last state is terminal.
             state1 = [np.copy(x) for x in state0[1:]]
-            if terminal:
+            if not self.ignore_episode_boundaries and terminal:
                 state1.append(np.zeros(state0[-1].shape))
             else:
                 state1.append(self.observations[idx])
@@ -113,7 +114,7 @@ class SequentialMemory(object):
         idx = self.nb_entries - 1
         for offset in range(0, window_length - 1):
             current_idx = idx - offset
-            if current_idx < 0 or self.terminals[current_idx]:
+            if current_idx < 0 or (not self.ignore_episode_boundaries and self.terminals[current_idx]):
                 break
             state.insert(0, self.observations[current_idx])
         while len(state) < window_length:

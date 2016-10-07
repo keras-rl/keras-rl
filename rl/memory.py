@@ -113,6 +113,13 @@ class SequentialMemory(object):
     def nb_entries(self):
         return len(self.observations)
 
+    def get_config(self):
+        config = {
+            'limit': self.limit,
+            'ignore_episode_boundaries': self.ignore_episode_boundaries,
+        }
+        return config
+
 
 class EpisodeParameterMemory(object):
     def __init__(self,limit,max_episode_steps):
@@ -147,3 +154,10 @@ class EpisodeParameterMemory(object):
     @property
     def nb_entries(self):
         return len(self.reward_totals)
+
+    def get_config(self):
+        config = {
+            'limit': self.limit,
+            'max_episode_steps': self.max_episode_steps,
+        }
+        return config

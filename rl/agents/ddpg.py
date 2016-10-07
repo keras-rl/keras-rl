@@ -249,18 +249,17 @@ class DDPGAgent(Agent):
         return self.critic.metrics_names[:]
 
     def backward(self, reward, terminal=False):
+        # Store most recent experience in memory.
+        if self.processor is not None:
+            reward = self.processor.process_reward(reward)
+        if self.step % self.memory_interval == 0:
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
+
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
             return metrics
-
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
-        
-        # Store most recent experience in memory.
-        if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
         
         # Train the network on a single stochastic batch.
         can_train_either = self.step > self.nb_steps_warmup_critic or self.step > self.nb_steps_warmup_actor

@@ -99,7 +99,6 @@ class SequentialMemory(object):
             # episode if the last state is terminal.
             state1 = [np.copy(x) for x in state0[1:]]
             if not self.ignore_episode_boundaries and terminal:
-                print idx
                 state1.append(np.zeros(state0[-1].shape))
             else:
                 state1.append(self.observations[idx])

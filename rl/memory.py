@@ -80,29 +80,33 @@ class SequentialMemory(object):
             # from different episodes. We ensure that an experience never spans multiple episodes.
             # This is probably not that important in practice but it seems cleaner.
             state0 = [self.observations[idx - 1]]
-            for current_idx in range(idx - 2, idx - window_length - 1, -1):
-                if not self.ignore_episode_boundaries and self.terminals[current_idx]:
+            for offset in range(0, window_length - 1):
+                current_idx = idx - 2 - offset
+                current_terminal = self.terminals[current_idx - 1] if current_idx - 1 > 0 else False
+                if current_idx < 0 or (not self.ignore_episode_boundaries and current_terminal):
+                    # The previously handled observation was terminal, don't add the current one.
+                    # Otherwise we would leak into a different episode.
                     break
                 state0.insert(0, self.observations[current_idx])
             while len(state0) < window_length:
                 state0.insert(0, np.zeros(state0[0].shape))
-
             action = self.actions[idx - 1]
             reward = self.rewards[idx - 1]
-            terminal = self.terminals[idx - 1]
+            terminal = self.terminals[idx - 2]
 
             # Okay, now we need to create the follow-up state. This is state0 shifted on timestep
             # to the right. Again, we need to be careful to not include an observation from the next
             # episode if the last state is terminal.
             state1 = [np.copy(x) for x in state0[1:]]
             if not self.ignore_episode_boundaries and terminal:
+                print idx
                 state1.append(np.zeros(state0[-1].shape))
             else:
                 state1.append(self.observations[idx])
 
             assert len(state0) == window_length
             assert len(state1) == len(state0)
-            experiences.append(Experience(state0, action, reward, terminal, state1))
+            experiences.append(Experience(np.array(state0), action, reward, terminal, np.array(state1)))
         assert len(experiences) == batch_size
         return experiences
 
@@ -114,7 +118,10 @@ class SequentialMemory(object):
         idx = self.nb_entries - 1
         for offset in range(0, window_length - 1):
             current_idx = idx - offset
-            if current_idx < 0 or (not self.ignore_episode_boundaries and self.terminals[current_idx]):
+            current_terminal = self.terminals[current_idx - 1] if current_idx - 1 > 0 else False
+            if current_idx < 0 or (not self.ignore_episode_boundaries and current_terminal):
+                # The previously handled observation was terminal, don't add the current one.
+                # Otherwise we would leak into a different episode.
                 break
             state.insert(0, self.observations[current_idx])
         while len(state) < window_length:

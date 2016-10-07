@@ -37,6 +37,14 @@ def get_soft_target_model_updates(target, source, tau):
     return updates
 
 
+def get_object_config(o):
+    config = {
+        'class_name': o.__class__.__name__,
+        'config': o.get_config()
+    }
+    return config
+
+
 class AdditionalUpdatesOptimizer(optimizers.Optimizer):
     def __init__(self, optimizer, additional_updates):
         super(AdditionalUpdatesOptimizer, self).__init__()

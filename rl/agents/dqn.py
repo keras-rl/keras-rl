@@ -73,6 +73,26 @@ class DQNAgent(Agent):
         self.compiled = False
         self.reset_states()
 
+    def get_config(self):
+        config = {
+            'nb_actions': self.nb_actions,
+            'window_length': self.window_length,
+            'gamma': self.gamma,
+            'batch_size': self.batch_size,
+            'nb_steps_warmup': self.nb_steps_warmup,
+            'train_interval': self.train_interval,
+            'memory_interval': self.memory_interval,
+            'target_model_update': self.target_model_update,
+            'delta_range': self.delta_range,
+            'enable_double_dqn': self.enable_double_dqn,
+            'model': get_object_config(self.model),
+            'memory': get_object_config(self.memory),
+            'policy': get_object_config(self.policy),
+        }
+        if self.compiled:
+            config['target_model'] = get_object_config(self.target_model)
+        return config
+
     def compile(self, optimizer, metrics=[]):
         metrics += [mean_q_new]  # register default metrics
 
@@ -172,19 +192,18 @@ class DQNAgent(Agent):
         return action
 
     def backward(self, reward, terminal):
+        # Store most recent experience in memory.
+        if self.processor is not None:
+            reward = self.processor.process_reward(reward)
+        if self.step % self.memory_interval == 0:
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
+
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
             return metrics
 
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
-
-        # Store most recent experience in memory.
-        if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
-        
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
             experiences = self.memory.sample(self.batch_size, self.window_length)
@@ -513,18 +532,17 @@ class ContinuousDQNAgent(DQNAgent):
         return action
 
     def backward(self, reward, terminal):
+        # Store most recent experience in memory.
+        if self.processor is not None:
+            reward = self.processor.process_reward(reward)
+        if self.step % self.memory_interval == 0:
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
+
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
             return metrics
-
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
-
-        # Store most recent experience in memory.
-        if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
         
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:

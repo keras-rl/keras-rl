@@ -213,22 +213,22 @@ class DQNAgent(Agent):
             state0_batch = []
             reward_batch = []
             action_batch = []
-            terminal_batch = []
+            terminal1_batch = []
             state1_batch = []
             for e in experiences:
                 state0_batch.append(e.state0)
                 state1_batch.append(e.state1)
                 reward_batch.append(e.reward)
                 action_batch.append(e.action)
-                terminal_batch.append(0. if e.terminal else 1.)
+                terminal1_batch.append(0. if e.terminal1 else 1.)
 
             # Prepare and validate parameters.
             state0_batch = self.process_state_batch(state0_batch)
             state1_batch = self.process_state_batch(state1_batch)
-            terminal_batch = np.array(terminal_batch)
+            terminal1_batch = np.array(terminal1_batch)
             reward_batch = np.array(reward_batch)
             assert reward_batch.shape == (self.batch_size,)
-            assert terminal_batch.shape == reward_batch.shape
+            assert terminal1_batch.shape == reward_batch.shape
             assert len(action_batch) == len(reward_batch)
 
             # Compute Q values for mini-batch update.
@@ -263,7 +263,7 @@ class DQNAgent(Agent):
             # but only for the affected output units (as given by action_batch).
             discounted_reward_batch = self.gamma * q_batch
             # Set discounted reward to zero for all states that were terminal.
-            discounted_reward_batch *= terminal_batch
+            discounted_reward_batch *= terminal1_batch
             assert discounted_reward_batch.shape == reward_batch.shape
             Rs = reward_batch + discounted_reward_batch
             for idx, (target, mask, R, action) in enumerate(zip(targets, masks, Rs, action_batch)):
@@ -553,23 +553,23 @@ class ContinuousDQNAgent(DQNAgent):
             state0_batch = []
             reward_batch = []
             action_batch = []
-            terminal_batch = []
+            terminal1_batch = []
             state1_batch = []
             for e in experiences:
                 state0_batch.append(e.state0)
                 state1_batch.append(e.state1)
                 reward_batch.append(e.reward)
                 action_batch.append(e.action)
-                terminal_batch.append(0. if e.terminal else 1.)
+                terminal1_batch.append(0. if e.terminal1 else 1.)
 
             # Prepare and validate parameters.
             state0_batch = self.process_state_batch(state0_batch)
             state1_batch = self.process_state_batch(state1_batch)
-            terminal_batch = np.array(terminal_batch)
+            terminal1_batch = np.array(terminal1_batch)
             reward_batch = np.array(reward_batch)
             action_batch = np.array(action_batch)
             assert reward_batch.shape == (self.batch_size,)
-            assert terminal_batch.shape == reward_batch.shape
+            assert terminal1_batch.shape == reward_batch.shape
             assert action_batch.shape == (self.batch_size, self.nb_actions)
 
             # Compute Q values for mini-batch update.
@@ -579,7 +579,7 @@ class ContinuousDQNAgent(DQNAgent):
             # Compute discounted reward.
             discounted_reward_batch = self.gamma * q_batch
             # Set discounted reward to zero for all states that were terminal.
-            discounted_reward_batch *= terminal_batch
+            discounted_reward_batch *= terminal1_batch
             assert discounted_reward_batch.shape == reward_batch.shape
             Rs = reward_batch + discounted_reward_batch
             assert Rs.shape == (self.batch_size,)

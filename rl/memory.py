@@ -8,7 +8,7 @@ import numpy as np
 
 # This is to be understood as a transition: Given `state0`, performing `action`
 # yields `reward` and results in `state1`, which might be `terminal`.
-Experience = namedtuple('Experience', 'state0, action, reward, terminal, state1')
+Experience = namedtuple('Experience', 'state0, action, reward, state1, terminal1')
 
 
 def sample_batch_indexes(low, high, size):
@@ -69,13 +69,26 @@ class SequentialMemory(object):
 
     def sample(self, batch_size, window_length, batch_idxs=None):
         if batch_idxs is None:
-            # Draw random indexes such that we have at least `window_length` entries before each index.
-            batch_idxs = sample_batch_indexes(window_length, self.nb_entries, size=batch_size)
+            # Draw random indexes such that we have at least a single entry before each
+            # index.
+            batch_idxs = sample_batch_indexes(0, self.nb_entries - 1, size=batch_size)
+        batch_idxs = np.array(batch_idxs) + 1
+        assert np.min(batch_idxs) >= 1
+        assert np.max(batch_idxs) < self.nb_entries
         assert len(batch_idxs) == batch_size
 
         # Create experiences
         experiences = []
         for idx in batch_idxs:
+            terminal0 = self.terminals[idx - 2] if idx >= 2 else False
+            while terminal0:
+                # Skip this transition because the environment was reset here. Select a new, random
+                # transition and use this instead. This may cause the batch to contain the same
+                # transition twice.
+                idx = sample_batch_indexes(1, self.nb_entries, size=1)[0]
+                terminal0 = self.terminals[idx - 2] if idx >= 2 else False
+            assert 1 <= idx < self.nb_entries
+
             # This code is slightly complicated by the fact that subsequent observations might be
             # from different episodes. We ensure that an experience never spans multiple episodes.
             # This is probably not that important in practice but it seems cleaner.
@@ -92,20 +105,18 @@ class SequentialMemory(object):
                 state0.insert(0, np.zeros(state0[0].shape))
             action = self.actions[idx - 1]
             reward = self.rewards[idx - 1]
-            terminal = self.terminals[idx - 2]
+            terminal1 = self.terminals[idx - 1]
 
             # Okay, now we need to create the follow-up state. This is state0 shifted on timestep
             # to the right. Again, we need to be careful to not include an observation from the next
             # episode if the last state is terminal.
             state1 = [np.copy(x) for x in state0[1:]]
-            if not self.ignore_episode_boundaries and terminal:
-                state1.append(np.zeros(state0[-1].shape))
-            else:
-                state1.append(self.observations[idx])
+            state1.append(self.observations[idx])
 
             assert len(state0) == window_length
             assert len(state1) == len(state0)
-            experiences.append(Experience(np.array(state0), action, reward, terminal, np.array(state1)))
+            experiences.append(Experience(state0=np.array(state0), action=action, reward=reward,
+                                          state1=np.array(state1), terminal1=terminal1))
         assert len(experiences) == batch_size
         return experiences
 

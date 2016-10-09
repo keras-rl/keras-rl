@@ -1,7 +1,7 @@
 
 import numpy as np
 from numpy.testing import assert_allclose
-from gym.envs.debugging.one_round_deterministic_reward import OneRoundDeterministicRewardEnv
+from gym.envs.debugging.two_round_deterministic_reward import TwoRoundDeterministicRewardEnv
 
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten
@@ -13,7 +13,7 @@ from rl.memory import SequentialMemory
 
 
 def test_dqn():
-    env = OneRoundDeterministicRewardEnv()
+    env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
     env.seed(123)
     nb_actions = env.action_space.n
@@ -33,11 +33,11 @@ def test_dqn():
 
     dqn.fit(env, nb_steps=2000, visualize=False, verbose=0)
     h = dqn.test(env, nb_episodes=20, visualize=False)
-    assert_allclose(np.mean(h.history['episode_reward']), 1.)
+    assert_allclose(np.mean(h.history['episode_reward']), 3.)
 
 
 def test_double_dqn():
-    env = OneRoundDeterministicRewardEnv()
+    env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
     env.seed(123)
     nb_actions = env.action_space.n
@@ -57,4 +57,4 @@ def test_double_dqn():
 
     dqn.fit(env, nb_steps=2000, visualize=False, verbose=0)
     h = dqn.test(env, nb_episodes=20, visualize=False)
-    assert_allclose(np.mean(h.history['episode_reward']), 1.)
+    assert_allclose(np.mean(h.history['episode_reward']), 3.)

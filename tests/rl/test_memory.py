@@ -3,7 +3,41 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from rl.memory import SequentialMemory
+from rl.memory import SequentialMemory, RingBuffer
+
+
+def test_ring_buffer():
+    def assert_elements(b, ref):
+        assert len(b) == len(ref)
+        for idx in range(b.maxlen):
+            if idx >= len(ref):
+                with pytest.raises(KeyError):
+                    b[idx]
+            else:
+                assert b[idx] == ref[idx]
+
+    b = RingBuffer(5)
+
+    # Fill buffer.
+    assert_elements(b, [])
+    b.append(1)
+    assert_elements(b, [1])
+    b.append(2)
+    assert_elements(b, [1, 2])
+    b.append(3)
+    assert_elements(b, [1, 2, 3])
+    b.append(4)
+    assert_elements(b, [1, 2, 3, 4])
+    b.append(5)
+    assert_elements(b, [1, 2, 3, 4, 5])
+
+    # Add couple more items with buffer at limit.
+    b.append(6)
+    assert_elements(b, [2, 3, 4, 5, 6])
+    b.append(7)
+    assert_elements(b, [3, 4, 5, 6, 7])
+    b.append(8)
+    assert_elements(b, [4, 5, 6, 7, 8])
 
 
 def test_get_recent_state_with_episode_boundaries():

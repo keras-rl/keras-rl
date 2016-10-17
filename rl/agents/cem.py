@@ -41,7 +41,7 @@ class CEMAgent(Agent):
         self.num_weights = sum(self.sizes)
         
         # store the best result seen during training, as a tuple (reward, flat_weights)
-        self.best_seen = (None, np.zeros(self.num_weights))
+        self.best_seen = (-np.inf, np.zeros(self.num_weights))
 
         self.theta = np.zeros(self.num_weights*2)
         self.update_theta(theta_init)
@@ -152,7 +152,7 @@ class CEMAgent(Agent):
                 best = np.vstack([params[i] for i in best_idx])
 
                 if reward_totals[best_idx[-1]] > self.best_seen[0]:
-                    self.best_seen = (reward_totals[best_idx[-1]],params[best_idx[-1]])
+                    self.best_seen = (reward_totals[best_idx[-1]], params[best_idx[-1]])
                     
                 metrics = [np.mean(np.array(reward_totals)[best_idx])]
                 min_std = self.noise_ampl * np.exp(-self.step * self.noise_decay_const)

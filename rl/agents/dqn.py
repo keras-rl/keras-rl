@@ -20,7 +20,7 @@ def mean_q(y_true, y_pred):
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(Agent):
-    def __init__(self, model, nb_actions, memory, window_length=1, policy=EpsGreedyQPolicy(),
+    def __init__(self, model, nb_actions, memory, policy=EpsGreedyQPolicy(),
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
                  target_model_update=10000, delta_range=(-np.inf, np.inf), enable_double_dqn=True,
                  custom_model_objects={}, processor=None):
@@ -44,7 +44,6 @@ class DQNAgent(Agent):
 
         # Parameters.
         self.nb_actions = nb_actions
-        self.window_length = window_length
         self.gamma = gamma
         self.batch_size = batch_size
         self.nb_steps_warmup = nb_steps_warmup
@@ -66,28 +65,67 @@ class DQNAgent(Agent):
         self.compiled = False
         self.reset_states()
 
+    def get_config(self):
+        config = {
+            'nb_actions': self.nb_actions,
+            'gamma': self.gamma,
+            'batch_size': self.batch_size,
+            'nb_steps_warmup': self.nb_steps_warmup,
+            'train_interval': self.train_interval,
+            'memory_interval': self.memory_interval,
+            'target_model_update': self.target_model_update,
+            'delta_range': self.delta_range,
+            'enable_double_dqn': self.enable_double_dqn,
+            'model': get_object_config(self.model),
+            'memory': get_object_config(self.memory),
+            'policy': get_object_config(self.policy),
+        }
+        if self.compiled:
+            config['target_model'] = get_object_config(self.target_model)
+        return config
+
     def compile(self, optimizer, metrics=[]):
         metrics += [mean_q]  # register default metrics
 
         # We never train the target model, hence we can set the optimizer and loss arbitrarily.
         self.target_model = clone_model(self.model, self.custom_model_objects)
         self.target_model.compile(optimizer='sgd', loss='mse')
+        self.model.compile(optimizer='sgd', loss='mse')
         
         # Compile model.
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             updates = get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
-        
-        def clipped_mse(y_true, y_pred):
+
+        def clipped_masked_mse(args):
+            y_true, y_pred, mask = args
             delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
-            return K.mean(K.square(delta), axis=-1)
-        
-        self.model.compile(optimizer=optimizer, loss=clipped_mse, metrics=metrics)
+            delta *= mask  # apply element-wise mask
+            loss = K.mean(K.square(delta), axis=-1)
+            # Multiply by the number of actions to reverse the effect of the mean.
+            loss *= float(self.nb_actions)
+            return loss
+
+        # Create trainable model. The problem is that we need to mask the output since we only
+        # ever want to update the Q values for a certain action. The way we achieve this is by
+        # using a custom Lambda layer that computes the loss. This gives us the necessary flexibility
+        # to mask out certain parameters by passing in multiple inputs to the Lambda layer.
+        y_pred = self.model.output
+        y_true = Input(name='y_true', shape=(self.nb_actions,))
+        mask = Input(name='mask', shape=(self.nb_actions,))
+        loss_out = Lambda(clipped_masked_mse, output_shape=(1,), name='loss')([y_pred, y_true, mask])
+        trainable_model = Model(input=[self.model.input, y_true, mask], output=[loss_out, y_pred])
+        assert len(trainable_model.output_names) == 2
+        combined_metrics = {trainable_model.output_names[1]: metrics}
+        losses = [
+            lambda y_true, y_pred: y_pred,  # loss is computed in Lambda layer
+            lambda y_true, y_pred: K.zeros_like(y_pred),  # we only include this for the metrics
+        ]
+        trainable_model.compile(optimizer=optimizer, loss=losses, metrics=combined_metrics)
+        self.trainable_model = trainable_model
         
         self.compiled = True
-
-    # TODO: implement support for pickle
 
     def load_weights(self, filepath):
         self.model.load_weights(filepath)
@@ -98,7 +136,7 @@ class DQNAgent(Agent):
 
     def reset_states(self):
         self.recent_action = None
-        self.recent_observations = deque(maxlen=self.window_length)
+        self.recent_observation = None
         if self.compiled:
             self.model.reset_states()
             self.target_model.reset_states()
@@ -112,9 +150,14 @@ class DQNAgent(Agent):
             return batch
         return self.processor.process_state_batch(batch)
 
+    def compute_batch_q_values(self, state_batch):
+        batch = self.process_state_batch(state_batch)
+        q_values = self.model.predict_on_batch(batch)
+        assert q_values.shape == (len(state_batch), self.nb_actions)
+        return q_values
+
     def compute_q_values(self, state):
-        batch = self.process_state_batch([state])
-        q_values = self.model.predict_on_batch(batch).flatten()
+        q_values = self.compute_batch_q_values([state]).flatten()
         assert q_values.shape == (self.nb_actions,)
         return q_values
 
@@ -123,63 +166,57 @@ class DQNAgent(Agent):
             observation = self.processor.process_observation(observation)
 
         # Select an action.
-        while len(self.recent_observations) < self.recent_observations.maxlen:
-            # Not enough data, fill the recent_observations queue with copies of the current input.
-            # This allows us to immediately perform a policy action instead of falling back to random
-            # actions.
-            self.recent_observations.append(np.copy(observation))
-        state = np.array(list(self.recent_observations)[1:] + [observation])
-        assert len(state) == self.window_length
+        state = self.memory.get_recent_state(observation)
         q_values = self.compute_q_values(state)
         action = self.policy.select_action(q_values=q_values)
         if self.processor is not None:
             action = self.processor.process_action(action)
 
         # Book-keeping.
-        self.recent_observations.append(observation)
+        self.recent_observation = observation
         self.recent_action = action
         
         return action
 
     def backward(self, reward, terminal):
+        # Store most recent experience in memory.
+        if self.processor is not None:
+            reward = self.processor.process_reward(reward)
+        if self.step % self.memory_interval == 0:
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
+                               training=self.training)
+
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
             return metrics
 
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
-
-        # Store most recent experience in memory.
-        if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observations[-1], self.recent_action, reward, terminal)
-        
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
-            experiences = self.memory.sample(self.batch_size, self.window_length)
+            experiences = self.memory.sample(self.batch_size)
             assert len(experiences) == self.batch_size
             
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             state0_batch = []
             reward_batch = []
             action_batch = []
-            terminal_batch = []
+            terminal1_batch = []
             state1_batch = []
             for e in experiences:
                 state0_batch.append(e.state0)
                 state1_batch.append(e.state1)
                 reward_batch.append(e.reward)
                 action_batch.append(e.action)
-                terminal_batch.append(0. if e.terminal else 1.)
+                terminal1_batch.append(0. if e.terminal1 else 1.)
 
             # Prepare and validate parameters.
             state0_batch = self.process_state_batch(state0_batch)
             state1_batch = self.process_state_batch(state1_batch)
-            terminal_batch = np.array(terminal_batch)
+            terminal1_batch = np.array(terminal1_batch)
             reward_batch = np.array(reward_batch)
             assert reward_batch.shape == (self.batch_size,)
-            assert terminal_batch.shape == reward_batch.shape
+            assert terminal1_batch.shape == reward_batch.shape
             assert len(action_batch) == len(reward_batch)
 
             # Compute Q values for mini-batch update.
@@ -206,25 +243,29 @@ class DQNAgent(Agent):
                 q_batch = np.max(target_q_values, axis=1).flatten()
             assert q_batch.shape == (self.batch_size,)
 
-            # Compute the current activations in the output layer given state0. This is hacky
-            # since we do this in the training step anyway, but this is currently the simplest
-            # way to set the gradients of the non-affected output units to zero.
-            targets = self.model.predict_on_batch(state0_batch)
-            assert targets.shape == (self.batch_size, self.nb_actions)
-
+            targets = np.zeros((self.batch_size, self.nb_actions))
+            dummy_targets = np.zeros((self.batch_size,))
+            masks = np.zeros((self.batch_size, self.nb_actions))
+            
             # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target targets accordingly,
             # but only for the affected output units (as given by action_batch).
             discounted_reward_batch = self.gamma * q_batch
             # Set discounted reward to zero for all states that were terminal.
-            discounted_reward_batch *= terminal_batch
+            discounted_reward_batch *= terminal1_batch
             assert discounted_reward_batch.shape == reward_batch.shape
             Rs = reward_batch + discounted_reward_batch
-            for target, R, action in zip(targets, Rs, action_batch):
+            for idx, (target, mask, R, action) in enumerate(zip(targets, masks, Rs, action_batch)):
                 target[action] = R  # update action with estimated accumulated reward
+                dummy_targets[idx] = R
+                mask[action] = 1.  # enable loss for this specific action
             targets = np.array(targets).astype('float32')
+            masks = np.array(masks).astype('float32')
 
-            # Finally, perform a single update on the entire batch.
-            metrics = self.model.train_on_batch(state0_batch, targets)
+            # Finally, perform a single update on the entire batch. We use a dummy target since
+            # the actual loss is computed in a Lambda layer that needs more complex input. However,
+            # it is still useful to know the actual target to compute metrics properly.
+            metrics = self.trainable_model.train_on_batch([state0_batch, targets, masks], [dummy_targets, targets])
+            metrics = [metric for idx, metric in enumerate(metrics) if idx not in (1, 2)]  # throw away individual losses
             metrics += self.policy.run_metrics()
 
         if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
@@ -234,7 +275,13 @@ class DQNAgent(Agent):
 
     @property
     def metrics_names(self):
-        return self.model.metrics_names[:] + self.policy.metrics_names[:]
+        # Throw away individual losses and replace output name since this is hidden from the user.
+        assert len(self.trainable_model.output_names) == 2
+        dummy_output_name = self.trainable_model.output_names[1]
+        model_metrics = [name for idx, name in enumerate(self.trainable_model.metrics_names) if idx not in (1, 2)]
+        model_metrics = [name.replace(dummy_output_name + '_', '') for name in model_metrics]
+
+        return model_metrics + self.policy.metrics_names[:]
 
 
 class NAFLayer(Layer):
@@ -357,7 +404,7 @@ class NAFLayer(Layer):
 
 
 class ContinuousDQNAgent(DQNAgent):
-    def __init__(self, V_model, L_model, mu_model, nb_actions, memory, window_length=1,
+    def __init__(self, V_model, L_model, mu_model, nb_actions, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
                  target_model_update=10000, delta_range=(-np.inf, np.inf), custom_model_objects={},
                  processor=None, random_process=None):
@@ -377,7 +424,6 @@ class ContinuousDQNAgent(DQNAgent):
 
         # Parameters.
         self.nb_actions = nb_actions
-        self.window_length = window_length
         self.gamma = gamma
         self.batch_size = batch_size
         self.nb_steps_warmup = nb_steps_warmup
@@ -411,7 +457,7 @@ class ContinuousDQNAgent(DQNAgent):
 
     def reset_states(self):
         self.recent_action = None
-        self.recent_observations = deque(maxlen=self.window_length)
+        self.recent_observation = None
         if self.compiled:
             self.combined_model.reset_states()
             self.target_V_model.reset_states()
@@ -467,63 +513,57 @@ class ContinuousDQNAgent(DQNAgent):
             observation = self.processor.process_observation(observation)
 
         # Select an action.
-        while len(self.recent_observations) < self.recent_observations.maxlen:
-            # Not enough data, fill the recent_observations queue with copies of the current input.
-            # This allows us to immediately perform a policy action instead of falling back to random
-            # actions.
-            self.recent_observations.append(np.copy(observation))
-        state = np.array(list(self.recent_observations)[1:] + [observation])
-        assert len(state) == self.window_length
+        state = self.memory.get_recent_state(observation)
         action = self.select_action(state)
         if self.processor is not None:
             action = self.processor.process_action(action)
 
         # Book-keeping.
-        self.recent_observations.append(observation)
+        self.recent_observation = observation
         self.recent_action = action
         
         return action
 
     def backward(self, reward, terminal):
+        # Store most recent experience in memory.
+        if self.processor is not None:
+            reward = self.processor.process_reward(reward)
+        if self.step % self.memory_interval == 0:
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
+                               training=self.training)
+
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
             return metrics
-
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
-
-        # Store most recent experience in memory.
-        if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observations[-1], self.recent_action, reward, terminal)
         
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
-            experiences = self.memory.sample(self.batch_size, self.window_length)
+            experiences = self.memory.sample(self.batch_size)
             assert len(experiences) == self.batch_size
             
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             state0_batch = []
             reward_batch = []
             action_batch = []
-            terminal_batch = []
+            terminal1_batch = []
             state1_batch = []
             for e in experiences:
                 state0_batch.append(e.state0)
                 state1_batch.append(e.state1)
                 reward_batch.append(e.reward)
                 action_batch.append(e.action)
-                terminal_batch.append(0. if e.terminal else 1.)
+                terminal1_batch.append(0. if e.terminal1 else 1.)
 
             # Prepare and validate parameters.
             state0_batch = self.process_state_batch(state0_batch)
             state1_batch = self.process_state_batch(state1_batch)
-            terminal_batch = np.array(terminal_batch)
+            terminal1_batch = np.array(terminal1_batch)
             reward_batch = np.array(reward_batch)
             action_batch = np.array(action_batch)
             assert reward_batch.shape == (self.batch_size,)
-            assert terminal_batch.shape == reward_batch.shape
+            assert terminal1_batch.shape == reward_batch.shape
             assert action_batch.shape == (self.batch_size, self.nb_actions)
 
             # Compute Q values for mini-batch update.
@@ -533,7 +573,7 @@ class ContinuousDQNAgent(DQNAgent):
             # Compute discounted reward.
             discounted_reward_batch = self.gamma * q_batch
             # Set discounted reward to zero for all states that were terminal.
-            discounted_reward_batch *= terminal_batch
+            discounted_reward_batch *= terminal1_batch
             assert discounted_reward_batch.shape == reward_batch.shape
             Rs = reward_batch + discounted_reward_batch
             assert Rs.shape == (self.batch_size,)

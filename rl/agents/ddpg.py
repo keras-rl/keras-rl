@@ -18,7 +18,7 @@ def mean_q(y_true, y_pred):
 # http://arxiv.org/pdf/1509.02971v2.pdf
 # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.646.4324&rep=rep1&type=pdf
 class DDPGAgent(Agent):
-    def __init__(self, nb_actions, actor, critic, critic_action_input, memory, window_length=1,
+    def __init__(self, nb_actions, actor, critic, critic_action_input, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
                  train_interval=1, memory_interval=1, delta_range=(-np.inf, np.inf), processor=None,
                  random_process=OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=0.3),
@@ -50,7 +50,6 @@ class DDPGAgent(Agent):
 
         # Parameters.
         self.nb_actions = nb_actions
-        self.window_length = window_length
         self.processor = processor
         self.nb_steps_warmup_actor = nb_steps_warmup_actor
         self.nb_steps_warmup_critic = nb_steps_warmup_critic
@@ -200,7 +199,12 @@ class DDPGAgent(Agent):
 
     def reset_states(self):
         self.recent_action = None
-        self.recent_observations = deque(maxlen=self.window_length)
+        self.recent_observation = None
+        if self.compiled:
+            self.actor.reset_states()
+            self.critic.reset_states()
+            self.target_actor.reset_states()
+            self.target_critic.reset_states()
 
     def process_state_batch(self, batch):
         batch = np.array(batch)
@@ -227,19 +231,13 @@ class DDPGAgent(Agent):
             observation = self.processor.process_observation(observation)
 
         # Select an action.
-        while len(self.recent_observations) < self.recent_observations.maxlen:
-            # Not enough data, fill the recent_observations queue with copies of the current input.
-            # This allows us to immediately perform a policy action instead of falling back to random
-            # actions.
-            self.recent_observations.append(np.copy(observation))
-        state = np.array(list(self.recent_observations)[1:] + [observation])
-        assert len(state) == self.window_length
+        state = self.memory.get_recent_state(observation)
         action = self.select_action(state)  # TODO: move this into policy
         if self.processor is not None:
             action = self.processor.process_action(action)
         
         # Book-keeping.
-        self.recent_observations.append(observation)
+        self.recent_observation = observation
         self.recent_action = action
         
         return action
@@ -249,46 +247,46 @@ class DDPGAgent(Agent):
         return self.critic.metrics_names[:]
 
     def backward(self, reward, terminal=False):
+        # Store most recent experience in memory.
+        if self.processor is not None:
+            reward = self.processor.process_reward(reward)
+        if self.step % self.memory_interval == 0:
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
+                               training=self.training)
+
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
             return metrics
-
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
-        
-        # Store most recent experience in memory.
-        if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observations[-1], self.recent_action, reward, terminal)
         
         # Train the network on a single stochastic batch.
         can_train_either = self.step > self.nb_steps_warmup_critic or self.step > self.nb_steps_warmup_actor
         if can_train_either and self.step % self.train_interval == 0:
-            experiences = self.memory.sample(self.batch_size, self.window_length)
+            experiences = self.memory.sample(self.batch_size)
             assert len(experiences) == self.batch_size
             
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             state0_batch = []
             reward_batch = []
             action_batch = []
-            terminal_batch = []
+            terminal1_batch = []
             state1_batch = []
             for e in experiences:
                 state0_batch.append(e.state0)
                 state1_batch.append(e.state1)
                 reward_batch.append(e.reward)
                 action_batch.append(e.action)
-                terminal_batch.append(0. if e.terminal else 1.)
+                terminal1_batch.append(0. if e.terminal1 else 1.)
 
             # Prepare and validate parameters.
             state0_batch = self.process_state_batch(state0_batch)
             state1_batch = self.process_state_batch(state1_batch)
-            terminal_batch = np.array(terminal_batch)
+            terminal1_batch = np.array(terminal1_batch)
             reward_batch = np.array(reward_batch)
             action_batch = np.array(action_batch)
             assert reward_batch.shape == (self.batch_size,)
-            assert terminal_batch.shape == reward_batch.shape
+            assert terminal1_batch.shape == reward_batch.shape
             assert action_batch.shape == (self.batch_size, self.nb_actions)
 
             # Update critic, if warm up is over.
@@ -303,7 +301,7 @@ class DDPGAgent(Agent):
                 # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target ys accordingly,
                 # but only for the affected output units (as given by action_batch).
                 discounted_reward_batch = self.gamma * target_q_values
-                discounted_reward_batch *= terminal_batch
+                discounted_reward_batch *= terminal1_batch
                 assert discounted_reward_batch.shape == reward_batch.shape
                 targets = (reward_batch + discounted_reward_batch).reshape(self.batch_size, 1)
                 

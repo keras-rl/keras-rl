@@ -7,6 +7,13 @@ from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Vi
 
 
 class Agent(object):
+    def __init__(self):
+        self.training = False
+        self.step = 0
+
+    def get_config(self):
+        return {}
+        
     def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
             nb_max_episode_steps=None):
@@ -33,6 +40,7 @@ class Agent(object):
         callbacks._set_params({
             'nb_steps': nb_steps,
         })
+        self._on_train_begin()
         callbacks.on_train_begin()
 
         episode = 0
@@ -88,6 +96,9 @@ class Agent(object):
                     reward += r
                     if done:
                         break
+                if nb_max_episode_steps and episode_step >= nb_max_episode_steps - 1:
+                    # Force a terminal state.
+                    done = True
                 metrics = self.backward(reward, terminal=done)
                 episode_reward += reward
                     
@@ -102,7 +113,15 @@ class Agent(object):
                 episode_step += 1
                 self.step += 1
 
-                if done or (nb_max_episode_steps and episode_step > nb_max_episode_steps):
+                if done:
+                    # We are in a terminal state but the agent hasn't yet seen it. We therefore
+                    # perform one more forward-backward call and simply ignore the action before
+                    # resetting the environment. We need to pass in `terminal=False` here since
+                    # the *next* state, that is the state of the newly reset environment, is
+                    # always non-terminal by convention.
+                    self.forward(observation)
+                    self.backward(0., terminal=False)
+
                     # This episode is finished, report and reset.
                     episode_logs = {
                         'episode_reward': episode_reward,
@@ -121,8 +140,15 @@ class Agent(object):
             # the `on_train_end` method is properly called.
             did_abort = True
         callbacks.on_train_end(logs={'did_abort': did_abort})
+        self._on_train_end()
 
         return history
+
+    def _on_train_begin(self):
+        pass
+
+    def _on_train_end(self):
+        pass
 
     def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
              nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1):
@@ -132,6 +158,7 @@ class Agent(object):
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
         self.training = False
+        self.step = 0
         
         callbacks = [] if not callbacks else callbacks[:]
 
@@ -148,6 +175,7 @@ class Agent(object):
             'nb_episodes': nb_episodes,
         })
 
+        self._on_test_begin()
         callbacks.on_train_begin()
         for episode in range(nb_episodes):
             callbacks.on_episode_begin(episode)
@@ -190,21 +218,39 @@ class Agent(object):
                     if d:
                         done = True
                         break
+                if nb_max_episode_steps and episode_step >= nb_max_episode_steps - 1:
+                    done = True
                 self.backward(reward, terminal=done)
                 episode_reward += reward
                 
                 callbacks.on_step_end(episode_step)
                 episode_step += 1
-                if nb_max_episode_steps and episode_step > nb_max_episode_steps:
-                    done = True
+                self.step += 1
+
+            # We are in a terminal state but the agent hasn't yet seen it. We therefore
+            # perform one more forward-backward call and simply ignore the action before
+            # resetting the environment. We need to pass in `terminal=False` here since
+            # the *next* state, that is the state of the newly reset environment, is
+            # always non-terminal by convention.
+            self.forward(observation)
+            self.backward(0., terminal=False)
+
+            # Report end of episode.
             episode_logs = {
                 'episode_reward': episode_reward,
                 'nb_steps': episode_step,
             }
             callbacks.on_episode_end(episode, episode_logs)
         callbacks.on_train_end()
+        self._on_test_end()
 
         return history
+
+    def _on_test_begin(self):
+        pass
+
+    def _on_test_end(self):
+        pass
 
     def reset_states(self):
         pass

@@ -1,6 +1,8 @@
 from __future__ import division
 import numpy as np
 
+from rl.util import *
+
 
 class Policy(object):
     def _set_agent(self, agent):
@@ -15,6 +17,9 @@ class Policy(object):
 
     def select_action(self, **kwargs):
         raise NotImplementedError()
+
+    def get_config(self):
+        return {}
 
 
 class LinearAnnealedPolicy(Policy):
@@ -52,6 +57,16 @@ class LinearAnnealedPolicy(Policy):
     def run_metrics(self):
         return [getattr(self.inner_policy, self.attr)]
 
+    def get_config(self):
+        config = super(LinearAnnealedPolicy, self).get_config()
+        config['attr'] = self.attr
+        config['value_max'] = self.value_max
+        config['value_min'] = self.value_min
+        config['value_test'] = self.value_test
+        config['nb_steps'] = self.nb_steps
+        config['inner_policy'] = get_object_config(self.inner_policy)
+        return config
+
 
 class EpsGreedyQPolicy(Policy):
     def __init__(self, eps=.1):
@@ -67,6 +82,11 @@ class EpsGreedyQPolicy(Policy):
         else:
             action = np.argmax(q_values)
         return action
+
+    def get_config(self):
+        config = super(EpsGreedyQPolicy, self).get_config()
+        config['eps'] = self.eps
+        return config
 
 
 class BoltzmannQPolicy(Policy):
@@ -84,3 +104,9 @@ class BoltzmannQPolicy(Policy):
         probs = exp_values / np.sum(exp_values)
         action = np.random.choice(range(nb_actions), p=probs)
         return action
+
+    def get_config(self):
+        config = super(BoltzmannQPolicy, self).get_config()
+        config['tau'] = self.tau
+        config['clip'] = self.clip
+        return config

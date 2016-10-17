@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 from numpy.testing import assert_allclose
 import gym
@@ -16,6 +18,7 @@ def test_cdqn():
     env = gym.make('Pendulum-v0')
     np.random.seed(123)
     env.seed(123)
+    random.seed(123)
     nb_actions = env.action_space.shape[0]
 
     V_model = Sequential()
@@ -41,7 +44,7 @@ def test_cdqn():
     x = Activation('linear')(x)
     L_model = Model(input=[action_input, observation_input], output=x)
 
-    memory = SequentialMemory(limit=1000)
+    memory = SequentialMemory(limit=1000, window_length=1)
     random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3, size=nb_actions)
     agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
                                memory=memory, nb_steps_warmup=50, random_process=random_process,
@@ -58,6 +61,7 @@ def test_ddpg():
     env = gym.make('Pendulum-v0')
     np.random.seed(123)
     env.seed(123)
+    random.seed(123)
     nb_actions = env.action_space.shape[0]
 
     actor = Sequential()
@@ -77,7 +81,7 @@ def test_ddpg():
     x = Activation('linear')(x)
     critic = Model(input=[action_input, observation_input], output=x)
     
-    memory = SequentialMemory(limit=1000)
+    memory = SequentialMemory(limit=1000, window_length=1)
     random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3)
     agent = DDPGAgent(nb_actions=nb_actions, actor=actor, critic=critic, critic_action_input=action_input,
                       memory=memory, nb_steps_warmup_critic=50, nb_steps_warmup_actor=50,

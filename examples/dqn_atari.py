@@ -92,7 +92,7 @@ print(model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!
-memory = SequentialMemory(limit=1000000)
+memory = SequentialMemory(limit=1000000, window_length=WINDOW_LENGTH)
 processor = AtariProcessor()
 
 # Select a policy. We use eps-greedy action selection, which means that a random action is selected
@@ -109,7 +109,7 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # policy = BoltzmannQPolicy(tau=1.)
 # Feel free to give it a try!
 
-dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, window_length=WINDOW_LENGTH, memory=memory,
+dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
                processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.),
                target_model_update=10000, train_interval=4)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])

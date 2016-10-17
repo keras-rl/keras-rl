@@ -20,7 +20,7 @@ def mean_q(y_true, y_pred):
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(Agent):
-    def __init__(self, model, nb_actions, memory, window_length=1, policy=EpsGreedyQPolicy(),
+    def __init__(self, model, nb_actions, memory, policy=EpsGreedyQPolicy(),
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
                  target_model_update=10000, delta_range=(-np.inf, np.inf), enable_double_dqn=True,
                  custom_model_objects={}, processor=None):
@@ -44,7 +44,6 @@ class DQNAgent(Agent):
 
         # Parameters.
         self.nb_actions = nb_actions
-        self.window_length = window_length
         self.gamma = gamma
         self.batch_size = batch_size
         self.nb_steps_warmup = nb_steps_warmup
@@ -69,7 +68,6 @@ class DQNAgent(Agent):
     def get_config(self):
         config = {
             'nb_actions': self.nb_actions,
-            'window_length': self.window_length,
             'gamma': self.gamma,
             'batch_size': self.batch_size,
             'nb_steps_warmup': self.nb_steps_warmup,
@@ -174,8 +172,7 @@ class DQNAgent(Agent):
             observation = self.processor.process_observation(observation)
 
         # Select an action.
-        state = self.memory.get_recent_state(observation, self.window_length)
-        assert len(state) == self.window_length
+        state = self.memory.get_recent_state(observation)
         q_values = self.compute_q_values(state)
         action = self.policy.select_action(q_values=q_values)
         if self.processor is not None:
@@ -192,7 +189,8 @@ class DQNAgent(Agent):
         if self.processor is not None:
             reward = self.processor.process_reward(reward)
         if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
+                               training=self.training)
 
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
@@ -202,7 +200,7 @@ class DQNAgent(Agent):
 
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
-            experiences = self.memory.sample(self.batch_size, self.window_length)
+            experiences = self.memory.sample(self.batch_size)
             assert len(experiences) == self.batch_size
             
             # Start by extracting the necessary parameters (we use a vectorized implementation).
@@ -412,7 +410,7 @@ class NAFLayer(Layer):
 
 
 class ContinuousDQNAgent(DQNAgent):
-    def __init__(self, V_model, L_model, mu_model, nb_actions, memory, window_length=1,
+    def __init__(self, V_model, L_model, mu_model, nb_actions, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
                  target_model_update=10000, delta_range=(-np.inf, np.inf), custom_model_objects={},
                  processor=None, random_process=None):
@@ -432,7 +430,6 @@ class ContinuousDQNAgent(DQNAgent):
 
         # Parameters.
         self.nb_actions = nb_actions
-        self.window_length = window_length
         self.gamma = gamma
         self.batch_size = batch_size
         self.nb_steps_warmup = nb_steps_warmup
@@ -522,8 +519,7 @@ class ContinuousDQNAgent(DQNAgent):
             observation = self.processor.process_observation(observation)
 
         # Select an action.
-        state = self.memory.get_recent_state(observation, self.window_length)
-        assert len(state) == self.window_length
+        state = self.memory.get_recent_state(observation)
         action = self.select_action(state)
         if self.processor is not None:
             action = self.processor.process_action(action)
@@ -539,7 +535,8 @@ class ContinuousDQNAgent(DQNAgent):
         if self.processor is not None:
             reward = self.processor.process_reward(reward)
         if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
+                               training=self.training)
 
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
@@ -549,7 +546,7 @@ class ContinuousDQNAgent(DQNAgent):
         
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
-            experiences = self.memory.sample(self.batch_size, self.window_length)
+            experiences = self.memory.sample(self.batch_size)
             assert len(experiences) == self.batch_size
             
             # Start by extracting the necessary parameters (we use a vectorized implementation).

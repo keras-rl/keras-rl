@@ -62,7 +62,7 @@ print(L_model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!
-memory = SequentialMemory(limit=100000)
+memory = SequentialMemory(limit=100000, window_length=1)
 random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3, size=nb_actions)
 agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
                            memory=memory, nb_steps_warmup=100, random_process=random_process,

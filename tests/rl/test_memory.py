@@ -41,7 +41,7 @@ def test_ring_buffer():
 
 
 def test_get_recent_state_with_episode_boundaries():
-    memory = SequentialMemory(3, ignore_episode_boundaries=False)
+    memory = SequentialMemory(3, window_length=2, ignore_episode_boundaries=False)
     obs_size = (3, 4)
     
     obs0 = np.random.random(obs_size)
@@ -65,7 +65,7 @@ def test_get_recent_state_with_episode_boundaries():
     obs6 = np.random.random(obs_size)
     terminal6 = False
 
-    state = memory.get_recent_state(obs0, window_length=2)
+    state = memory.get_recent_state(obs0)
     assert state.shape == (2,) + obs_size
     assert np.allclose(state[0], 0.)
     assert np.all(state[1] == obs0)
@@ -73,44 +73,86 @@ def test_get_recent_state_with_episode_boundaries():
     # memory.append takes the current observation, the reward after taking an action and if
     # the *new* observation is terminal, thus `obs0` and `terminal1` is correct.
     memory.append(obs0, 0, 0., terminal1)
-    state = memory.get_recent_state(obs1, window_length=2)
+    state = memory.get_recent_state(obs1)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == obs0)
     assert np.all(state[1] == obs1)
 
     memory.append(obs1, 0, 0., terminal2)
-    state = memory.get_recent_state(obs2, window_length=2)
+    state = memory.get_recent_state(obs2)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == obs1)
     assert np.all(state[1] == obs2)
 
     memory.append(obs2, 0, 0., terminal3)
-    state = memory.get_recent_state(obs3, window_length=2)
+    state = memory.get_recent_state(obs3)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == obs2)
     assert np.all(state[1] == obs3)
 
     memory.append(obs3, 0, 0., terminal4)
-    state = memory.get_recent_state(obs4, window_length=2)
+    state = memory.get_recent_state(obs4)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == np.zeros(obs_size))
     assert np.all(state[1] == obs4)
 
     memory.append(obs4, 0, 0., terminal5)
-    state = memory.get_recent_state(obs5, window_length=2)
+    state = memory.get_recent_state(obs5)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == obs4)
     assert np.all(state[1] == obs5)
 
     memory.append(obs5, 0, 0., terminal6)
-    state = memory.get_recent_state(obs6, window_length=2)
+    state = memory.get_recent_state(obs6)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == np.zeros(obs_size))
     assert np.all(state[1] == obs6)
 
 
+def test_training_flag():
+    obs_size = (3, 4)
+
+    obs0 = np.random.random(obs_size)
+    terminal0 = False
+
+    obs1 = np.random.random(obs_size)
+    terminal1 = True
+
+    obs2 = np.random.random(obs_size)
+    terminal2 = False
+
+    for training in (True, False):
+        memory = SequentialMemory(3, window_length=2)
+
+        state = memory.get_recent_state(obs0)
+        assert state.shape == (2,) + obs_size
+        assert np.allclose(state[0], 0.)
+        assert np.all(state[1] == obs0)
+        assert memory.nb_entries == 0
+        
+        memory.append(obs0, 0, 0., terminal1, training=training)
+        state = memory.get_recent_state(obs1)
+        assert state.shape == (2,) + obs_size
+        assert np.all(state[0] == obs0)
+        assert np.all(state[1] == obs1)
+        if training:
+            assert memory.nb_entries == 1
+        else:
+            assert memory.nb_entries == 0
+
+        memory.append(obs1, 0, 0., terminal2, training=training)
+        state = memory.get_recent_state(obs2)
+        assert state.shape == (2,) + obs_size
+        assert np.allclose(state[0], 0.)
+        assert np.all(state[1] == obs2)
+        if training:
+            assert memory.nb_entries == 2
+        else:
+            assert memory.nb_entries == 0
+
+
 def test_get_recent_state_without_episode_boundaries():
-    memory = SequentialMemory(3, ignore_episode_boundaries=True)
+    memory = SequentialMemory(3, window_length=2, ignore_episode_boundaries=True)
     obs_size = (3, 4)
     
     obs0 = np.random.random(obs_size)
@@ -134,7 +176,7 @@ def test_get_recent_state_without_episode_boundaries():
     obs6 = np.random.random(obs_size)
     terminal6 = False
     
-    state = memory.get_recent_state(obs0, window_length=2)
+    state = memory.get_recent_state(obs0)
     assert state.shape == (2,) + obs_size
     assert np.allclose(state[0], 0.)
     assert np.all(state[1] == obs0)
@@ -142,44 +184,44 @@ def test_get_recent_state_without_episode_boundaries():
     # memory.append takes the current observation, the reward after taking an action and if
     # the *new* observation is terminal, thus `obs0` and `terminal1` is correct.
     memory.append(obs0, 0, 0., terminal1)
-    state = memory.get_recent_state(obs1, window_length=2)
+    state = memory.get_recent_state(obs1)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == obs0)
     assert np.all(state[1] == obs1)
 
     memory.append(obs1, 0, 0., terminal2)
-    state = memory.get_recent_state(obs2, window_length=2)
+    state = memory.get_recent_state(obs2)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == obs1)
     assert np.all(state[1] == obs2)
 
     memory.append(obs2, 0, 0., terminal3)
-    state = memory.get_recent_state(obs3, window_length=2)
+    state = memory.get_recent_state(obs3)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == obs2)
     assert np.all(state[1] == obs3)
 
     memory.append(obs3, 0, 0., terminal4)
-    state = memory.get_recent_state(obs4, window_length=2)
+    state = memory.get_recent_state(obs4)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == obs3)
     assert np.all(state[1] == obs4)
 
     memory.append(obs4, 0, 0., terminal5)
-    state = memory.get_recent_state(obs5, window_length=2)
+    state = memory.get_recent_state(obs5)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == obs4)
     assert np.all(state[1] == obs5)
 
     memory.append(obs5, 0, 0., terminal6)
-    state = memory.get_recent_state(obs6, window_length=2)
+    state = memory.get_recent_state(obs6)
     assert state.shape == (2,) + obs_size
     assert np.all(state[0] == obs5)
     assert np.all(state[1] == obs6)
 
 
 def test_sampling():
-    memory = SequentialMemory(100, ignore_episode_boundaries=False)
+    memory = SequentialMemory(100, window_length=2, ignore_episode_boundaries=False)
     obs_size = (3, 4)
     actions = range(5)
     
@@ -228,7 +270,7 @@ def test_sampling():
     memory.append(obs5, action5, reward5, terminal6)
     assert memory.nb_entries == 6
 
-    experiences = memory.sample(batch_size=5, window_length=2, batch_idxs=[0, 1, 2, 3, 4])
+    experiences = memory.sample(batch_size=5, batch_idxs=[0, 1, 2, 3, 4])
     assert len(experiences) == 5
 
     assert_allclose(experiences[0].state0, np.array([np.zeros(obs_size), obs0]))

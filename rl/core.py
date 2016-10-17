@@ -7,6 +7,10 @@ from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Vi
 
 
 class Agent(object):
+    def __init__(self):
+        self.training = False
+        self.step = 0
+
     def get_config(self):
         return {}
         
@@ -212,6 +216,7 @@ class Agent(object):
                 
                 callbacks.on_step_end(episode_step)
                 episode_step += 1
+                self.step += 1
 
             # We are in a terminal state but the agent hasn't yet seen it. We therefore
             # perform one more forward-backward call and simply ignore the action before

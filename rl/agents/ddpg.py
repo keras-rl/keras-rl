@@ -18,7 +18,7 @@ def mean_q(y_true, y_pred):
 # http://arxiv.org/pdf/1509.02971v2.pdf
 # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.646.4324&rep=rep1&type=pdf
 class DDPGAgent(Agent):
-    def __init__(self, nb_actions, actor, critic, critic_action_input, memory, window_length=1,
+    def __init__(self, nb_actions, actor, critic, critic_action_input, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
                  train_interval=1, memory_interval=1, delta_range=(-np.inf, np.inf), processor=None,
                  random_process=OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=0.3),
@@ -50,7 +50,6 @@ class DDPGAgent(Agent):
 
         # Parameters.
         self.nb_actions = nb_actions
-        self.window_length = window_length
         self.processor = processor
         self.nb_steps_warmup_actor = nb_steps_warmup_actor
         self.nb_steps_warmup_critic = nb_steps_warmup_critic
@@ -232,8 +231,7 @@ class DDPGAgent(Agent):
             observation = self.processor.process_observation(observation)
 
         # Select an action.
-        state = self.memory.get_recent_state(observation, self.window_length)
-        assert len(state) == self.window_length
+        state = self.memory.get_recent_state(observation)
         action = self.select_action(state)  # TODO: move this into policy
         if self.processor is not None:
             action = self.processor.process_action(action)
@@ -253,7 +251,8 @@ class DDPGAgent(Agent):
         if self.processor is not None:
             reward = self.processor.process_reward(reward)
         if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
+                               training=self.training)
 
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
@@ -264,7 +263,7 @@ class DDPGAgent(Agent):
         # Train the network on a single stochastic batch.
         can_train_either = self.step > self.nb_steps_warmup_critic or self.step > self.nb_steps_warmup_actor
         if can_train_either and self.step % self.train_interval == 0:
-            experiences = self.memory.sample(self.batch_size, self.window_length)
+            experiences = self.memory.sample(self.batch_size)
             assert len(experiences) == self.batch_size
             
             # Start by extracting the necessary parameters (we use a vectorized implementation).

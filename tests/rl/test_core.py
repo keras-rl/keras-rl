@@ -48,14 +48,14 @@ class TestAgent(Agent):
 
 
 def test_fit_observations():
-    memory = SequentialMemory(100, ignore_episode_boundaries=False)
+    memory = SequentialMemory(100, window_length=2, ignore_episode_boundaries=False)
     agent = TestAgent(memory)
     env = TestEnv()
     agent.compile()
     agent.fit(env, 20, verbose=0)
 
     # Inspect memory to see if observations are correct.
-    experiencies = memory.sample(batch_size=8, window_length=2, batch_idxs=range(8))
+    experiencies = memory.sample(batch_size=8, batch_idxs=range(8))
     
     assert experiencies[0].reward == .2
     assert experiencies[0].action == 1

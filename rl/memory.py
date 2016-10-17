@@ -56,8 +56,9 @@ class RingBuffer(object):
         self.data[(self.start + self.length - 1) % self.maxlen] = v
 
 class SequentialMemory(object):
-    def __init__(self, limit, ignore_episode_boundaries=False):
+    def __init__(self, limit, window_length, ignore_episode_boundaries=False):
         self.limit = limit
+        self.window_length = window_length
         self.ignore_episode_boundaries = ignore_episode_boundaries
 
         # Do not use deque to implement the memory. This data structure may seem convenient but
@@ -66,8 +67,10 @@ class SequentialMemory(object):
         self.rewards = RingBuffer(limit)
         self.terminals = RingBuffer(limit)
         self.observations = RingBuffer(limit)
+        self.recent_observations = deque(maxlen=window_length)
+        self.recent_terminals = deque(maxlen=window_length)
 
-    def sample(self, batch_size, window_length, batch_idxs=None):
+    def sample(self, batch_size, batch_idxs=None):
         if batch_idxs is None:
             # Draw random indexes such that we have at least a single entry before each
             # index.
@@ -93,7 +96,7 @@ class SequentialMemory(object):
             # from different episodes. We ensure that an experience never spans multiple episodes.
             # This is probably not that important in practice but it seems cleaner.
             state0 = [self.observations[idx - 1]]
-            for offset in range(0, window_length - 1):
+            for offset in range(0, self.window_length - 1):
                 current_idx = idx - 2 - offset
                 current_terminal = self.terminals[current_idx - 1] if current_idx - 1 > 0 else False
                 if current_idx < 0 or (not self.ignore_episode_boundaries and current_terminal):
@@ -101,7 +104,7 @@ class SequentialMemory(object):
                     # Otherwise we would leak into a different episode.
                     break
                 state0.insert(0, self.observations[current_idx])
-            while len(state0) < window_length:
+            while len(state0) < self.window_length:
                 state0.insert(0, np.zeros(state0[0].shape))
             action = self.actions[idx - 1]
             reward = self.rewards[idx - 1]
@@ -113,40 +116,43 @@ class SequentialMemory(object):
             state1 = [np.copy(x) for x in state0[1:]]
             state1.append(self.observations[idx])
 
-            assert len(state0) == window_length
+            assert len(state0) == self.window_length
             assert len(state1) == len(state0)
             experiences.append(Experience(state0=np.array(state0), action=action, reward=reward,
                                           state1=np.array(state1), terminal1=terminal1))
         assert len(experiences) == batch_size
         return experiences
 
-    def get_recent_state(self, current_observation, window_length):
+    def get_recent_state(self, current_observation):
         # This code is slightly complicated by the fact that subsequent observations might be
         # from different episodes. We ensure that an experience never spans multiple episodes.
         # This is probably not that important in practice but it seems cleaner.
         state = [np.array(current_observation)]
-        idx = self.nb_entries - 1
-        for offset in range(0, window_length - 1):
+        idx = len(self.recent_observations) - 1
+        for offset in range(0, self.window_length - 1):
             current_idx = idx - offset
-            current_terminal = self.terminals[current_idx - 1] if current_idx - 1 > 0 else False
+            current_terminal = self.recent_terminals[current_idx - 1] if current_idx - 1 >= 0 else False
             if current_idx < 0 or (not self.ignore_episode_boundaries and current_terminal):
                 # The previously handled observation was terminal, don't add the current one.
                 # Otherwise we would leak into a different episode.
                 break
-            state.insert(0, self.observations[current_idx])
-        while len(state) < window_length:
+            state.insert(0, self.recent_observations[current_idx])
+        while len(state) < self.window_length:
             state.insert(0, np.zeros(state[0].shape))
         state = np.array(state)
-        assert state.shape[0] == window_length
+        assert state.shape[0] == self.window_length
         return state
 
-    def append(self, observation, action, reward, terminal):
+    def append(self, observation, action, reward, terminal, training=True):
         # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
         # and weather the next state is `terminal` or not.
-        self.observations.append(np.array(observation))
-        self.actions.append(action)
-        self.rewards.append(reward)
-        self.terminals.append(terminal)
+        if training:
+            self.observations.append(np.array(observation))
+            self.actions.append(action)
+            self.rewards.append(reward)
+            self.terminals.append(terminal)
+        self.recent_observations.append(np.array(observation))
+        self.recent_terminals.append(terminal)
 
     @property
     def nb_entries(self):
@@ -155,13 +161,14 @@ class SequentialMemory(object):
     def get_config(self):
         config = {
             'limit': self.limit,
+            'window_size': self.window_size,
             'ignore_episode_boundaries': self.ignore_episode_boundaries,
         }
         return config
 
 
 class EpisodeParameterMemory(object):
-    def __init__(self,limit,max_episode_steps):
+    def __init__(self, limit, max_episode_steps):
         self.limit = limit
         self.max_episode_steps = max_episode_steps
 

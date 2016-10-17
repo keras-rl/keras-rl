@@ -306,65 +306,6 @@ class FileLogger(Callback):
             json.dump(sorted_data, f)
 
 
-class DQNValidation(Callback):
-    def __init__(self, interval, nb_samples=2000):
-        super(DQNValidation, self).__init__()
-        self.nb_samples = nb_samples
-        self.interval = interval
-
-    def on_train_begin(self, logs):
-        from rl.agents import DQNAgent
-        if not isinstance(self.model, DQNAgent):
-            raise RuntimeError('DQNValidation does only work with a DQN agent.')
-
-        print('Collecting {} samples for validation ...'.format(self.nb_samples))
-        memory = SequentialMemory(self.nb_samples)
-        observation = self.env.reset()
-        step = 0
-        while memory.nb_entries < self.nb_samples:
-            action = self.env.action_space.sample()
-            new_observation, reward, terminal, _ = self.env.step(action)
-            if step % self.model.memory_interval == 0:
-                memory.append(observation, action, reward, terminal)
-            observation = new_observation
-            step += 1
-        print('done')
-        print('')
-        self.env.reset()
-        self.memory = memory
-
-    def on_step_end(self, step, logs):
-        if step % self.interval != 0:
-            return
-
-        print('Computing Q values on validation set ...')
-        max_q_values = []
-        nb_batches = int(np.ceil(float(self.nb_samples - self.model.window_length) / float(self.model.batch_size)))
-        all_batch_idxs = range(self.model.window_length, self.nb_samples - 1)
-        nb_all_items = len(all_batch_idxs)
-        for _ in range(nb_batches):
-            assert len(all_batch_idxs) > 0
-            
-            # Ensure that we sample each sample exactly once.
-            batch_idxs = all_batch_idxs[:self.model.batch_size]
-            nb_items = len(batch_idxs)
-            while len(batch_idxs) < self.model.batch_size:
-                batch_idxs.append(batch_idxs[-1])
-            assert len(batch_idxs) == self.model.batch_size
-            all_batch_idxs = all_batch_idxs[self.model.batch_size:]
-
-            # Compute Q values.
-            experiences = self.memory.sample(self.model.batch_size, self.model.window_length, batch_idxs=batch_idxs)
-            state0_batch = [e.state0 for e in experiences]
-            q_values_batch = self.model.compute_batch_q_values(state0_batch)
-            assert q_values_batch.shape == (self.model.batch_size, self.model.nb_actions)
-            max_q_values += np.max(q_values_batch[:nb_items, :], axis=1).tolist()
-        assert len(max_q_values) == nb_all_items
-        mean_q = np.mean(max_q_values)
-        print('done, mean_q: {:.3f}'.format(mean_q))
-        print('')
-
-
 class Visualizer(Callback):
     def on_action_end(self, action, logs):
         self.env.render(mode='human')

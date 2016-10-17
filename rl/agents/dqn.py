@@ -16,13 +16,6 @@ def mean_q(y_true, y_pred):
     return K.mean(K.max(y_pred, axis=-1))
 
 
-def mean_q_new(y_true, loss):
-    # loss = K.square(y_true - y_pred). Solving for y_pred yields:
-    # K.sqrt(loss) = y_true - y_pred <=> y_pred = y_true - K.sqrt(loss).
-    y_pred = K.flatten(y_true) - K.sqrt(K.flatten(loss))
-    return K.mean(y_pred)
-
-
 # An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
@@ -94,7 +87,7 @@ class DQNAgent(Agent):
         return config
 
     def compile(self, optimizer, metrics=[]):
-        metrics += [mean_q_new]  # register default metrics
+        metrics += [mean_q]  # register default metrics
 
         # We never train the target model, hence we can set the optimizer and loss arbitrarily.
         self.target_model = clone_model(self.model, self.custom_model_objects)
@@ -124,14 +117,17 @@ class DQNAgent(Agent):
         y_true = Input(name='y_true', shape=(self.nb_actions,))
         mask = Input(name='mask', shape=(self.nb_actions,))
         loss_out = Lambda(clipped_masked_mse, output_shape=(1,), name='loss')([y_pred, y_true, mask])
-        trainable_model = Model(input=[self.model.input, y_true, mask], output=[loss_out])
-        # TOOD: does this break metrics?
-        trainable_model.compile(optimizer=optimizer, loss=lambda y_true, y_pred: y_pred, metrics=metrics)
+        trainable_model = Model(input=[self.model.input, y_true, mask], output=[loss_out, y_pred])
+        assert len(trainable_model.output_names) == 2
+        combined_metrics = {trainable_model.output_names[1]: metrics}
+        losses = [
+            lambda y_true, y_pred: y_pred,  # loss is computed in Lambda layer
+            lambda y_true, y_pred: K.zeros_like(y_pred),  # we only include this for the metrics
+        ]
+        trainable_model.compile(optimizer=optimizer, loss=losses, metrics=combined_metrics)
         self.trainable_model = trainable_model
         
         self.compiled = True
-
-    # TODO: implement support for pickle
 
     def load_weights(self, filepath):
         self.model.load_weights(filepath)
@@ -276,7 +272,8 @@ class DQNAgent(Agent):
             # Finally, perform a single update on the entire batch. We use a dummy target since
             # the actual loss is computed in a Lambda layer that needs more complex input. However,
             # it is still useful to know the actual target to compute metrics properly.
-            metrics = self.trainable_model.train_on_batch([state0_batch, targets, masks], dummy_targets)
+            metrics = self.trainable_model.train_on_batch([state0_batch, targets, masks], [dummy_targets, targets])
+            metrics = [metric for idx, metric in enumerate(metrics) if idx not in (1, 2)]  # throw away individual losses
             metrics += self.policy.run_metrics()
 
         if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
@@ -286,7 +283,13 @@ class DQNAgent(Agent):
 
     @property
     def metrics_names(self):
-        return self.trainable_model.metrics_names[:] + self.policy.metrics_names[:]
+        # Throw away individual losses and replace output name since this is hidden from the user.
+        assert len(self.trainable_model.output_names) == 2
+        dummy_output_name = self.trainable_model.output_names[1]
+        model_metrics = [name for idx, name in enumerate(self.trainable_model.metrics_names) if idx not in (1, 2)]
+        model_metrics = [name.replace(dummy_output_name + '_', '') for name in model_metrics]
+
+        return model_metrics + self.policy.metrics_names[:]
 
 
 class NAFLayer(Layer):

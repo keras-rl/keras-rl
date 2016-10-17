@@ -200,7 +200,12 @@ class DDPGAgent(Agent):
 
     def reset_states(self):
         self.recent_action = None
-        self.recent_observations = deque(maxlen=self.window_length)
+        self.recent_observation = None
+        if self.compiled:
+            self.actor.reset_states()
+            self.critic.reset_states()
+            self.target_actor.reset_states()
+            self.target_critic.reset_states()
 
     def process_state_batch(self, batch):
         batch = np.array(batch)
@@ -227,19 +232,14 @@ class DDPGAgent(Agent):
             observation = self.processor.process_observation(observation)
 
         # Select an action.
-        while len(self.recent_observations) < self.recent_observations.maxlen:
-            # Not enough data, fill the recent_observations queue with copies of the current input.
-            # This allows us to immediately perform a policy action instead of falling back to random
-            # actions.
-            self.recent_observations.append(np.copy(observation))
-        state = np.array(list(self.recent_observations)[1:] + [observation])
+        state = self.memory.get_recent_state(observation, self.window_length)
         assert len(state) == self.window_length
         action = self.select_action(state)  # TODO: move this into policy
         if self.processor is not None:
             action = self.processor.process_action(action)
         
         # Book-keeping.
-        self.recent_observations.append(observation)
+        self.recent_observation = observation
         self.recent_action = action
         
         return action
@@ -249,18 +249,17 @@ class DDPGAgent(Agent):
         return self.critic.metrics_names[:]
 
     def backward(self, reward, terminal=False):
+        # Store most recent experience in memory.
+        if self.processor is not None:
+            reward = self.processor.process_reward(reward)
+        if self.step % self.memory_interval == 0:
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
+
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
             return metrics
-
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
-        
-        # Store most recent experience in memory.
-        if self.step % self.memory_interval == 0:
-            self.memory.append(self.recent_observations[-1], self.recent_action, reward, terminal)
         
         # Train the network on a single stochastic batch.
         can_train_either = self.step > self.nb_steps_warmup_critic or self.step > self.nb_steps_warmup_actor

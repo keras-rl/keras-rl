@@ -141,12 +141,6 @@ class DQNAgent(Agent):
             self.model.reset_states()
             self.target_model.reset_states()
 
-            # TODO: remove this hack, maybe add a callback that can be used for this sort of stuff.
-            for layer, target_layer in zip(self.model.layers, self.target_model.layers):
-                if hasattr(target_layer, 'stateful_mask'):
-                    K.set_value(target_layer.is_target_network, np.array([1]))
-                    K.set_value(target_layer.stateful_mask, K.get_value(layer.stateful_mask))
-
     def update_target_model_hard(self):
         self.target_model.set_weights(self.model.get_weights())
 

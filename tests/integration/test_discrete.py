@@ -12,9 +12,6 @@ from rl.policy import EpsGreedyQPolicy
 from rl.memory import SequentialMemory, EpisodeParameterMemory
 
 
-np.random.seed(123)
-
-
 def test_dqn():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
@@ -29,12 +26,13 @@ def test_dqn():
     model.add(Activation('linear'))
 
     memory = SequentialMemory(limit=1000, window_length=1)
-    policy = EpsGreedyQPolicy(eps=.05)
+    policy = EpsGreedyQPolicy(eps=.1)
     dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=50,
                    target_model_update=1e-1, policy=policy, enable_double_dqn=False)
     dqn.compile(Adam(lr=1e-3))
 
     dqn.fit(env, nb_steps=2000, visualize=False, verbose=0)
+    policy.eps = 0.
     h = dqn.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
 
@@ -53,12 +51,13 @@ def test_double_dqn():
     model.add(Activation('linear'))
 
     memory = SequentialMemory(limit=1000, window_length=1)
-    policy = EpsGreedyQPolicy(eps=.05)
+    policy = EpsGreedyQPolicy(eps=.1)
     dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=50,
                    target_model_update=1e-1, policy=policy, enable_double_dqn=True)
     dqn.compile(Adam(lr=1e-3))
 
     dqn.fit(env, nb_steps=2000, visualize=False, verbose=0)
+    policy.eps = 0.
     h = dqn.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
 

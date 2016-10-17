@@ -17,7 +17,11 @@ def sample_batch_indexes(low, high, size):
         # batch. We cannot use `np.random.choice` here because it is horribly inefficient as
         # the memory grows. See https://github.com/numpy/numpy/issues/2764 for a discussion.
         # `random.sample` does the same thing (drawing without replacement) and is way faster.
-        batch_idxs = random.sample(xrange(low, high), size)
+        try:
+            r = xrange(low, high)
+        except NameError:
+            r = range(low, high)
+        batch_idxs = random.sample(r, size)
     else:
         # Not enough data. Help ourselves with sampling from the range, but the same index
         # can occur multiple times. This is not good and should be avoided by picking a

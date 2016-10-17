@@ -61,31 +61,31 @@ def test_fit_observations():
     assert experiencies[0].action == 1
     assert_allclose(experiencies[0].state0, np.array([0, 1]))
     assert_allclose(experiencies[0].state1, np.array([1, 2]))
-    assert experiencies[0].terminal1 == False
+    assert experiencies[0].terminal1 is False
     
     assert experiencies[1].reward == .3
     assert experiencies[1].action == 2
     assert_allclose(experiencies[1].state0, np.array([1, 2]))
     assert_allclose(experiencies[1].state1, np.array([2, 3]))
-    assert experiencies[1].terminal1 == False
+    assert experiencies[1].terminal1 is False
 
     assert experiencies[2].reward == .4
     assert experiencies[2].action == 3
     assert_allclose(experiencies[2].state0, np.array([2, 3]))
     assert_allclose(experiencies[2].state1, np.array([3, 4]))
-    assert experiencies[2].terminal1 == False
+    assert experiencies[2].terminal1 is False
 
     assert experiencies[3].reward == .5
     assert experiencies[3].action == 4
     assert_allclose(experiencies[3].state0, np.array([3, 4]))
     assert_allclose(experiencies[3].state1, np.array([4, 5]))
-    assert experiencies[3].terminal1 == False
+    assert experiencies[3].terminal1 is False
 
     assert experiencies[4].reward == .6
     assert experiencies[4].action == 5
     assert_allclose(experiencies[4].state0, np.array([4, 5]))
     assert_allclose(experiencies[4].state1, np.array([5, 6]))
-    assert experiencies[4].terminal1 == True
+    assert experiencies[4].terminal1 is True
 
     # Experience 5 has been re-sampled since since state0 would be terminal in which case we
     # cannot really have a meaningful transition because the environment gets reset. We thus
@@ -96,13 +96,13 @@ def test_fit_observations():
     assert experiencies[6].action == 1
     assert_allclose(experiencies[6].state0, np.array([0, 1]))
     assert_allclose(experiencies[6].state1, np.array([1, 2]))
-    assert experiencies[6].terminal1 == False
+    assert experiencies[6].terminal1 is False
 
     assert experiencies[7].reward == .3
     assert experiencies[7].action == 2
     assert_allclose(experiencies[7].state0, np.array([1, 2]))
     assert_allclose(experiencies[7].state1, np.array([2, 3]))
-    assert experiencies[7].terminal1 == False
+    assert experiencies[7].terminal1 is False
     
 
 if __name__ == '__main__':

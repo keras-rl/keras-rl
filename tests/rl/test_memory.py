@@ -277,19 +277,19 @@ def test_sampling():
     assert_allclose(experiences[0].state1, np.array([obs0, obs1]))
     assert experiences[0].action == action0
     assert experiences[0].reward == reward0
-    assert experiences[0].terminal1 == False
+    assert experiences[0].terminal1 is False
 
     assert_allclose(experiences[1].state0, np.array([obs0, obs1]))
     assert_allclose(experiences[1].state1, np.array([obs1, obs2]))
     assert experiences[1].action == action1
     assert experiences[1].reward == reward1
-    assert experiences[1].terminal1 == False
+    assert experiences[1].terminal1 is False
 
     assert_allclose(experiences[2].state0, np.array([obs1, obs2]))
     assert_allclose(experiences[2].state1, np.array([obs2, obs3]))
     assert experiences[2].action == action2
     assert experiences[2].reward == reward2
-    assert experiences[2].terminal1 == True
+    assert experiences[2].terminal1 is True
 
     # Next experience has been re-sampled since since state0 would be terminal in which case we
     # cannot really have a meaningful transition because the environment gets reset. We thus
@@ -300,7 +300,7 @@ def test_sampling():
     assert_allclose(experiences[4].state1, np.array([obs4, obs5]))
     assert experiences[4].action == action4
     assert experiences[4].reward == reward4
-    assert experiences[4].terminal1 == False
+    assert experiences[4].terminal1 is False
     
 
 if __name__ == '__main__':

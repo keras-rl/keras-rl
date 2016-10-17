@@ -1,3 +1,4 @@
+import random
 
 import numpy as np
 from numpy.testing import assert_allclose
@@ -16,6 +17,7 @@ def test_dqn():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
     env.seed(123)
+    random.seed(123)
     nb_actions = env.action_space.n
 
     # Next, we build a very simple model.
@@ -41,6 +43,7 @@ def test_double_dqn():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
     env.seed(123)
+    random.seed(123)
     nb_actions = env.action_space.n
 
     # Next, we build a very simple model.
@@ -66,6 +69,7 @@ def test_cem():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
     env.seed(123)
+    random.seed(123)
     nb_actions = env.action_space.n
 
     # Next, we build a very simple model.

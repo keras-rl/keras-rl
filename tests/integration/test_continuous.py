@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 from numpy.testing import assert_allclose
 import gym
@@ -16,6 +18,7 @@ def test_cdqn():
     env = gym.make('Pendulum-v0')
     np.random.seed(123)
     env.seed(123)
+    random.seed(123)
     nb_actions = env.action_space.shape[0]
 
     V_model = Sequential()
@@ -58,6 +61,7 @@ def test_ddpg():
     env = gym.make('Pendulum-v0')
     np.random.seed(123)
     env.seed(123)
+    random.seed(123)
     nb_actions = env.action_space.shape[0]
 
     actor = Sequential()

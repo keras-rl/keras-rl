@@ -12,7 +12,7 @@ matrix:
         - python: 2.7
           env: KERAS_BACKEND=tensorflow
         - python: 2.7
-          env: KERAS_BACKEND=theano TEST_MODE=PEP8
+          env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8
         - python: 2.7
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
         - python: 3.4

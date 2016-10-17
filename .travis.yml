@@ -17,6 +17,10 @@ matrix:
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
         - python: 3.4
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
+        - python: 2.7
+          env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
+        - python: 3.4
+          env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
 install:
   # Adopted from https://github.com/fchollet/keras/blob/master/.travis.yml.
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then

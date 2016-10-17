@@ -10,8 +10,6 @@ import numpy as np
 from keras.callbacks import Callback as KerasCallback, CallbackList as KerasCallbackList
 from keras.utils.generic_utils import Progbar
 
-from rl.memory import SequentialMemory
-
 
 class Callback(KerasCallback):
     def _set_env(self, env):

@@ -3,7 +3,7 @@ from setuptools import find_packages
 
 
 setup(name='keras-rl',
-      version='0.2rc1',
+      version='0.2.0rc1',
       description='Deep Reinforcement Learning for Keras',
       author='Matthias Plappert',
       author_email='matthiasplappert@me.com',

@@ -40,6 +40,7 @@ class Agent(object):
         callbacks._set_params({
             'nb_steps': nb_steps,
         })
+        self._on_train_begin()
         callbacks.on_train_begin()
 
         episode = 0
@@ -139,8 +140,15 @@ class Agent(object):
             # the `on_train_end` method is properly called.
             did_abort = True
         callbacks.on_train_end(logs={'did_abort': did_abort})
+        self._on_train_end()
 
         return history
+
+    def _on_train_begin(self):
+        pass
+
+    def _on_train_end(self):
+        pass
 
     def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
              nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1):
@@ -167,6 +175,7 @@ class Agent(object):
             'nb_episodes': nb_episodes,
         })
 
+        self._on_test_begin()
         callbacks.on_train_begin()
         for episode in range(nb_episodes):
             callbacks.on_episode_begin(episode)
@@ -233,8 +242,15 @@ class Agent(object):
             }
             callbacks.on_episode_end(episode, episode_logs)
         callbacks.on_train_end()
+        self._on_test_end()
 
         return history
+
+    def _on_test_begin(self):
+        pass
+
+    def _on_test_end(self):
+        pass
 
     def reset_states(self):
         pass

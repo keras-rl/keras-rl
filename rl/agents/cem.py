@@ -90,7 +90,7 @@ class CEMAgent(Agent):
 
         action = self.model.predict_on_batch(batch).flatten()
         if stochastic or self.training:
-            return np.random.choice(np.arange(self.nb_actions), p=action / np.sum(action))
+            return np.random.choice(np.arange(self.nb_actions), p=np.exp(action) / np.sum(np.exp(action)))
         return np.argmax(action)
     
     def update_theta(self,theta):
@@ -164,6 +164,9 @@ class CEMAgent(Agent):
             self.choose_weights()
             self.episode += 1
         return metrics
+
+    def _on_train_end(self):
+        self.model.set_weights(self.get_weights_list(self.best_seen[1]))
 
     @property
     def metrics_names(self):

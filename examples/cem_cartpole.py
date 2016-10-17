@@ -55,8 +55,6 @@ cem.compile()
 cem.fit(env, nb_steps=100000, visualize=False, verbose=2)
 
 # After training is done, we save the best weights.
-print("highest reward total seen : {0}".format(cem.best_seen[0]))
-cem.model.set_weights(cem.get_weights_list(cem.best_seen[1]))
 cem.save_weights('cem_{}_params.h5f'.format(ENV_NAME), overwrite=True)
 
 # Finally, evaluate our algorithm for 5 episodes.

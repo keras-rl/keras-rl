@@ -95,6 +95,13 @@ class Memory(object):
         assert state.shape[0] == self.window_length
         return state
 
+    def get_config(self):
+        config = {
+            'window_length': self.window_length,
+            'ignore_episode_boundaries': self.ignore_episode_boundaries,
+        }
+        return config
+
 class SequentialMemory(Memory):
     def __init__(self, limit, **kwargs):
         super(SequentialMemory, self).__init__(**kwargs)

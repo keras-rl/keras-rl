@@ -182,7 +182,7 @@ class DDPGAgent(Agent):
         critic_filepath = filename + '_critic' + extension
         self.actor.load_weights(actor_filepath)
         self.critic.load_weights(critic_filepath)
-        self.update_target_model_hard()
+        self.update_target_models_hard()
 
     def save_weights(self, filepath, overwrite=False):
         filename, extension = os.path.splitext(filepath)

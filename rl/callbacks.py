@@ -296,7 +296,9 @@ class FileLogger(Callback):
         sorted_data = {}
         for key, values in self.data.items():
             assert len(self.data[key]) == len(sorted_indexes)
-            sorted_data[key] = [self.data[key][idx] for idx in sorted_indexes]
+            # We convert to np.array() and then to list to convert from np datatypes to native datatypes.
+            # This is necessary because json.dump cannot handle np.float32, for example.
+            sorted_data[key] = np.array([self.data[key][idx] for idx in sorted_indexes]).tolist()
 
         # Overwrite already open file. We can simply seek to the beginning since the file will
         # grow strictly monotonously.

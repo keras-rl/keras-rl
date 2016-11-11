@@ -586,6 +586,25 @@ class ContinuousDQNAgent(DQNAgent):
 
         return metrics
 
+    def get_config(self):
+        config = {
+            'nb_actions': self.nb_actions,
+            'gamma': self.gamma,
+            'batch_size': self.batch_size,
+            'nb_steps_warmup': self.nb_steps_warmup,
+            'train_interval': self.train_interval,
+            'memory_interval': self.memory_interval,
+            'target_model_update': self.target_model_update,
+            'delta_range': self.delta_range,
+            'V_model': get_object_config(self.V_model),
+            'mu_model': get_object_config(self.mu_model),
+            'L_model': get_object_config(self.L_model),
+            'memory': get_object_config(self.memory),
+        }
+        if self.compiled:
+            config['target_L_model'] = get_object_config(self.target_L_model)
+        return config
+
     @property
     def metrics_names(self):
         return self.combined_model.metrics_names[:]

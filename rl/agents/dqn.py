@@ -602,7 +602,7 @@ class ContinuousDQNAgent(DQNAgent):
             'memory': get_object_config(self.memory),
         }
         if self.compiled:
-            config['target_L_model'] = get_object_config(self.target_L_model)
+            config['target_V_model'] = get_object_config(self.target_V_model)
         return config
 
     @property

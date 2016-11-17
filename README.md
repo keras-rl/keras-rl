@@ -1,4 +1,6 @@
 # Deep Reinforcement Learning for Keras
+[![Build Status](https://api.travis-ci.org/matthiasplappert/keras-rl.svg?branch=master)](https://travis-ci.org/matthiasplappert/keras-rl)
+[![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/matthiasplappert/keras-rl/blob/master/LICENSE)
 
 <table>
   <tr>
@@ -23,6 +25,9 @@ As of today, the following algorithms have been implemented:
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
 - Continuous DQN (CDQN or NAF) [[6]](http://arxiv.org/abs/1603.00748)
+- Cross-Entropy Method (CEM) [[7]](http://learning.mpi-sws.org/mlss2016/slides/2016-MLSS-RL.pdf), [[8]](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.81.6579&rep=rep1&type=pdf)
+
+You can find more information on each agent in the [wiki](https://github.com/matthiasplappert/keras-rl/wiki/Agent-Overview).
 
 I'm currently working on the following algorithms, which can be found on the `experimental` branch:
 
@@ -69,13 +74,27 @@ You can load the weights using the `load_weights` method on the respective agent
 
 ## Requirements
 - Python 2.7
-- [Keras](http://keras.io) >= 1.0
+- [Keras](http://keras.io) >= 1.0.7
 
 That's it. However, if you want to run the examples, you'll also need the following dependencies:
 - [OpenAI Gym](https://github.com/openai/gym)
 - [h5py](https://pypi.python.org/pypi/h5py)
 
 `keras-rl` also works with [TensorFlow](https://www.tensorflow.org/). To find out how to use TensorFlow instead of [Theano](http://deeplearning.net/software/theano/), please refer to the [Keras documentation](http://keras.io/#switching-from-theano-to-tensorflow).
+
+## Running the Tests
+To run the tests locally, you'll first have to install the following dependencies:
+```bash
+pip install pytest pytest-xdist pep8 pytest-pep8 pytest-cov python-coveralls
+```
+You can then run all tests using this command:
+```bash
+py.test tests/.
+```
+If you want to check if the files conform to the PEP8 style guidelines, run the following command:
+```bash
+py.test --pep8
+```
 
 ## Citing
 If you use `keras-rl` in your research, you can cite it as follows:
@@ -101,8 +120,10 @@ It has since been adapted to become a general-purpose library.
 4. *Continuous control with deep reinforcement learning*, Lillicrap et al., 2015
 5. *Asynchronous Methods for Deep Reinforcement Learning*, Mnih et al., 2016
 6. *Continuous Deep Q-Learning with Model-based Acceleration*, Gu et al., 2016
+7. *Learning Tetris Using the Noisy Cross-Entropy Method*, Szita et al., 2006
+8. *Deep Reinforcement Learning (MLSS lecture notes)*, John Schulman, 2016.
 
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.
 - Documentation: Currently, the documentation is pretty much non-existent.
-- TROP, priority-based memory, dueling DQN, A3C, async DQN, ...
+- TRPO, priority-based memory, dueling DQN, A3C, async DQN, ...

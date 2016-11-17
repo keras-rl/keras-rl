@@ -1,25 +1,27 @@
-from keras.models import model_from_config, Sequential, Model
+from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
+from keras.optimizers import optimizer_from_config
 
 
 def clone_model(model, custom_objects={}):
-    config = model.get_config()
-    try:
-        clone = Sequential.from_config(config, custom_objects)
-    except:
-        clone = Model.from_config(config, custom_objects)
+    # Requires Keras 1.0.7 since get_config has breaking changes.
+    config = {
+        'class_name': model.__class__.__name__,
+        'config': model.get_config(),
+    }
+    clone = model_from_config(config, custom_objects=custom_objects)
     clone.set_weights(model.get_weights())
     return clone
 
 
 def clone_optimizer(optimizer):
+    # Requires Keras 1.0.7 since get_config has breaking changes.
     params = dict([(k, v) for k, v in optimizer.get_config().items()])
-    name = params.pop('name')
-    clone = optimizers.get(name, params)
-    if hasattr(optimizer, 'clipnorm'):
-        clone.clipnorm = optimizer.clipnorm
-    if hasattr(optimizer, 'clipvalue'):
-        clone.clipvalue = optimizer.clipvalue
+    config = {
+        'class_name': optimizer.__class__.__name__,
+        'config': params,
+    }
+    clone = optimizer_from_config(config)
     return clone
 
 
@@ -33,6 +35,14 @@ def get_soft_target_model_updates(target, source, tau):
     for tw, sw in zip(target_weights, source_weights):
         updates.append((tw, tau * sw + (1. - tau) * tw))
     return updates
+
+
+def get_object_config(o):
+    config = {
+        'class_name': o.__class__.__name__,
+        'config': o.get_config()
+    }
+    return config
 
 
 class AdditionalUpdatesOptimizer(optimizers.Optimizer):

@@ -1,0 +1,72 @@
+sudo: required
+dist: trusty
+language: python
+matrix:
+    include:
+        - python: 3.4
+          env: KERAS_BACKEND=theano
+        - python: 3.4
+          env: KERAS_BACKEND=tensorflow
+        - python: 2.7
+          env: KERAS_BACKEND=theano
+        - python: 2.7
+          env: KERAS_BACKEND=tensorflow
+        - python: 2.7
+          env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8
+        - python: 2.7
+          env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
+        - python: 3.4
+          env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
+        - python: 2.7
+          env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
+        - python: 3.4
+          env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
+install:
+  # Adopted from https://github.com/fchollet/keras/blob/master/.travis.yml.
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
+    else
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    fi
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  # Useful for debugging any issues with conda
+  - conda info -a
+
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib pandas pytest h5py
+  - source activate test-environment
+  - pip install pytest-xdist
+  # See https://github.com/pytest-dev/pytest-cov/issues/124 for details
+  - pip install pytest-cov==2.2.1 python-coveralls coverage==3.7.1
+  - pip install pep8 pytest-pep8
+  - pip install git+git://github.com/Theano/Theano.git
+  - pip install gym
+
+  # Install TensorFlow.
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.9.0-cp27-none-linux_x86_64.whl;
+    elif [[ "$TRAVIS_PYTHON_VERSION" == "3.4" ]]; then
+      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.9.0-cp34-cp34m-linux_x86_64.whl;
+    fi
+
+  - python setup.py install
+
+# command to run tests.
+script:
+  # Run keras backend init to initialize backend config.
+  - python -c "import keras.backend"
+  # Set up keras backend
+  - sed -i -e 's/"backend":[[:space:]]*"[^"]*/"backend":\ "'$KERAS_BACKEND'/g' ~/.keras/keras.json;
+  - echo -e "Running tests with the following config:\n$(cat ~/.keras/keras.json)"
+  - if [[ "$TEST_MODE" == "INTEGRATION" ]]; then
+       PYTHONPATH=$PWD:$PYTHONPATH py.test tests/integration;
+    elif [[ "$TEST_MODE" == "PEP8" ]]; then
+       PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8 -m pep8 -n0;
+    else
+       PYTHONPATH=$PWD:$PYTHONPATH py.test tests/;
+    fi
+after_success:
+  - coveralls

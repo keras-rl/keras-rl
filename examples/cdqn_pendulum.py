@@ -1,4 +1,4 @@
-import numpy as np; np.random.seed(123)
+import numpy as np
 import gym
 
 from keras.models import Sequential, Model
@@ -8,6 +8,14 @@ from keras.optimizers import Adam
 from rl.agents import ContinuousDQNAgent
 from rl.memory import SequentialMemory
 from rl.random import OrnsteinUhlenbeckProcess
+from rl.core import Processor
+
+
+class PendulumProcessor(Processor):
+    def process_reward(self, reward):
+        # The magnitude of the reward can be important. Since each step yields a relatively
+        # high reward, we reduce the magnitude by two orders.
+        return reward / 100.
 
 
 ENV_NAME = 'Pendulum-v0'
@@ -16,6 +24,7 @@ gym.undo_logger_setup()
 
 # Get the environment and extract the number of actions.
 env = gym.make(ENV_NAME)
+np.random.seed(123)
 env.seed(123)
 assert len(env.action_space.shape) == 1
 nb_actions = env.action_space.shape[0]
@@ -61,11 +70,12 @@ print(L_model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!
-memory = SequentialMemory(limit=100000)
+processor = PendulumProcessor()
+memory = SequentialMemory(limit=100000, window_length=1)
 random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3, size=nb_actions)
 agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
-    memory=memory, nb_steps_warmup=100, random_process=random_process,
-    gamma=.99, target_model_update=1e-3)
+                           memory=memory, nb_steps_warmup=100, random_process=random_process,
+                           gamma=.99, target_model_update=1e-3, processor=processor)
 agent.compile(Adam(lr=.001, clipnorm=1.), metrics=['mae'])
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this

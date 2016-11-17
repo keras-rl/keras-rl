@@ -52,25 +52,26 @@ print(critic.summary())
 agents = []
 threads = []
 nb_jobs = 4
+
 def run(agent, idx):
-	if idx == 0:
-		verbose = 1
-	else:
-		verbose = 0
-	agent.fit(gym.make(ENV_NAME), nb_steps=1000000, visualize=False, verbose=verbose, nb_max_episode_steps=200)
+    if idx == 0:
+        verbose = 1
+    else:
+        verbose = 0
+    agent.fit(gym.make(ENV_NAME), nb_steps=1000000, visualize=False, verbose=verbose, nb_max_episode_steps=200)
 for job in xrange(nb_jobs):
-	agent = ContinuousA3CAgent(nb_actions=nb_actions, actor=actor, critic=critic,
-		actor_mean_output=actor_mean_output, actor_variance_output=actor_variance_output,
-		gamma=.99, batch_size=5)
-	agent.compile([Nadam(lr=.001), Nadam(lr=.001)], metrics=['mae'])
-	agents.append(agent)
+    agent = ContinuousA3CAgent(nb_actions=nb_actions, actor=actor, critic=critic,
+        actor_mean_output=actor_mean_output, actor_variance_output=actor_variance_output,
+        gamma=.99, batch_size=5)
+    agent.compile([Nadam(lr=.001), Nadam(lr=.001)], metrics=['mae'])
+    agents.append(agent)
 for idx, agent in enumerate(agents):
-	thread = threading.Thread(target=run, args=(agent, idx))
-	thread.daemon = True
-	threads.append(thread)
-	thread.start()
+    thread = threading.Thread(target=run, args=(agent, idx))
+    thread.daemon = True
+    threads.append(thread)
+    thread.start()
 for thread in threads:
-	thread.join()
+    thread.join()
 
 # After training is done, we save the final weights.
 agent.save_weights('a3c_{}_weights.h5f'.format(ENV_NAME), overwrite=True)

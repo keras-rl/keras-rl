@@ -198,6 +198,8 @@ class DDPGAgent(Agent):
     # TODO: implement pickle
 
     def reset_states(self):
+        if self.random_process is not None:
+            self.random_process.reset_states()
         self.recent_action = None
         self.recent_observation = None
         if self.compiled:

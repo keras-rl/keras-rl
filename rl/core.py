@@ -88,10 +88,17 @@ class Agent(object):
                 # (forward step) and then use the reward to improve (backward step).
                 action = self.forward(observation)
                 reward = 0.
+                accumulated_info = {}
                 done = False
                 for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
-                    observation, r, done, _ = env.step(action)
+                    observation, r, done, info = env.step(action)
+                    for key, value in info.items():
+                        if not np.isreal(value):
+                            continue
+                        if key not in accumulated_info:
+                            accumulated_info[key] = np.zeros_like(value)
+                        accumulated_info[key] += value
                     callbacks.on_action_end(action)
                     reward += r
                     if done:
@@ -108,6 +115,7 @@ class Agent(object):
                     'reward': reward,
                     'metrics': metrics,
                     'episode': episode,
+                    'info': accumulated_info,
                 }
                 callbacks.on_step_end(episode_step, step_logs)
                 episode_step += 1
@@ -210,11 +218,18 @@ class Agent(object):
 
                 action = self.forward(observation)
                 reward = 0.
+                accumulated_info = {}
                 for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
-                    observation, r, d, _ = env.step(action)
+                    observation, r, d, info = env.step(action)
                     callbacks.on_action_end(action)
                     reward += r
+                    for key, value in info.items():
+                        if not np.isreal(value):
+                            continue
+                        if key not in accumulated_info:
+                            accumulated_info[key] = np.zeros_like(value)
+                        accumulated_info[key] += value
                     if d:
                         done = True
                         break
@@ -223,7 +238,14 @@ class Agent(object):
                 self.backward(reward, terminal=done)
                 episode_reward += reward
                 
-                callbacks.on_step_end(episode_step)
+                step_logs = {
+                    'action': action,
+                    'observation': observation,
+                    'reward': reward,
+                    'episode': episode,
+                    'info': accumulated_info,
+                }
+                callbacks.on_step_end(episode_step, step_logs)
                 episode_step += 1
                 self.step += 1
 

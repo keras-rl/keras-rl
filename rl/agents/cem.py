@@ -155,6 +155,8 @@ class CEMAgent(Agent):
                     self.best_seen = (reward_totals[best_idx[-1]], params[best_idx[-1]])
                     
                 metrics = [np.mean(np.array(reward_totals)[best_idx])]
+                if self.processor is not None:
+                    metrics += self.processor.metrics
                 min_std = self.noise_ampl * np.exp(-self.step * self.noise_decay_const)
                 
                 mean = np.mean(best, axis=0)
@@ -170,4 +172,7 @@ class CEMAgent(Agent):
 
     @property
     def metrics_names(self):
-        return ['mean_best_reward']
+        names = ['mean_best_reward']
+        if self.processor is not None:
+            names += self.processor.metrics_names[:]
+        return names

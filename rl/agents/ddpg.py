@@ -246,7 +246,10 @@ class DDPGAgent(Agent):
 
     @property
     def metrics_names(self):
-        return self.critic.metrics_names[:]
+        names = self.critic.metrics_names[:]
+        if self.processor is not None:
+            names += self.processor.metrics_names[:]
+        return names
 
     def backward(self, reward, terminal=False):
         # Store most recent experience in memory.
@@ -311,6 +314,8 @@ class DDPGAgent(Agent):
                 state0_batch_with_action = [state0_batch]
                 state0_batch_with_action.insert(self.critic_action_input_idx, action_batch)
                 metrics = self.critic.train_on_batch(state0_batch_with_action, targets)
+                if self.processor is not None:
+                    metrics += self.processor.metrics
 
             # Update actor, if warm up is over.
             if self.step > self.nb_steps_warmup_actor:

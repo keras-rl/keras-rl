@@ -12,7 +12,8 @@ class Policy(object):
     def metrics_names(self):
         return []
 
-    def run_metrics(self):
+    @property
+    def metrics(self):
         return []
 
     def select_action(self, **kwargs):
@@ -54,7 +55,8 @@ class LinearAnnealedPolicy(Policy):
     def metrics_names(self):
         return ['mean_{}'.format(self.attr)]
 
-    def run_metrics(self):
+    @property
+    def metrics(self):
         return [getattr(self.inner_policy, self.attr)]
 
     def get_config(self):

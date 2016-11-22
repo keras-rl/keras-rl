@@ -314,6 +314,14 @@ class Processor(object):
     def process_reward(self, reward):
         return reward
 
+    @property
+    def metrics_names(self):
+        return []
+
+    @property
+    def metrics(self):
+        return []
+
 
 # Note: the API of the `Env` and `Space` classes are taken from the OpenAI Gym implementation.
 # https://github.com/openai/gym/blob/master/gym/core.py

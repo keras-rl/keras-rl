@@ -266,7 +266,9 @@ class DQNAgent(Agent):
             # it is still useful to know the actual target to compute metrics properly.
             metrics = self.trainable_model.train_on_batch([state0_batch, targets, masks], [dummy_targets, targets])
             metrics = [metric for idx, metric in enumerate(metrics) if idx not in (1, 2)]  # throw away individual losses
-            metrics += self.policy.run_metrics()
+            metrics += self.policy.metrics
+            if self.processor is not None:
+                metrics += self.processor.metrics
 
         if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
             self.update_target_model_hard()
@@ -281,7 +283,10 @@ class DQNAgent(Agent):
         model_metrics = [name for idx, name in enumerate(self.trainable_model.metrics_names) if idx not in (1, 2)]
         model_metrics = [name.replace(dummy_output_name + '_', '') for name in model_metrics]
 
-        return model_metrics + self.policy.metrics_names[:]
+        names = model_metrics + self.policy.metrics_names[:]
+        if self.processor is not None:
+            names += self.processor.metrics_names[:]
+        return names
 
 
 class NAFLayer(Layer):
@@ -582,6 +587,8 @@ class ContinuousDQNAgent(DQNAgent):
 
             # Finally, perform a single update on the entire batch.
             metrics = self.combined_model.train_on_batch([action_batch, state0_batch], Rs)
+            if self.processor is not None:
+                metrics += self.processor.metrics
 
         if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
             self.update_target_model_hard()
@@ -609,4 +616,7 @@ class ContinuousDQNAgent(DQNAgent):
 
     @property
     def metrics_names(self):
-        return self.combined_model.metrics_names[:]
+        names = self.combined_model.metrics_names[:]
+        if self.processor is not None:
+            names += self.processor.metrics_names[:]
+        return names

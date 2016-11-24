@@ -290,98 +290,150 @@ class DQNAgent(Agent):
 
 
 class NAFLayer(Layer):
-    def __init__(self, nb_actions, **kwargs):
+    def __init__(self, nb_actions, mode='full', **kwargs):
+        if mode not in ('full', 'diag'):
+            raise RuntimeError('Unknown mode "{}" in NAFLayer.'.format(self.mode))
+
         self.nb_actions = nb_actions
+        self.mode = mode
         super(NAFLayer, self).__init__(**kwargs)
 
     def call(self, x, mask=None):
+        # TODO: validate input shape
+
         # The input of this layer is [L, mu, a] in concatenated form. We first split
         # those up.
         idx = 0
-        L_flat = x[:, idx:idx + (self.nb_actions * self.nb_actions + self.nb_actions) // 2]
-        idx += (self.nb_actions * self.nb_actions + self.nb_actions) // 2
+        if self.mode == 'full':
+            L_flat = x[:, idx:idx + (self.nb_actions * self.nb_actions + self.nb_actions) // 2]
+            idx += (self.nb_actions * self.nb_actions + self.nb_actions) // 2
+        elif self.mode == 'diag':
+            L_flat = x[:, idx:idx + self.nb_actions]
+            idx += self.nb_actions
+        else:
+            L_flat = None
+        assert L_flat is not None
         mu = x[:, idx:idx + self.nb_actions]
         idx += self.nb_actions
         a = x[:, idx:idx + self.nb_actions]
         idx += self.nb_actions
 
-        # Create L and L^T matrix, which we use to construct the positive-definite matrix P.
-        L = None
-        LT = None
-        if K._BACKEND == 'theano':
-            import theano.tensor as T
-            import theano
+        if self.mode == 'full':
+            # Create L and L^T matrix, which we use to construct the positive-definite matrix P.
+            L = None
+            LT = None
+            if K._BACKEND == 'theano':
+                import theano.tensor as T
+                import theano
 
-            def fn(x, L_acc, LT_acc):
-                x_ = K.zeros((self.nb_actions, self.nb_actions))
-                x_ = T.set_subtensor(x_[np.tril_indices(self.nb_actions)], x)
-                diag = K.exp(T.diag(x_))
-                x_ = T.set_subtensor(x_[np.diag_indices(self.nb_actions)], diag)
-                return x_, x_.T
+                def fn(x, L_acc, LT_acc):
+                    x_ = K.zeros((self.nb_actions, self.nb_actions))
+                    x_ = T.set_subtensor(x_[np.tril_indices(self.nb_actions)], x)
+                    diag = K.exp(T.diag(x_))
+                    x_ = T.set_subtensor(x_[np.diag_indices(self.nb_actions)], diag)
+                    return x_, x_.T
 
-            outputs_info = [
-                K.zeros((self.nb_actions, self.nb_actions)),
-                K.zeros((self.nb_actions, self.nb_actions)),
-            ]
-            results, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
-            L, LT = results
-        elif K._BACKEND == 'tensorflow':
-            import tensorflow as tf
+                outputs_info = [
+                    K.zeros((self.nb_actions, self.nb_actions)),
+                    K.zeros((self.nb_actions, self.nb_actions)),
+                ]
+                results, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
+                L, LT = results
+            elif K._BACKEND == 'tensorflow':
+                import tensorflow as tf
 
-            # Number of elements in a triangular matrix.
-            nb_elems = (self.nb_actions * self.nb_actions + self.nb_actions) // 2
+                # Number of elements in a triangular matrix.
+                nb_elems = (self.nb_actions * self.nb_actions + self.nb_actions) // 2
 
-            # Create mask for the diagonal elements in L_flat. This is used to exponentiate
-            # only the diagonal elements, which is done before gathering.
-            diag_indeces = [0]
-            for row in range(1, self.nb_actions):
-                diag_indeces.append(diag_indeces[-1] + (row + 1))
-            diag_mask = np.zeros(1 + nb_elems)  # +1 for the leading zero
-            diag_mask[np.array(diag_indeces) + 1] = 1
-            diag_mask = K.variable(diag_mask)
+                # Create mask for the diagonal elements in L_flat. This is used to exponentiate
+                # only the diagonal elements, which is done before gathering.
+                diag_indeces = [0]
+                for row in range(1, self.nb_actions):
+                    diag_indeces.append(diag_indeces[-1] + (row + 1))
+                diag_mask = np.zeros(1 + nb_elems)  # +1 for the leading zero
+                diag_mask[np.array(diag_indeces) + 1] = 1
+                diag_mask = K.variable(diag_mask)
 
-            # Add leading zero element to each element in the L_flat. We use this zero
-            # element when gathering L_flat into a lower triangular matrix L.
-            nb_rows = tf.shape(L_flat)[0]
-            zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
-            L_flat = tf.concat(1, [zeros, L_flat])
-            
-            # Create mask that can be used to gather elements from L_flat and put them
-            # into a lower triangular matrix.
-            tril_mask = np.zeros((self.nb_actions, self.nb_actions), dtype='int32')
-            tril_mask[np.tril_indices(self.nb_actions)] = range(1, nb_elems + 1)
-            
-            # Finally, process each element of the batch.
-            init = [
-                K.zeros((self.nb_actions, self.nb_actions)),
-                K.zeros((self.nb_actions, self.nb_actions)),
-            ]
-            
-            def fn(a, x):
-                # Exponentiate everything. This is much easier than only exponentiating
-                # the diagonal elements, and, usually, the action space is relatively low.
-                x_ = K.exp(x)
-                # Only keep the diagonal elements.
-                x_ *= diag_mask
-                # Add the original, non-diagonal elements.
-                x_ += x * (1. - diag_mask)
-                # Finally, gather everything into a lower triangular matrix.
-                L_ = tf.gather(x_, tril_mask)
-                return [L_, tf.transpose(L_)]
+                # Add leading zero element to each element in the L_flat. We use this zero
+                # element when gathering L_flat into a lower triangular matrix L.
+                nb_rows = tf.shape(L_flat)[0]
+                zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
+                L_flat = tf.concat(1, [zeros, L_flat])
+                
+                # Create mask that can be used to gather elements from L_flat and put them
+                # into a lower triangular matrix.
+                tril_mask = np.zeros((self.nb_actions, self.nb_actions), dtype='int32')
+                tril_mask[np.tril_indices(self.nb_actions)] = range(1, nb_elems + 1)
+                
+                # Finally, process each element of the batch.
+                init = [
+                    K.zeros((self.nb_actions, self.nb_actions)),
+                    K.zeros((self.nb_actions, self.nb_actions)),
+                ]
+                
+                def fn(a, x):
+                    # Exponentiate everything. This is much easier than only exponentiating
+                    # the diagonal elements, and, usually, the action space is relatively low.
+                    x_ = K.exp(x)
+                    # Only keep the diagonal elements.
+                    x_ *= diag_mask
+                    # Add the original, non-diagonal elements.
+                    x_ += x * (1. - diag_mask)
+                    # Finally, gather everything into a lower triangular matrix.
+                    L_ = tf.gather(x_, tril_mask)
+                    return [L_, tf.transpose(L_)]
 
-            tmp = tf.scan(fn, L_flat, initializer=init)
-            if isinstance(tmp, (list, tuple)):
-                # TensorFlow 0.10 now returns a tuple of tensors.
-                L, LT = tmp
+                tmp = tf.scan(fn, L_flat, initializer=init)
+                if isinstance(tmp, (list, tuple)):
+                    # TensorFlow 0.10 now returns a tuple of tensors.
+                    L, LT = tmp
+                else:
+                    # Old TensorFlow < 0.10 returns a shared tensor.
+                    L = tmp[:, 0, :, :]
+                    LT = tmp[:, 1, :, :]
             else:
-                # Old TensorFlow < 0.10 returns a shared tensor.
-                L = tmp[:, 0, :, :]
-                LT = tmp[:, 1, :, :]
-        else:
-            raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
-        assert L is not None
-        assert LT is not None
-        P = K.batch_dot(L, LT)
+                raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
+            assert L is not None
+            assert LT is not None
+            P = K.batch_dot(L, LT)
+        elif self.mode == 'diag':
+            if K._BACKEND == 'theano':
+                import theano.tensor as T
+                import theano
+
+                def fn(x, P_acc):
+                    x_ = K.zeros((self.nb_actions, self.nb_actions))
+                    x_ = T.set_subtensor(x_[np.diag_indices(self.nb_actions)], x)
+                    return x_
+
+                outputs_info = [
+                    K.zeros((self.nb_actions, self.nb_actions)),
+                ]
+                P, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
+                print(P)
+            elif K._BACKEND == 'tensorflow':
+                import tensorflow as tf
+
+                # Create mask that can be used to gather elements from L_flat and put them
+                # into a diagonal matrix.
+                diag_mask = np.zeros((self.nb_actions, self.nb_actions), dtype='int32')
+                diag_mask[np.diag_indices(self.nb_actions)] = range(1, self.nb_actions + 1)
+
+                # Add leading zero element to each element in the L_flat. We use this zero
+                # element when gathering L_flat into a lower triangular matrix L.
+                nb_rows = tf.shape(L_flat)[0]
+                zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
+                L_flat = tf.concat(1, [zeros, L_flat])
+
+                # Finally, process each element of the batch.
+                def fn(a, x):
+                    x_ = tf.gather(x, diag_mask)
+                    return x_
+
+                P = tf.scan(fn, L_flat, initializer=K.zeros((self.nb_actions, self.nb_actions)))
+            else:
+                raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
+        assert P is not None
         assert K.ndim(P) == 3
 
         # Combine a, mu and P into a scalar (over the batches). What we compute here is
@@ -399,7 +451,13 @@ class NAFLayer(Layer):
         shape = list(input_shape)
         if len(shape) != 2:
             raise RuntimeError('Input tensor must be 2D, has shape {} instead.'.format(input_shape))
-        expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) // 2 + self.nb_actions + self.nb_actions
+        if self.mode == 'full':
+            expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) // 2 + self.nb_actions + self.nb_actions
+        elif self.mode == 'diag':
+            expected_elements = self.nb_actions + self.nb_actions + self.nb_actions
+        else:
+            expected_elements = None
+        assert expected_elements is not None
         if shape[-1] != expected_elements:
             raise RuntimeError(('Last dimension of input tensor must have exactly {} elements, ' +
                                 'has {} elements instead. This layer expects the input in the ' + 
@@ -412,7 +470,7 @@ class ContinuousDQNAgent(DQNAgent):
     def __init__(self, V_model, L_model, mu_model, nb_actions, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
                  target_model_update=10000, delta_range=(-np.inf, np.inf), custom_model_objects={},
-                 processor=None, random_process=None):
+                 processor=None, random_process=None, covariance_mode='full'):
         # TODO: Validate (important) input.
         
         # TODO: call super of abstract DQN agent
@@ -438,6 +496,7 @@ class ContinuousDQNAgent(DQNAgent):
         self.delta_range = delta_range
         self.custom_model_objects = custom_model_objects
         self.random_process = random_process
+        self.covariance_mode = covariance_mode
 
         # Related objects.
         self.V_model = V_model
@@ -483,7 +542,7 @@ class ContinuousDQNAgent(DQNAgent):
         L_out = self.L_model([a_in, o_in])
         V_out = self.V_model(o_in)
         mu_out = self.mu_model(o_in)
-        A_out = NAFLayer(self.nb_actions)(merge([L_out, mu_out, a_in], mode='concat'))
+        A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)(merge([L_out, mu_out, a_in], mode='concat'))
         combined_out = merge([A_out, V_out], mode='sum')
         combined = Model(input=[a_in, o_in], output=combined_out)
 

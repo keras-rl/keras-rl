@@ -338,9 +338,7 @@ class Env(object):
     observation_space = None
 
     def step(self, action):
-        """Run one timestep of the environment's dynamics. When end of
-        episode is reached, you are responsible for calling `reset()`
-        to reset this environment's state.
+        """Run one timestep of the environment's dynamics.
         Accepts an action and returns a tuple (observation, reward, done, info).
         Args:
             action (object): an action provided by the environment

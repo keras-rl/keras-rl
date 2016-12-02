@@ -99,7 +99,6 @@ class DQNAgent(AbstractDQNAgent):
         # Related objects.
         self.model = model
         self.policy = policy
-        self.policy._set_agent(self)
 
         # State.
         self.reset_states()
@@ -297,6 +296,14 @@ class DQNAgent(AbstractDQNAgent):
             names += self.processor.metrics_names[:]
         return names
 
+    @property
+    def policy(self):
+        return self.__policy
+
+    @policy.setter
+    def policy(self, policy):
+        self.__policy = policy
+        self.__policy._set_agent(self)
 
 class NAFLayer(Layer):
     def __init__(self, nb_actions, mode='full', **kwargs):

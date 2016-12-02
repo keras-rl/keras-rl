@@ -2,11 +2,61 @@ from __future__ import division
 import pytest
 import numpy as np
 from numpy.testing import assert_allclose
+import random
 
-from keras.models import Model
-from keras.layers import Input, merge
+from keras.models import Model, Sequential
+from keras.layers import Input, merge, Dense, Flatten
 
-from rl.agents.dqn import NAFLayer
+from rl.agents.dqn import NAFLayer, DQNAgent
+from rl.memory import SequentialMemory
+from rl.core import MultiInputProcessor
+
+
+class Env(object):
+    def __init__(self, observation_shape):
+        self.observation_shape = observation_shape
+
+    def step(self, action):
+        return self._get_obs(), random.choice([0, 1]), False, {}
+
+    def reset(self):
+        return self._get_obs()
+
+    def _get_obs(self):
+        if type(self.observation_shape) is list:
+            return [np.random.random(s) for s in self.observation_shape]
+        else:
+            return np.random.random(self.observation_shape)
+
+
+def test_single_dqn_input():
+    model = Sequential()
+    model.add(Flatten(input_shape=(1, 3)))
+    model.add(Dense(2))
+
+    memory = SequentialMemory(limit=10, window_length=1)
+    for double_dqn in (True, False):
+        agent = DQNAgent(model, memory=memory, nb_actions=2, nb_steps_warmup=5, batch_size=4,
+                         enable_double_dqn=double_dqn)
+        agent.compile('sgd')
+        agent.fit(Env((3,)), nb_steps=10)
+
+
+def test_multi_dqn_input():
+    input1 = Input(shape=(2, 3))
+    input2 = Input(shape=(2, 4))
+    x = merge([input1, input2], mode='concat')
+    x = Flatten()(x)
+    x = Dense(2)(x)
+    model = Model(input=[input1, input2], output=x)
+
+    memory = SequentialMemory(limit=10, window_length=2)
+    processor = MultiInputProcessor(nb_inputs=2)
+    for double_dqn in (True, False):
+        agent = DQNAgent(model, memory=memory, nb_actions=2, nb_steps_warmup=5, batch_size=5,
+                         processor=processor, enable_double_dqn=double_dqn)
+        agent.compile('sgd')
+        agent.fit(Env([(3,), (4,)]), nb_steps=10)
 
 
 def test_naf_layer_full():

@@ -323,6 +323,23 @@ class Processor(object):
         return []
 
 
+class MultiInputProcessor(Processor):
+    def __init__(self, nb_inputs):
+        self.nb_inputs = nb_inputs
+
+    def process_state_batch(self, state_batch):
+        input_batches = [[] for x in range(self.nb_inputs)]
+        for state in state_batch:
+            processed_state = [[] for x in range(self.nb_inputs)]
+            for observation in state:
+                assert len(observation) == self.nb_inputs
+                for o, s in zip(observation, processed_state):
+                    s.append(o)
+            for idx, s in enumerate(processed_state):
+                input_batches[idx].append(s)
+        return [np.array(x) for x in input_batches]
+
+
 # Note: the API of the `Env` and `Space` classes are taken from the OpenAI Gym implementation.
 # https://github.com/openai/gym/blob/master/gym/core.py
 

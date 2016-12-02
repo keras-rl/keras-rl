@@ -289,12 +289,16 @@ class Agent(object):
 
         return history
 
-    def fit_test(self, env, nb_steps, **kwargs):
+    def fit_test(self, env, nb_steps, fit_policy=None, test_policy=None, **kwargs):
         # Run one fit/test epoch
+        old_policy = self.policy
         fitargs = {k: kwargs[k] for k in kwargs if k in self.fit.__code__.co_varnames}
+        self.policy = fit_policy if fit_policy != None else old_policy
         fit = self.fit(env, nb_steps, **fitargs)
         testargs = {k: kwargs[k] for k in kwargs if k in self.test.__code__.co_varnames}
+        self.policy = test_policy if test_policy != None else old_policy
         test = self.test(env, **testargs)
+        self.policy = old_policy
         return fit, test
 
     def _on_test_begin(self):

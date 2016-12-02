@@ -289,6 +289,14 @@ class Agent(object):
 
         return history
 
+    def fit_test(self, env, nb_steps, **kwargs):
+        # Run one fit/test epoch
+        fitargs = {k: kwargs[k] for k in kwargs if k in self.fit.__code__.co_varnames}
+        fit = self.fit(env, nb_steps, **fitargs)
+        testargs = {k: kwargs[k] for k in kwargs if k in self.test.__code__.co_varnames}
+        test = self.test(env, **testargs)
+        return fit, test
+
     def _on_test_begin(self):
         pass
 
@@ -480,4 +488,3 @@ class Space(object):
         """Return boolean specifying if x is a valid member of this space
         """
         raise NotImplementedError()
-

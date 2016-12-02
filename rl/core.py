@@ -11,6 +11,7 @@ class Agent(object):
         self.processor = processor
         self.training = False
         self.step = 0
+        self.epoch = 0
 
     def get_config(self):
         return {}
@@ -24,6 +25,7 @@ class Agent(object):
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
         self.training = True
+        self.epoch += 1
         
         callbacks = [] if not callbacks else callbacks[:]
 
@@ -40,6 +42,7 @@ class Agent(object):
         callbacks._set_env(env)
         callbacks._set_params({
             'nb_steps': nb_steps,
+            'epoch': self.epoch,
         })
         self._on_train_begin()
         callbacks.on_train_begin()
@@ -117,6 +120,7 @@ class Agent(object):
                 episode_reward += reward
                     
                 step_logs = {
+                    'epoch': self.epoch,
                     'action': action,
                     'observation': observation,
                     'reward': reward,
@@ -142,6 +146,7 @@ class Agent(object):
                         'episode_reward': episode_reward,
                         'nb_episode_steps': episode_step,
                         'nb_steps': self.step,
+                        'epoch': self.epoch
                     }
                     callbacks.on_episode_end(episode, episode_logs)
 
@@ -188,6 +193,7 @@ class Agent(object):
         callbacks._set_env(env)
         callbacks._set_params({
             'nb_episodes': nb_episodes,
+            'epoch': self.epoch
         })
 
         self._on_test_begin()
@@ -252,6 +258,7 @@ class Agent(object):
                 episode_reward += reward
                 
                 step_logs = {
+                    'epoch': self.epoch,
                     'action': action,
                     'observation': observation,
                     'reward': reward,
@@ -274,6 +281,7 @@ class Agent(object):
             episode_logs = {
                 'episode_reward': episode_reward,
                 'nb_steps': episode_step,
+                'epoch': self.epoch
             }
             callbacks.on_episode_end(episode, episode_logs)
         callbacks.on_train_end()
@@ -472,3 +480,4 @@ class Space(object):
         """Return boolean specifying if x is a valid member of this space
         """
         raise NotImplementedError()
+

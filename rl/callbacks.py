@@ -89,8 +89,9 @@ class CallbackList(KerasCallbackList):
 
 class TestLogger(Callback):
     def on_episode_end(self, episode, logs):
-        template = 'Episode {0}: reward: {1:.3f}, steps: {2}'
+        template = 'Epoch {0}: episode {1}: reward: {2:.3f}, steps: {3}'
         variables = [
+            self.params['epoch'],
             episode + 1,
             logs['episode_reward'],
             logs['nb_steps'],
@@ -149,8 +150,9 @@ class TrainEpisodeLogger(Callback):
         metrics_text = metrics_template.format(*metrics_variables)
 
         nb_step_digits = str(int(np.ceil(np.log10(self.params['nb_steps']))) + 1)
-        template = '{step: ' + nb_step_digits + 'd}/{nb_steps}: episode: {episode}, duration: {duration:.3f}s, episode steps: {episode_steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, mean reward: {reward_mean:.3f} [{reward_min:.3f}, {reward_max:.3f}], mean action: {action_mean:.3f} [{action_min:.3f}, {action_max:.3f}], mean observation: {obs_mean:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
+        template = '{step: ' + nb_step_digits + 'd}/{nb_steps}: epoch: {epoch}, episode: {episode}, duration: {duration:.3f}s, episode steps: {episode_steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, mean reward: {reward_mean:.3f} [{reward_min:.3f}, {reward_max:.3f}], mean action: {action_mean:.3f} [{action_min:.3f}, {action_max:.3f}], mean observation: {obs_mean:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
         variables = {
+            'epoch': self.params['epoch'],
             'step': self.step,
             'nb_steps': self.params['nb_steps'],
             'episode': episode + 1,
@@ -233,7 +235,7 @@ class TrainIntervalLogger(Callback):
                 print('{} episodes - episode_reward: {:.3f} [{:.3f}, {:.3f}]{}{}'.format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards), formatted_metrics, formatted_infos))
                 print('')
             self.reset()
-            print('Interval {} ({} steps performed)'.format(self.step // self.interval + 1, self.step))
+            print('Epoch {} - Interval {} ({} steps performed)'.format(self.params['epoch'], self.step // self.interval + 1, self.step))
 
     def on_step_end(self, step, logs):
         if self.info_names is None:

@@ -10,6 +10,8 @@ import numpy as np
 # yields `reward` and results in `state1`, which might be `terminal`.
 Experience = namedtuple('Experience', 'state0, action, reward, state1, terminal1')
 
+EpisodicTimestep = namedtuple('EpisodicTimestep', 'observation, action, reward, terminal')
+
 
 def sample_batch_indexes(low, high, size):
     if high - low >= size:
@@ -43,6 +45,8 @@ class RingBuffer(object):
         return self.length
 
     def __getitem__(self, idx):
+        if idx < 0:
+            idx = self.length + idx
         if idx < 0 or idx >= self.length:
             raise KeyError()
         return self.data[(self.start + idx) % self.maxlen]
@@ -101,6 +105,7 @@ class Memory(object):
             'ignore_episode_boundaries': self.ignore_episode_boundaries,
         }
         return config
+
 
 class SequentialMemory(Memory):
     def __init__(self, limit, **kwargs):
@@ -182,6 +187,91 @@ class SequentialMemory(Memory):
     @property
     def nb_entries(self):
         return len(self.observations)
+
+    def get_config(self):
+        config = super(SequentialMemory, self).get_config()
+        config['limit'] = self.limit
+        return config
+
+
+class EpisodicMemory(Memory):
+    def __init__(self, limit, **kwargs):
+        super(EpisodicMemory, self).__init__(**kwargs)
+        
+        self.limit = limit
+        self.episodes = RingBuffer(limit)
+        self.terminal = False
+
+    def sample(self, batch_size, batch_idxs=None):
+        if len(self.episodes) <= 1:
+            # We don't have a complete episode yet ...
+            return []
+
+        if batch_idxs is None:
+            # Draw random indexes such that we never use the last episode yet, which is
+            # always incomplete by definition.
+            batch_idxs = sample_batch_indexes(0, self.nb_entries - 1, size=batch_size)
+        assert np.min(batch_idxs) >= 0
+        assert np.max(batch_idxs) < self.nb_entries
+        assert len(batch_idxs) == batch_size
+
+        # Create sequence of experiences.
+        sequences = []
+        for idx in batch_idxs:
+            episode = self.episodes[idx]
+            while len(episode) == 0:
+                idx = sample_batch_indexes(0, self.nb_entries, size=1)[0]
+
+            # Bootstrap state.
+            running_state = deque(maxlen=self.window_length)
+            for _ in range(self.window_length - 1):
+                running_state.append(np.zeros(episode[0].observation.shape))
+            assert len(running_state) == self.window_length - 1
+
+            states, rewards, actions, terminals = [], [], [], []
+            terminals.append(False)
+            for idx, timestep in enumerate(episode):
+                running_state.append(timestep.observation)
+                states.append(np.array(running_state))
+                rewards.append(timestep.reward)
+                actions.append(timestep.action)
+                terminals.append(timestep.terminal)  # offset by 1, see `terminals.append(False)` above
+            assert len(states) == len(rewards)
+            assert len(states) == len(actions)
+            assert len(states) == len(terminals) - 1
+
+            # Transform into experiences (to be consistent).
+            sequence = []
+            for idx in range(len(episode) - 1):
+                state0 = states[idx]
+                state1 = states[idx + 1]
+                reward = rewards[idx]
+                action = actions[idx]
+                terminal1 = terminals[idx + 1]
+                experience = Experience(state0=state0, state1=state1, reward=reward, action=action, terminal1=terminal1)
+                sequence.append(experience)
+            sequences.append(sequence)
+            assert len(sequence) == len(episode) - 1
+        assert len(sequences) == batch_size
+        return sequences
+
+    def append(self, observation, action, reward, terminal, training=True):
+        super(EpisodicMemory, self).append(observation, action, reward, terminal, training=training)
+        
+        # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
+        # and weather the next state is `terminal` or not.
+        if training:
+            timestep = EpisodicTimestep(observation=observation, action=action, reward=reward, terminal=terminal)
+            if len(self.episodes) == 0:
+                self.episodes.append([])  # first episode
+            self.episodes[-1].append(timestep)
+            if self.terminal:
+                self.episodes.append([])
+            self.terminal = terminal
+
+    @property
+    def nb_entries(self):
+        return len(self.episodes)
 
     def get_config(self):
         config = super(SequentialMemory, self).get_config()

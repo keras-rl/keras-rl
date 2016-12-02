@@ -23,12 +23,14 @@ class DQNAgent(Agent):
     def __init__(self, model, nb_actions, memory, policy=EpsGreedyQPolicy(),
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
                  target_model_update=10000, delta_range=(-np.inf, np.inf), enable_double_dqn=True,
-                 custom_model_objects={}, processor=None):
+                 custom_model_objects={}, processor=None, target_model=None):
         # Validate (important) input.
         if hasattr(model.output, '__len__') and len(model.output) > 1:
             raise ValueError('Model "{}" has more than one output. DQN expects a model that has a single output.'.format(model))
-        if model.output._keras_shape != (None, nb_actions):
-            raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, nb_actions))
+        # TODO: detect RNN and ensure that proper memory is used
+        #if model.output._keras_shape != (None, nb_actions):
+        #    raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, nb_actions))
+        self.is_recurrent = True
         
         super(DQNAgent, self).__init__()
 
@@ -53,6 +55,7 @@ class DQNAgent(Agent):
         self.delta_range = delta_range
         self.enable_double_dqn = enable_double_dqn
         self.custom_model_objects = custom_model_objects
+        self.target_model = target_model
 
         # Related objects.
         self.model = model
@@ -88,7 +91,8 @@ class DQNAgent(Agent):
         metrics += [mean_q]  # register default metrics
 
         # We never train the target model, hence we can set the optimizer and loss arbitrarily.
-        self.target_model = clone_model(self.model, self.custom_model_objects)
+        if self.target_model is None:
+            self.target_model = clone_model(self.model, self.custom_model_objects)
         self.target_model.compile(optimizer='sgd', loss='mse')
         self.model.compile(optimizer='sgd', loss='mse')
         
@@ -146,6 +150,7 @@ class DQNAgent(Agent):
 
     def process_state_batch(self, batch):
         batch = np.array(batch)
+        print batch.shape
         if self.processor is None:
             return batch
         return self.processor.process_state_batch(batch)
@@ -153,7 +158,6 @@ class DQNAgent(Agent):
     def compute_batch_q_values(self, state_batch):
         batch = self.process_state_batch(state_batch)
         q_values = self.model.predict_on_batch(batch)
-        assert q_values.shape == (len(state_batch), self.nb_actions)
         return q_values
 
     def compute_q_values(self, state):
@@ -167,6 +171,8 @@ class DQNAgent(Agent):
 
         # Select an action.
         state = self.memory.get_recent_state(observation)
+        if self.is_recurrent:
+            state = state.reshape((1,) + state.shape)
         q_values = self.compute_q_values(state)
         action = self.policy.select_action(q_values=q_values)
         if self.processor is not None:
@@ -196,31 +202,71 @@ class DQNAgent(Agent):
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
             experiences = self.memory.sample(self.batch_size)
             assert len(experiences) == self.batch_size
-            
-            # Start by extracting the necessary parameters (we use a vectorized implementation).
-            state0_batch = []
-            reward_batch = []
-            action_batch = []
-            terminal1_batch = []
-            state1_batch = []
-            for e in experiences:
-                state0_batch.append(e.state0)
-                state1_batch.append(e.state1)
-                reward_batch.append(e.reward)
-                action_batch.append(e.action)
-                terminal1_batch.append(0. if e.terminal1 else 1.)
 
-            # Prepare and validate parameters.
-            state0_batch = self.process_state_batch(state0_batch)
-            state1_batch = self.process_state_batch(state1_batch)
-            terminal1_batch = np.array(terminal1_batch)
-            reward_batch = np.array(reward_batch)
-            assert reward_batch.shape == (self.batch_size,)
-            assert terminal1_batch.shape == reward_batch.shape
-            assert len(action_batch) == len(reward_batch)
+            if self.is_recurrent:
+                lengths = [len(seq) for seq in experiences]
+                maxlen = np.max(lengths)
+
+                # Start by extracting the necessary parameters (we use a vectorized implementation).
+                state0_batch = [[] for _ in range(len(experiences))]
+                reward_batch = [[] for _ in range(len(experiences))]
+                action_batch = [[] for _ in range(len(experiences))]
+                terminal1_batch = [[] for _ in range(len(experiences))]
+                state1_batch = [[] for _ in range(len(experiences))]
+                for sequence_idx, sequence in enumerate(experiences):
+                    for e in sequence:
+                        state0_batch[sequence_idx].append(e.state0)
+                        state1_batch[sequence_idx].append(e.state1)
+                        reward_batch[sequence_idx].append(e.reward)
+                        action_batch[sequence_idx].append(e.action)
+                        terminal1_batch[sequence_idx].append(0. if e.terminal1 else 1.)
+
+                    # Apply padding.
+                    state_shape = state0_batch[sequence_idx][-1].shape
+                    while len(state0_batch[sequence_idx]) < maxlen:
+                        state0_batch[sequence_idx].append(np.zeros(state_shape))
+                        state1_batch[sequence_idx].append(np.zeros(state_shape))
+                        reward_batch[sequence_idx].append(0.)
+                        action_batch[sequence_idx].append(0)
+                        terminal1_batch[sequence_idx].append(1.)
+
+                state0_batch = self.process_state_batch(state0_batch)
+                state1_batch = self.process_state_batch(state1_batch)
+                terminal1_batch = np.array(terminal1_batch)
+                reward_batch = np.array(reward_batch)
+                assert reward_batch.shape == (self.batch_size, maxlen)
+                assert terminal1_batch.shape == reward_batch.shape
+                assert len(action_batch) == len(reward_batch)
+            else:
+                # Start by extracting the necessary parameters (we use a vectorized implementation).
+                state0_batch = []
+                reward_batch = []
+                action_batch = []
+                terminal1_batch = []
+                state1_batch = []
+                for e in experiences:
+                    state0_batch.append(e.state0)
+                    state1_batch.append(e.state1)
+                    reward_batch.append(e.reward)
+                    action_batch.append(e.action)
+                    terminal1_batch.append(0. if e.terminal1 else 1.)
+
+                # Prepare and validate parameters.
+                state0_batch = self.process_state_batch(state0_batch)
+                state1_batch = self.process_state_batch(state1_batch)
+                terminal1_batch = np.array(terminal1_batch)
+                reward_batch = np.array(reward_batch)
+                assert reward_batch.shape == (self.batch_size,)
+                assert terminal1_batch.shape == reward_batch.shape
+                assert len(action_batch) == len(reward_batch)
 
             # Compute Q values for mini-batch update.
             if self.enable_double_dqn:
+                # Double DQN relies on the model for additional predictions, which we cannot use
+                # since it must be stateful (we could save the state and re-apply, but this is
+                # messy).
+                assert not self.is_recurrent
+
                 # According to the paper "Deep Reinforcement Learning with Double Q-learning"
                 # (van Hasselt et al., 2015), in Double DQN, the online network predicts the actions
                 # while the target network is used to estimate the Q value.
@@ -239,13 +285,25 @@ class DQNAgent(Agent):
                 # We perform this prediction on the target_model instead of the model for reasons
                 # outlined in Mnih (2015). In short: it makes the algorithm more stable.
                 target_q_values = self.target_model.predict_on_batch(state1_batch)
-                assert target_q_values.shape == (self.batch_size, self.nb_actions)
-                q_batch = np.max(target_q_values, axis=1).flatten()
-            assert q_batch.shape == (self.batch_size,)
+                if self.is_recurrent:
+                    assert target_q_values.shape == (self.batch_size, maxlen, self.nb_actions)
+                else:
+                    assert target_q_values.shape == (self.batch_size, self.nb_actions)
+                q_batch = np.max(target_q_values, axis=-1)
+            if self.is_recurrent:
+                assert q_batch.shape == (self.batch_size, maxlen)
+            else:
+                q_batch = q_batch.flatten()
+                assert q_batch.shape == (self.batch_size,)
 
-            targets = np.zeros((self.batch_size, self.nb_actions))
-            dummy_targets = np.zeros((self.batch_size,))
-            masks = np.zeros((self.batch_size, self.nb_actions))
+            if self.is_recurrent:
+                targets = np.zeros((self.batch_size, maxlen, self.nb_actions))
+                dummy_targets = np.zeros((self.batch_size, maxlen))
+                masks = np.zeros((self.batch_size, maxlen, self.nb_actions))
+            else:
+                targets = np.zeros((self.batch_size, self.nb_actions))
+                dummy_targets = np.zeros((self.batch_size,))
+                masks = np.zeros((self.batch_size, self.nb_actions))
             
             # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target targets accordingly,
             # but only for the affected output units (as given by action_batch).
@@ -254,10 +312,20 @@ class DQNAgent(Agent):
             discounted_reward_batch *= terminal1_batch
             assert discounted_reward_batch.shape == reward_batch.shape
             Rs = reward_batch + discounted_reward_batch
-            for idx, (target, mask, R, action) in enumerate(zip(targets, masks, Rs, action_batch)):
-                target[action] = R  # update action with estimated accumulated reward
-                dummy_targets[idx] = R
-                mask[action] = 1.  # enable loss for this specific action
+            if self.is_recurrent:
+                for inner_targets, inner_masks, inner_Rs, inner_action_batch, length in zip(targets, masks, Rs, action_batch, lengths):
+                    for idx, (target, mask, R, action) in enumerate(zip(inner_targets, inner_masks, inner_Rs, inner_action_batch)):
+                        target[action] = R  # update action with estimated accumulated reward
+                        dummy_targets[idx] = R
+                        if idx < length:  # only enable loss for valid transitions
+                            mask[action] = 1.  # enable loss for this specific action
+
+            else:
+                for idx, (target, mask, R, action) in enumerate(zip(targets, masks, Rs, action_batch)):
+                    target[action] = R  # update action with estimated accumulated reward
+                    dummy_targets[idx] = R
+                    mask[action] = 1.  # enable loss for this specific action
+
             targets = np.array(targets).astype('float32')
             masks = np.array(masks).astype('float32')
 

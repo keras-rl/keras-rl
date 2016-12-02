@@ -60,6 +60,18 @@ class RingBuffer(object):
         self.data[(self.start + self.length - 1) % self.maxlen] = v
 
 
+def zeroed_observation(observation):
+    if hasattr(observation, 'shape'):
+        return np.zeros(observation.shape)
+    elif hasattr(observation, '__iter__'):
+        out = []
+        for x in observation:
+            out.append(zeroed_observation(x))
+        return out
+    else:
+        return 0.
+
+
 class Memory(object):
     def __init__(self, window_length, ignore_episode_boundaries=False):
         self.window_length = window_length
@@ -72,14 +84,14 @@ class Memory(object):
         raise NotImplementedError()
 
     def append(self, observation, action, reward, terminal, training=True):
-        self.recent_observations.append(np.array(observation))
+        self.recent_observations.append(observation)
         self.recent_terminals.append(terminal)
 
     def get_recent_state(self, current_observation):
         # This code is slightly complicated by the fact that subsequent observations might be
         # from different episodes. We ensure that an experience never spans multiple episodes.
         # This is probably not that important in practice but it seems cleaner.
-        state = [np.array(current_observation)]
+        state = [current_observation]
         idx = len(self.recent_observations) - 1
         for offset in range(0, self.window_length - 1):
             current_idx = idx - offset
@@ -90,9 +102,7 @@ class Memory(object):
                 break
             state.insert(0, self.recent_observations[current_idx])
         while len(state) < self.window_length:
-            state.insert(0, np.zeros(state[0].shape))
-        state = np.array(state)
-        assert state.shape[0] == self.window_length
+            state.insert(0, zeroed_observation(state[0]))
         return state
 
     def get_config(self):
@@ -150,7 +160,7 @@ class SequentialMemory(Memory):
                     break
                 state0.insert(0, self.observations[current_idx])
             while len(state0) < self.window_length:
-                state0.insert(0, np.zeros(state0[0].shape))
+                state0.insert(0, zeroed_observation(state0[0]))
             action = self.actions[idx - 1]
             reward = self.rewards[idx - 1]
             terminal1 = self.terminals[idx - 1]
@@ -163,8 +173,8 @@ class SequentialMemory(Memory):
 
             assert len(state0) == self.window_length
             assert len(state1) == len(state0)
-            experiences.append(Experience(state0=np.array(state0), action=action, reward=reward,
-                                          state1=np.array(state1), terminal1=terminal1))
+            experiences.append(Experience(state0=state0, action=action, reward=reward,
+                                          state1=state1, terminal1=terminal1))
         assert len(experiences) == batch_size
         return experiences
 
@@ -174,7 +184,7 @@ class SequentialMemory(Memory):
         # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
         # and weather the next state is `terminal` or not.
         if training:
-            self.observations.append(np.array(observation))
+            self.observations.append(observation)
             self.actions.append(action)
             self.rewards.append(reward)
             self.terminals.append(terminal)

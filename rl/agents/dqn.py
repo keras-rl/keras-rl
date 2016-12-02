@@ -115,7 +115,8 @@ class DQNAgent(Agent):
         y_true = Input(name='y_true', shape=(self.nb_actions,))
         mask = Input(name='mask', shape=(self.nb_actions,))
         loss_out = Lambda(clipped_masked_mse, output_shape=(1,), name='loss')([y_pred, y_true, mask])
-        trainable_model = Model(input=[self.model.input, y_true, mask], output=[loss_out, y_pred])
+        ins = [self.model.input] if type(self.model.input) is not list else self.model.input
+        trainable_model = Model(input=ins + [y_true, mask], output=[loss_out, y_pred])
         assert len(trainable_model.output_names) == 2
         combined_metrics = {trainable_model.output_names[1]: metrics}
         losses = [
@@ -264,7 +265,8 @@ class DQNAgent(Agent):
             # Finally, perform a single update on the entire batch. We use a dummy target since
             # the actual loss is computed in a Lambda layer that needs more complex input. However,
             # it is still useful to know the actual target to compute metrics properly.
-            metrics = self.trainable_model.train_on_batch([state0_batch, targets, masks], [dummy_targets, targets])
+            ins = [state0_batch] if type(self.model.input) is not list else state0_batch
+            metrics = self.trainable_model.train_on_batch(ins + [targets, masks], [dummy_targets, targets])
             metrics = [metric for idx, metric in enumerate(metrics) if idx not in (1, 2)]  # throw away individual losses
             metrics += self.policy.metrics
             if self.processor is not None:

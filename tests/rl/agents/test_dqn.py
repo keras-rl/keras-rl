@@ -37,7 +37,7 @@ def test_single_dqn_input():
     memory = SequentialMemory(limit=10, window_length=1)
     for double_dqn in (True, False):
         agent = DQNAgent(model, memory=memory, nb_actions=2, nb_steps_warmup=5, batch_size=4,
-            enable_double_dqn=double_dqn)
+                         enable_double_dqn=double_dqn)
         agent.compile('sgd')
         agent.fit(Env((3,)), nb_steps=10)
 
@@ -54,7 +54,7 @@ def test_multi_dqn_input():
     processor = MultiInputProcessor(nb_inputs=2)
     for double_dqn in (True, False):
         agent = DQNAgent(model, memory=memory, nb_actions=2, nb_steps_warmup=5, batch_size=5,
-            processor=processor, enable_double_dqn=double_dqn)
+                         processor=processor, enable_double_dqn=double_dqn)
         agent.compile('sgd')
         agent.fit(Env([(3,), (4,)]), nb_steps=10)
 

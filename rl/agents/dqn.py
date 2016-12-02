@@ -23,14 +23,14 @@ class DQNAgent(Agent):
     def __init__(self, model, nb_actions, memory, policy=EpsGreedyQPolicy(),
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
                  target_model_update=10000, delta_range=(-np.inf, np.inf), enable_double_dqn=True,
-                 custom_model_objects={}, processor=None):
+                 custom_model_objects={}, **kwargs):
         # Validate (important) input.
         if hasattr(model.output, '__len__') and len(model.output) > 1:
             raise ValueError('Model "{}" has more than one output. DQN expects a model that has a single output.'.format(model))
         if model.output._keras_shape != (None, nb_actions):
             raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, nb_actions))
         
-        super(DQNAgent, self).__init__()
+        super(DQNAgent, self).__init__(**kwargs)
 
         # Soft vs hard target model updates.
         if target_model_update < 0:
@@ -59,7 +59,6 @@ class DQNAgent(Agent):
         self.memory = memory
         self.policy = policy
         self.policy._set_agent(self)
-        self.processor = processor
 
         # State.
         self.compiled = False
@@ -163,9 +162,6 @@ class DQNAgent(Agent):
         return q_values
 
     def forward(self, observation):
-        if self.processor is not None:
-            observation = self.processor.process_observation(observation)
-
         # Select an action.
         state = self.memory.get_recent_state(observation)
         q_values = self.compute_q_values(state)
@@ -181,8 +177,6 @@ class DQNAgent(Agent):
 
     def backward(self, reward, terminal):
         # Store most recent experience in memory.
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)
@@ -472,7 +466,7 @@ class ContinuousDQNAgent(DQNAgent):
     def __init__(self, V_model, L_model, mu_model, nb_actions, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
                  target_model_update=10000, delta_range=(-np.inf, np.inf), custom_model_objects={},
-                 processor=None, random_process=None, covariance_mode='full'):
+                 random_process=None, covariance_mode='full'):
         # TODO: Validate (important) input.
         
         # TODO: call super of abstract DQN agent
@@ -505,7 +499,6 @@ class ContinuousDQNAgent(DQNAgent):
         self.L_model = L_model
         self.mu_model = mu_model
         self.memory = memory
-        self.processor = processor
 
         # State.
         self.compiled = False
@@ -577,9 +570,6 @@ class ContinuousDQNAgent(DQNAgent):
         return action
 
     def forward(self, observation):
-        if self.processor is not None:
-            observation = self.processor.process_observation(observation)
-
         # Select an action.
         state = self.memory.get_recent_state(observation)
         action = self.select_action(state)
@@ -594,8 +584,6 @@ class ContinuousDQNAgent(DQNAgent):
 
     def backward(self, reward, terminal):
         # Store most recent experience in memory.
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)

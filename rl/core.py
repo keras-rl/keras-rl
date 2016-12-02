@@ -7,7 +7,8 @@ from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Vi
 
 
 class Agent(object):
-    def __init__(self):
+    def __init__(self, processor=None):
+        self.processor = processor
         self.training = False
         self.step = 0
 
@@ -70,7 +71,10 @@ class Agent(object):
                         else:
                             action = start_step_policy(observation)
                         callbacks.on_action_begin(action)
-                        observation, _, done, _ = env.step(action)
+                        if self.processor is None:
+                            observation, _, done, _ = env.step(action)
+                        else:
+                            observation, _, done, _ = self.processor.process_step(*env.step(action))
                         callbacks.on_action_end(action)
                         if done:
                             warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(nb_random_start_steps))
@@ -92,7 +96,10 @@ class Agent(object):
                 done = False
                 for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
-                    observation, r, done, info = env.step(action)
+                    if self.processor is None:
+                        observation, r, done, info = env.step(action)
+                    else:
+                        observation, r, done, info = self.processor.process_step(*env.step(action))
                     for key, value in info.items():
                         if not np.isreal(value):
                             continue
@@ -204,7 +211,10 @@ class Agent(object):
                 else:
                     action = start_step_policy(observation)
                 callbacks.on_action_begin(action)
-                observation, _, done, _ = env.step(action)
+                if self.processor is None:
+                    observation, _, done, _ = env.step(action)
+                else:
+                    observation, _, done, _ = self.processor.process_step(*env.step(action))
                 callbacks.on_action_end(action)
                 if done:
                     warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(nb_random_start_steps))
@@ -221,7 +231,10 @@ class Agent(object):
                 accumulated_info = {}
                 for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
-                    observation, r, d, info = env.step(action)
+                    if self.processor is None:
+                        observation, r, d, info = env.step(action)
+                    else:
+                        observation, r, d, info = self.processor.process_step(*env.step(action))
                     callbacks.on_action_end(action)
                     reward += r
                     for key, value in info.items():
@@ -298,10 +311,22 @@ class Agent(object):
 
 
 class Processor(object):
+    def process_step(self, observation, reward, done, info):
+        observation = self.process_observation(observation)
+        reward = self.process_reward(reward)
+        info = self.process_info(info)
+        return observation, reward, done, info
+
     def process_observation(self, observation):
         """Processed observation will be stored in memory
         """
         return observation
+
+    def process_reward(self, reward):
+        return reward
+
+    def process_info(self, info):
+        return info
 
     def process_state_batch(self, batch):
         """Process for input into NN
@@ -310,9 +335,6 @@ class Processor(object):
 
     def process_action(self, action):
         return action
-
-    def process_reward(self, reward):
-        return reward
 
     @property
     def metrics_names(self):

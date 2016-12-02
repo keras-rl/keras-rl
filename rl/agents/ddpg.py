@@ -20,9 +20,9 @@ def mean_q(y_true, y_pred):
 class DDPGAgent(Agent):
     def __init__(self, nb_actions, actor, critic, critic_action_input, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
-                 train_interval=1, memory_interval=1, delta_range=(-np.inf, np.inf), processor=None,
+                 train_interval=1, memory_interval=1, delta_range=(-np.inf, np.inf),
                  random_process=OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=0.3),
-                 custom_model_objects={}, target_model_update=.001):
+                 custom_model_objects={}, target_model_update=.001, **kwargs):
         if hasattr(actor.output, '__len__') and len(actor.output) > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
         if hasattr(actor.input, '__len__') and len(actor.input) != 1:
@@ -36,7 +36,7 @@ class DDPGAgent(Agent):
         if critic_action_input._keras_shape != actor.output._keras_shape:
             raise ValueError('Critic "{}" and actor "{}" do not have matching shapes')
 
-        super(DDPGAgent, self).__init__()
+        super(DDPGAgent, self).__init__(**kwargs)
 
         # Soft vs hard target model updates.
         if target_model_update < 0:
@@ -50,7 +50,6 @@ class DDPGAgent(Agent):
 
         # Parameters.
         self.nb_actions = nb_actions
-        self.processor = processor
         self.nb_steps_warmup_actor = nb_steps_warmup_actor
         self.nb_steps_warmup_critic = nb_steps_warmup_critic
         self.random_process = random_process
@@ -68,7 +67,6 @@ class DDPGAgent(Agent):
         self.critic_action_input = critic_action_input
         self.critic_action_input_idx = self.critic.input.index(critic_action_input)
         self.memory = memory
-        self.processor = processor
 
         # State.
         self.compiled = False
@@ -228,10 +226,6 @@ class DDPGAgent(Agent):
         return action
 
     def forward(self, observation):
-        # TODO: this could be shared with DQN
-        if self.processor is not None:
-            observation = self.processor.process_observation(observation)
-
         # Select an action.
         state = self.memory.get_recent_state(observation)
         action = self.select_action(state)  # TODO: move this into policy
@@ -253,8 +247,6 @@ class DDPGAgent(Agent):
 
     def backward(self, reward, terminal=False):
         # Store most recent experience in memory.
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)

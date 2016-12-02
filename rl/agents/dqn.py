@@ -4,7 +4,7 @@ from copy import deepcopy
 
 import numpy as np
 import keras.backend as K
-from keras.layers import Lambda, Input, merge, Layer
+from keras.layers import Lambda, Input, merge, Layer, TimeDistributed
 from keras.models import Model
 
 from rl.core import Agent
@@ -23,7 +23,7 @@ class DQNAgent(Agent):
     def __init__(self, model, nb_actions, memory, policy=EpsGreedyQPolicy(),
                  gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
                  target_model_update=10000, delta_range=(-np.inf, np.inf), enable_double_dqn=True,
-                 custom_model_objects={}, processor=None, target_model=None):
+                 custom_model_objects={}, processor=None, target_model=None, stateful_model=None):
         # Validate (important) input.
         if hasattr(model.output, '__len__') and len(model.output) > 1:
             raise ValueError('Model "{}" has more than one output. DQN expects a model that has a single output.'.format(model))
@@ -56,6 +56,7 @@ class DQNAgent(Agent):
         self.enable_double_dqn = enable_double_dqn
         self.custom_model_objects = custom_model_objects
         self.target_model = target_model
+        self.stateful_model = stateful_model
 
         # Related objects.
         self.model = model
@@ -97,9 +98,14 @@ class DQNAgent(Agent):
         self.model.compile(optimizer='sgd', loss='mse')
         
         # Compile model.
+        updates = []
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
-            updates = get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
+            updates += get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
+        if self.stateful_model is not None:
+            # Update the stateful model after every training step.
+            updates += get_soft_target_model_updates(self.stateful_model, self.model, 1.)
+        if len(updates) > 0:
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
 
         def clipped_masked_mse(args):
@@ -115,10 +121,13 @@ class DQNAgent(Agent):
         # ever want to update the Q values for a certain action. The way we achieve this is by
         # using a custom Lambda layer that computes the loss. This gives us the necessary flexibility
         # to mask out certain parameters by passing in multiple inputs to the Lambda layer.
+        input_shape = (None, self.nb_actions) if self.is_recurrent else (self.nb_actions,)
+        output_shape = (None, 1) if self.is_recurrent else (1,)
+
         y_pred = self.model.output
-        y_true = Input(name='y_true', shape=(self.nb_actions,))
-        mask = Input(name='mask', shape=(self.nb_actions,))
-        loss_out = Lambda(clipped_masked_mse, output_shape=(1,), name='loss')([y_pred, y_true, mask])
+        y_true = Input(name='y_true', shape=input_shape)
+        mask = Input(name='mask', shape=input_shape)
+        loss_out = Lambda(clipped_masked_mse, output_shape=output_shape, name='loss')([y_pred, y_true, mask])
         ins = [self.model.input] if type(self.model.input) is not list else self.model.input
         trainable_model = Model(input=ins + [y_true, mask], output=[loss_out, y_pred])
         assert len(trainable_model.output_names) == 2
@@ -129,7 +138,8 @@ class DQNAgent(Agent):
         ]
         trainable_model.compile(optimizer=optimizer, loss=losses, metrics=combined_metrics)
         self.trainable_model = trainable_model
-        
+
+        self.update_target_model_hard()
         self.compiled = True
 
     def load_weights(self, filepath):
@@ -145,20 +155,33 @@ class DQNAgent(Agent):
         if self.compiled:
             self.model.reset_states()
             self.target_model.reset_states()
+            if self.stateful_model is not None:
+                self.stateful_model.reset_states()
 
     def update_target_model_hard(self):
         self.target_model.set_weights(self.model.get_weights())
+        if self.stateful_model is not None:
+            self.stateful_model.set_weights(self.model.get_weights())
 
     def process_state_batch(self, batch):
         batch = np.array(batch)
-        print batch.shape
         if self.processor is None:
             return batch
         return self.processor.process_state_batch(batch)
 
+    @property
+    def online_model(self):
+        if self.stateful_model is not None:
+            return self.stateful_model
+        else:
+            return self.model
+
     def compute_batch_q_values(self, state_batch):
         batch = self.process_state_batch(state_batch)
-        q_values = self.model.predict_on_batch(batch)
+        if self.is_recurrent:
+            # TODO: fix this
+            batch = batch.reshape((1,) + batch.shape)
+        q_values = self.online_model.predict_on_batch(batch)
         return q_values
 
     def compute_q_values(self, state):
@@ -172,8 +195,6 @@ class DQNAgent(Agent):
 
         # Select an action.
         state = self.memory.get_recent_state(observation)
-        if self.is_recurrent:
-            state = state.reshape((1,) + state.shape)
         q_values = self.compute_q_values(state)
         action = self.policy.select_action(q_values=q_values)
         if self.processor is not None:
@@ -299,7 +320,7 @@ class DQNAgent(Agent):
 
             if self.is_recurrent:
                 targets = np.zeros((self.batch_size, maxlen, self.nb_actions))
-                dummy_targets = np.zeros((self.batch_size, maxlen))
+                dummy_targets = np.zeros((self.batch_size, maxlen, 1))
                 masks = np.zeros((self.batch_size, maxlen, self.nb_actions))
             else:
                 targets = np.zeros((self.batch_size, self.nb_actions))
@@ -314,10 +335,10 @@ class DQNAgent(Agent):
             assert discounted_reward_batch.shape == reward_batch.shape
             Rs = reward_batch + discounted_reward_batch
             if self.is_recurrent:
-                for inner_targets, inner_masks, inner_Rs, inner_action_batch, length in zip(targets, masks, Rs, action_batch, lengths):
+                for batch_idx, (inner_targets, inner_masks, inner_Rs, inner_action_batch, length) in enumerate(zip(targets, masks, Rs, action_batch, lengths)):
                     for idx, (target, mask, R, action) in enumerate(zip(inner_targets, inner_masks, inner_Rs, inner_action_batch)):
                         target[action] = R  # update action with estimated accumulated reward
-                        dummy_targets[idx] = R
+                        dummy_targets[batch_idx, idx] = R
                         if idx < length:  # only enable loss for valid transitions
                             mask[action] = 1.  # enable loss for this specific action
 
@@ -480,7 +501,6 @@ class NAFLayer(Layer):
                     K.zeros((self.nb_actions, self.nb_actions)),
                 ]
                 P, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
-                print(P)
             elif K._BACKEND == 'tensorflow':
                 import tensorflow as tf
 

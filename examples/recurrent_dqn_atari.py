@@ -69,11 +69,11 @@ env._step = _step
 
 def build_model(stateful):
     # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
+    # TODO: fix TF
     if stateful:
         input_shape = (1, 1, 1) + INPUT_SHAPE
     else:
         input_shape = (None, 1) + INPUT_SHAPE
-    print input_shape
     model = Sequential()
     if K.image_dim_ordering() == 'tf':
         # (width, height, channels)
@@ -101,8 +101,8 @@ def build_model(stateful):
     model.add(Activation('linear'))
     return model
 
-model = build_model(stateful=True)
-target_model = build_model(stateful=False)
+model = build_model(stateful=False)
+stateful_model = build_model(stateful=True)
 print(model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
@@ -125,8 +125,8 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 # Feel free to give it a try!
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
-               processor=processor, nb_steps_warmup=100, gamma=.99, delta_range=(-1., 1.),
-               target_model_update=10000, train_interval=4, target_model=target_model,
+               processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.),
+               target_model_update=10000, train_interval=4, stateful_model=stateful_model,
                enable_double_dqn=False)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
 

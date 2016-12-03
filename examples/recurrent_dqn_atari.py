@@ -96,7 +96,7 @@ def build_model(stateful):
     model.add(TimeDistributed(Convolution2D(64, 3, 3, subsample=(1, 1))))
     model.add(Activation('relu'))
     model.add(TimeDistributed(Flatten()))
-    model.add(LSTM(512, return_sequences=True, stateful=stateful))
+    model.add(LSTM(128, return_sequences=True, stateful=stateful))
     model.add(TimeDistributed(Dense(nb_actions)))
     model.add(Activation('linear'))
     return model
@@ -126,7 +126,7 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
                processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.),
-               target_model_update=10000, train_interval=4, stateful_model=stateful_model,
+               target_model_update=10000, train_interval=10, stateful_model=stateful_model,
                enable_double_dqn=False)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
 

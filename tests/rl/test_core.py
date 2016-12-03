@@ -30,6 +30,7 @@ class TestEnv(Env):
 
 class TestAgent(Agent):
     def __init__(self, memory):
+        super(TestAgent, self).__init__()
         self.memory = memory
 
     def forward(self, observation):

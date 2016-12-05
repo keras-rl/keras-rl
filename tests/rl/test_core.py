@@ -4,7 +4,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 from rl.memory import SequentialMemory
-from rl.core import Agent, Env
+from rl.core import Agent, Env, Processor
 
 
 class TestEnv(Env):
@@ -29,8 +29,8 @@ class TestEnv(Env):
 
 
 class TestAgent(Agent):
-    def __init__(self, memory):
-        super(TestAgent, self).__init__()
+    def __init__(self, memory, **kwargs):
+        super(TestAgent, self).__init__(**kwargs)
         self.memory = memory
 
     def forward(self, observation):
@@ -104,6 +104,55 @@ def test_fit_observations():
     assert_allclose(experiencies[7].state0, np.array([1, 2]))
     assert_allclose(experiencies[7].state1, np.array([2, 3]))
     assert experiencies[7].terminal1 is False
+
+
+def test_copy_observations():
+    methods = [
+        'fit',
+        'test',
+    ]
+
+    for method in methods:
+        original_observations = []
+        class LocalEnv(Env):
+            def __init__(self):
+                super(LocalEnv, self).__init__()
+
+            def step(self, action):
+                self.state += 1
+                done = self.state >= 6
+                reward = float(self.state) / 10.
+                obs = np.array(self.state)
+                original_observations.append(obs)
+                return obs, reward, done, {}
+
+            def reset(self):
+                self.state = 1
+                return np.array(self.state)
+
+            def seed(self, seed=None):
+                pass
+
+            def configure(self, *args, **kwargs):
+                pass
+
+        # Slight abuse of the processor for test purposes.
+        observations = []
+        class LocalProcessor(Processor):
+            def process_step(self, observation, reward, done, info):
+                observations.append(observation)
+                return observation, reward, done, info
+
+        processor = LocalProcessor()
+        memory = SequentialMemory(100, window_length=1)
+        agent = TestAgent(memory, processor=processor)
+        env = LocalEnv()
+        agent.compile()
+        getattr(agent, method)(env, 20, verbose=0, visualize=False)
+
+        assert len(observations) == len(original_observations)
+        assert_allclose(np.array(observations), np.array(original_observations))
+        assert np.all([o is not o_ for o, o_ in zip(original_observations, observations)])
     
 
 if __name__ == '__main__':

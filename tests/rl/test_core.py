@@ -114,6 +114,7 @@ def test_copy_observations():
 
     for method in methods:
         original_observations = []
+        
         class LocalEnv(Env):
             def __init__(self):
                 super(LocalEnv, self).__init__()
@@ -138,6 +139,7 @@ def test_copy_observations():
 
         # Slight abuse of the processor for test purposes.
         observations = []
+
         class LocalProcessor(Processor):
             def process_step(self, observation, reward, done, info):
                 observations.append(observation)

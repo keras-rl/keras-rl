@@ -1,8 +1,9 @@
 from __future__ import division
+from __future__ import absolute_import
+
 import pytest
 import numpy as np
 from numpy.testing import assert_allclose
-import random
 
 from keras.models import Model, Sequential
 from keras.layers import Input, merge, Dense, Flatten
@@ -11,22 +12,7 @@ from rl.agents.dqn import NAFLayer, DQNAgent, ContinuousDQNAgent
 from rl.memory import SequentialMemory
 from rl.core import MultiInputProcessor
 
-
-class Env(object):
-    def __init__(self, observation_shape):
-        self.observation_shape = observation_shape
-
-    def step(self, action):
-        return self._get_obs(), random.choice([0, 1]), False, {}
-
-    def reset(self):
-        return self._get_obs()
-
-    def _get_obs(self):
-        if type(self.observation_shape) is list:
-            return [np.random.random(s) for s in self.observation_shape]
-        else:
-            return np.random.random(self.observation_shape)
+from ..util import MultiInputTestEnv
 
 
 def test_single_dqn_input():
@@ -39,7 +25,7 @@ def test_single_dqn_input():
         agent = DQNAgent(model, memory=memory, nb_actions=2, nb_steps_warmup=5, batch_size=4,
                          enable_double_dqn=double_dqn)
         agent.compile('sgd')
-        agent.fit(Env((3,)), nb_steps=10)
+        agent.fit(MultiInputTestEnv((3,)), nb_steps=10)
 
 
 def test_multi_dqn_input():
@@ -53,10 +39,10 @@ def test_multi_dqn_input():
     memory = SequentialMemory(limit=10, window_length=2)
     processor = MultiInputProcessor(nb_inputs=2)
     for double_dqn in (True, False):
-        agent = DQNAgent(model, memory=memory, nb_actions=2, nb_steps_warmup=5, batch_size=5,
+        agent = DQNAgent(model, memory=memory, nb_actions=2, nb_steps_warmup=5, batch_size=4,
                          processor=processor, enable_double_dqn=double_dqn)
         agent.compile('sgd')
-        agent.fit(Env([(3,), (4,)]), nb_steps=10)
+        agent.fit(MultiInputTestEnv([(3,), (4,)]), nb_steps=10)
 
 
 def test_single_continuous_dqn_input():
@@ -78,9 +64,9 @@ def test_single_continuous_dqn_input():
 
     memory = SequentialMemory(limit=10, window_length=2)
     agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
-                               memory=memory, nb_steps_warmup=5, batch_size=5)
+                               memory=memory, nb_steps_warmup=5, batch_size=4)
     agent.compile('sgd')
-    agent.fit(Env((3,)), nb_steps=10)
+    agent.fit(MultiInputTestEnv((3,)), nb_steps=10)
 
 
 def test_multi_continuous_dqn_input():
@@ -111,9 +97,9 @@ def test_multi_continuous_dqn_input():
     memory = SequentialMemory(limit=10, window_length=2)
     processor = MultiInputProcessor(nb_inputs=2)
     agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
-                               memory=memory, nb_steps_warmup=5, batch_size=5, processor=processor)
+                               memory=memory, nb_steps_warmup=5, batch_size=4, processor=processor)
     agent.compile('sgd')
-    agent.fit(Env([(3,), (4,)]), nb_steps=10)
+    agent.fit(MultiInputTestEnv([(3,), (4,)]), nb_steps=10)
 
 
 def test_naf_layer_full():

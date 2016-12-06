@@ -1,6 +1,6 @@
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
-from keras.optimizers import optimizer_from_config
+from keras.optimizers import optimizer_from_config, get
 
 
 def clone_model(model, custom_objects={}):
@@ -15,6 +15,8 @@ def clone_model(model, custom_objects={}):
 
 
 def clone_optimizer(optimizer):
+    if type(optimizer) is str:
+        return get(optimizer)
     # Requires Keras 1.0.7 since get_config has breaking changes.
     params = dict([(k, v) for k, v in optimizer.get_config().items()])
     config = {

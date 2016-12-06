@@ -16,23 +16,12 @@ def mean_q(y_true, y_pred):
     return K.mean(K.max(y_pred, axis=-1))
 
 
-# An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
-# http://arxiv.org/pdf/1312.5602.pdf
-# http://arxiv.org/abs/1509.06461
-class DQNAgent(Agent):
-    def __init__(self, model, nb_actions, memory, policy=EpsGreedyQPolicy(),
-                 gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
-                 target_model_update=10000, delta_range=(-np.inf, np.inf), enable_double_dqn=True,
-                 custom_model_objects={}, processor=None, target_model=None, stateful_model=None):
-        # Validate (important) input.
-        if hasattr(model.output, '__len__') and len(model.output) > 1:
-            raise ValueError('Model "{}" has more than one output. DQN expects a model that has a single output.'.format(model))
-        # TODO: detect RNN and ensure that proper memory is used
-        #if model.output._keras_shape != (None, nb_actions):
-        #    raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, nb_actions))
-        self.is_recurrent = True
-        
-        super(DQNAgent, self).__init__()
+class AbstractDQNAgent(Agent):
+    def __init__(self, nb_actions, memory, gamma=.99, batch_size=32, nb_steps_warmup=1000,
+                 train_interval=1, memory_interval=1, target_model_update=10000,
+                 delta_range=(-np.inf, np.inf), custom_model_objects={},
+                 target_model=None, stateful_model=None, **kwargs):
+        super(AbstractDQNAgent, self).__init__(**kwargs)
 
         # Soft vs hard target model updates.
         if target_model_update < 0:
@@ -53,24 +42,47 @@ class DQNAgent(Agent):
         self.memory_interval = memory_interval
         self.target_model_update = target_model_update
         self.delta_range = delta_range
-        self.enable_double_dqn = enable_double_dqn
         self.custom_model_objects = custom_model_objects
         self.target_model = target_model
         self.stateful_model = stateful_model
 
+        # TODO: auto-detect
+        self.is_recurrent = False
+
         # Related objects.
-        self.model = model
         self.memory = memory
-        self.policy = policy
-        self.policy._set_agent(self)
-        self.processor = processor
 
         # State.
         self.compiled = False
-        self.reset_states()
+
+    @property
+    def online_model(self):
+        if self.stateful_model is not None:
+            return self.stateful_model
+        else:
+            return self.model
+
+    def process_state_batch(self, batch):
+        batch = np.array(batch)
+        if self.processor is None:
+            return batch
+        return self.processor.process_state_batch(batch)
+
+    def compute_batch_q_values(self, state_batch):
+        batch = self.process_state_batch(state_batch)
+        if self.is_recurrent:
+            # TODO: fix this
+            batch = batch.reshape((1,) + batch.shape)
+        q_values = self.online_model.predict_on_batch(batch)
+        return q_values
+
+    def compute_q_values(self, state):
+        q_values = self.compute_batch_q_values([state]).flatten()
+        assert q_values.shape == (self.nb_actions,)
+        return q_values
 
     def get_config(self):
-        config = {
+        return {
             'nb_actions': self.nb_actions,
             'gamma': self.gamma,
             'batch_size': self.batch_size,
@@ -79,11 +91,38 @@ class DQNAgent(Agent):
             'memory_interval': self.memory_interval,
             'target_model_update': self.target_model_update,
             'delta_range': self.delta_range,
-            'enable_double_dqn': self.enable_double_dqn,
-            'model': get_object_config(self.model),
             'memory': get_object_config(self.memory),
-            'policy': get_object_config(self.policy),
         }
+
+# An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
+# http://arxiv.org/pdf/1312.5602.pdf
+# http://arxiv.org/abs/1509.06461
+class DQNAgent(AbstractDQNAgent):
+    def __init__(self, model, policy=EpsGreedyQPolicy(), enable_double_dqn=True,
+                 *args, **kwargs):
+        super(DQNAgent, self).__init__(*args, **kwargs)
+
+        # Validate (important) input.
+        if hasattr(model.output, '__len__') and len(model.output) > 1:
+            raise ValueError('Model "{}" has more than one output. DQN expects a model that has a single output.'.format(model))
+        if model.output._keras_shape != (None, self.nb_actions):
+            raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, nb_actions))
+
+        # Parameters.
+        self.enable_double_dqn = enable_double_dqn
+
+        # Related objects.
+        self.model = model
+        self.policy = policy
+
+        # State.
+        self.reset_states()
+
+    def get_config(self):
+        config = super(DQNAgent, self).get_config()
+        config['enable_double_dqn'] = self.enable_double_dqn
+        config['model'] = get_object_config(self.model)
+        config['policy'] = get_object_config(self.policy)
         if self.compiled:
             config['target_model'] = get_object_config(self.target_model)
         return config
@@ -163,36 +202,7 @@ class DQNAgent(Agent):
         if self.stateful_model is not None:
             self.stateful_model.set_weights(self.model.get_weights())
 
-    def process_state_batch(self, batch):
-        batch = np.array(batch)
-        if self.processor is None:
-            return batch
-        return self.processor.process_state_batch(batch)
-
-    @property
-    def online_model(self):
-        if self.stateful_model is not None:
-            return self.stateful_model
-        else:
-            return self.model
-
-    def compute_batch_q_values(self, state_batch):
-        batch = self.process_state_batch(state_batch)
-        if self.is_recurrent:
-            # TODO: fix this
-            batch = batch.reshape((1,) + batch.shape)
-        q_values = self.online_model.predict_on_batch(batch)
-        return q_values
-
-    def compute_q_values(self, state):
-        q_values = self.compute_batch_q_values([state]).flatten()
-        assert q_values.shape == (self.nb_actions,)
-        return q_values
-
     def forward(self, observation):
-        if self.processor is not None:
-            observation = self.processor.process_observation(observation)
-
         # Select an action.
         state = self.memory.get_recent_state(observation)
         q_values = self.compute_q_values(state)
@@ -208,8 +218,6 @@ class DQNAgent(Agent):
 
     def backward(self, reward, terminal):
         # Store most recent experience in memory.
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)
@@ -379,6 +387,14 @@ class DQNAgent(Agent):
             names += self.processor.metrics_names[:]
         return names
 
+    @property
+    def policy(self):
+        return self.__policy
+
+    @policy.setter
+    def policy(self, policy):
+        self.__policy = policy
+        self.__policy._set_agent(self)
 
 class NAFLayer(Layer):
     def __init__(self, nb_actions, mode='full', **kwargs):
@@ -420,7 +436,7 @@ class NAFLayer(Layer):
                 def fn(x, L_acc, LT_acc):
                     x_ = K.zeros((self.nb_actions, self.nb_actions))
                     x_ = T.set_subtensor(x_[np.tril_indices(self.nb_actions)], x)
-                    diag = K.exp(T.diag(x_))
+                    diag = K.exp(T.diag(x_) + K.epsilon())
                     x_ = T.set_subtensor(x_[np.diag_indices(self.nb_actions)], diag)
                     return x_, x_.T
 
@@ -465,7 +481,7 @@ class NAFLayer(Layer):
                 def fn(a, x):
                     # Exponentiate everything. This is much easier than only exponentiating
                     # the diagonal elements, and, usually, the action space is relatively low.
-                    x_ = K.exp(x)
+                    x_ = K.exp(x + K.epsilon())
                     # Only keep the diagonal elements.
                     x_ *= diag_mask
                     # Add the original, non-diagonal elements.
@@ -556,35 +572,14 @@ class NAFLayer(Layer):
         return tuple(shape)
 
 
-class ContinuousDQNAgent(DQNAgent):
-    def __init__(self, V_model, L_model, mu_model, nb_actions, memory,
-                 gamma=.99, batch_size=32, nb_steps_warmup=1000, train_interval=1, memory_interval=1,
-                 target_model_update=10000, delta_range=(-np.inf, np.inf), custom_model_objects={},
-                 processor=None, random_process=None, covariance_mode='full'):
-        # TODO: Validate (important) input.
-        
-        # TODO: call super of abstract DQN agent
+class ContinuousDQNAgent(AbstractDQNAgent):
+    def __init__(self, V_model, L_model, mu_model, random_process=None,
+                 covariance_mode='full', *args, **kwargs):
+        super(ContinuousDQNAgent, self).__init__(*args, **kwargs)
 
-        # Soft vs hard target model updates.
-        if target_model_update < 0:
-            raise ValueError('`target_model_update` must be >= 0.')
-        elif target_model_update >= 1:
-            # Hard update every `target_model_update` steps.
-            target_model_update = int(target_model_update)
-        else:
-            # Soft update with `(1 - target_model_update) * old + target_model_update * new`.
-            target_model_update = float(target_model_update)
+        # TODO: Validate (important) input.
 
         # Parameters.
-        self.nb_actions = nb_actions
-        self.gamma = gamma
-        self.batch_size = batch_size
-        self.nb_steps_warmup = nb_steps_warmup
-        self.train_interval = train_interval
-        self.memory_interval = memory_interval
-        self.target_model_update = target_model_update
-        self.delta_range = delta_range
-        self.custom_model_objects = custom_model_objects
         self.random_process = random_process
         self.covariance_mode = covariance_mode
 
@@ -592,11 +587,8 @@ class ContinuousDQNAgent(DQNAgent):
         self.V_model = V_model
         self.L_model = L_model
         self.mu_model = mu_model
-        self.memory = memory
-        self.processor = processor
 
         # State.
-        self.compiled = False
         self.reset_states()
 
     def update_target_model_hard(self):
@@ -626,15 +618,18 @@ class ContinuousDQNAgent(DQNAgent):
         self.target_V_model.compile(optimizer='sgd', loss='mse')
 
         # Build combined model.
-        observation_shape = self.V_model.input._keras_shape[1:]
         a_in = Input(shape=(self.nb_actions,), name='action_input')
-        o_in = Input(shape=observation_shape, name='observation_input')
-        L_out = self.L_model([a_in, o_in])
-        V_out = self.V_model(o_in)
-        mu_out = self.mu_model(o_in)
+        if type(self.V_model.input) is list:
+            observation_shapes = [i._keras_shape[1:] for i in self.V_model.input]
+        else:
+            observation_shapes = [self.V_model.input._keras_shape[1:]]
+        os_in = [Input(shape=shape, name='observation_input_{}'.format(idx)) for idx, shape in enumerate(observation_shapes)]
+        L_out = self.L_model([a_in] + os_in)
+        V_out = self.V_model(os_in)
+        mu_out = self.mu_model(os_in)
         A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)(merge([L_out, mu_out, a_in], mode='concat'))
         combined_out = merge([A_out, V_out], mode='sum')
-        combined = Model(input=[a_in, o_in], output=combined_out)
+        combined = Model(input=[a_in] + os_in, output=combined_out)
 
         # Compile combined model.
         if self.target_model_update < 1.:
@@ -665,9 +660,6 @@ class ContinuousDQNAgent(DQNAgent):
         return action
 
     def forward(self, observation):
-        if self.processor is not None:
-            observation = self.processor.process_observation(observation)
-
         # Select an action.
         state = self.memory.get_recent_state(observation)
         action = self.select_action(state)
@@ -682,8 +674,6 @@ class ContinuousDQNAgent(DQNAgent):
 
     def backward(self, reward, terminal):
         # Store most recent experience in memory.
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)
@@ -735,7 +725,10 @@ class ContinuousDQNAgent(DQNAgent):
             assert Rs.shape == (self.batch_size,)
 
             # Finally, perform a single update on the entire batch.
-            metrics = self.combined_model.train_on_batch([action_batch, state0_batch], Rs)
+            if len(self.combined_model.input) == 2:
+                metrics = self.combined_model.train_on_batch([action_batch, state0_batch], Rs)
+            else:
+                metrics = self.combined_model.train_on_batch([action_batch] + state0_batch, Rs)
             if self.processor is not None:
                 metrics += self.processor.metrics
 
@@ -745,20 +738,10 @@ class ContinuousDQNAgent(DQNAgent):
         return metrics
 
     def get_config(self):
-        config = {
-            'nb_actions': self.nb_actions,
-            'gamma': self.gamma,
-            'batch_size': self.batch_size,
-            'nb_steps_warmup': self.nb_steps_warmup,
-            'train_interval': self.train_interval,
-            'memory_interval': self.memory_interval,
-            'target_model_update': self.target_model_update,
-            'delta_range': self.delta_range,
-            'V_model': get_object_config(self.V_model),
-            'mu_model': get_object_config(self.mu_model),
-            'L_model': get_object_config(self.L_model),
-            'memory': get_object_config(self.memory),
-        }
+        config = super(ContinuousDQNAgent, self).get_config()
+        config['V_model'] = get_object_config(self.V_model)
+        config['mu_model'] = get_object_config(self.mu_model)
+        config['L_model'] = get_object_config(self.L_model)
         if self.compiled:
             config['target_V_model'] = get_object_config(self.target_V_model)
         return config

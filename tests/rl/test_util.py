@@ -55,5 +55,10 @@ def test_clone_optimizer():
     assert optimizer.clipvalue == clone.clipvalue
 
 
+def test_clone_optimizer_from_string():
+    clone = clone_optimizer('sgd')
+    assert isinstance(clone, SGD)
+
+
 if __name__ == '__main__':
     pytest.main([__file__])

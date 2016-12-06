@@ -12,8 +12,8 @@ from rl.util import *
 class CEMAgent(Agent):
     def __init__(self, model, nb_actions, memory, batch_size=50, nb_steps_warmup=1000,
                  train_interval=50, elite_frac=0.05, memory_interval=1, theta_init=None,
-                 noise_decay_const=0.0, noise_ampl=0.0, processor=None):
-        super(CEMAgent, self).__init__()
+                 noise_decay_const=0.0, noise_ampl=0.0, **kwargs):
+        super(CEMAgent, self).__init__(**kwargs)
 
         # Parameters.
         self.nb_actions = nb_actions
@@ -35,7 +35,6 @@ class CEMAgent(Agent):
         # Related objects.
         self.memory = memory
         self.model = model
-        self.processor = processor
         self.shapes = [w.shape for w in model.get_weights()]
         self.sizes = [w.size for w in model.get_weights()]
         self.num_weights = sum(self.sizes)
@@ -113,9 +112,6 @@ class CEMAgent(Agent):
         self.model.set_weights(sampled_weights)
 
     def forward(self, observation):
-        if self.processor is not None:
-            observation = self.processor.process_observation(observation)
-
         # Select an action.
         state = self.memory.get_recent_state(observation)
         action = self.select_action(state)
@@ -130,8 +126,6 @@ class CEMAgent(Agent):
          
     def backward(self, reward, terminal):
         # Store most recent experience in memory.
-        if self.processor is not None:
-            reward = self.processor.process_reward(reward)
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)

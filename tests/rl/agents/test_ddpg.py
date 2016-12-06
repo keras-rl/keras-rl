@@ -15,33 +15,6 @@ from rl.core import MultiInputProcessor
 from ..util import MultiInputTestEnv
 
 
-# actor = Sequential()
-# actor.add(Flatten(input_shape=(1,) + env.observation_space.shape))
-# actor.add(Dense(16))
-# actor.add(Activation('relu'))
-# actor.add(Dense(16))
-# actor.add(Activation('relu'))
-# actor.add(Dense(16))
-# actor.add(Activation('relu'))
-# actor.add(Dense(nb_actions))
-# actor.add(Activation('linear'))
-# print(actor.summary())
-
-# action_input = Input(shape=(nb_actions,), name='action_input')
-# observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
-# flattened_observation = Flatten()(observation_input)
-# x = merge([action_input, flattened_observation], mode='concat')
-# x = Dense(32)(x)
-# x = Activation('relu')(x)
-# x = Dense(32)(x)
-# x = Activation('relu')(x)
-# x = Dense(32)(x)
-# x = Activation('relu')(x)
-# x = Dense(1)(x)
-# x = Activation('linear')(x)
-# critic = Model(input=[action_input, observation_input], output=x)
-# print(critic.summary())
-
 def test_single_ddpg_input():
     nb_actions = 2
 

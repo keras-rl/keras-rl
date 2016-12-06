@@ -9,7 +9,7 @@ class MultiInputTestEnv(Env):
         self.observation_shape = observation_shape
 
     def step(self, action):
-        return self._get_obs(), random.choice([0, 1]), False, {}
+        return self._get_obs(), random.choice([0, 1]), random.choice([True, False]), {}
 
     def reset(self):
         return self._get_obs()

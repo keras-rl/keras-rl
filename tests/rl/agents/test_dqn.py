@@ -7,7 +7,7 @@ import random
 from keras.models import Model, Sequential
 from keras.layers import Input, merge, Dense, Flatten
 
-from rl.agents.dqn import NAFLayer, DQNAgent
+from rl.agents.dqn import NAFLayer, DQNAgent, ContinuousDQNAgent
 from rl.memory import SequentialMemory
 from rl.core import MultiInputProcessor
 
@@ -31,10 +31,10 @@ class Env(object):
 
 def test_single_dqn_input():
     model = Sequential()
-    model.add(Flatten(input_shape=(1, 3)))
+    model.add(Flatten(input_shape=(2, 3)))
     model.add(Dense(2))
 
-    memory = SequentialMemory(limit=10, window_length=1)
+    memory = SequentialMemory(limit=10, window_length=2)
     for double_dqn in (True, False):
         agent = DQNAgent(model, memory=memory, nb_actions=2, nb_steps_warmup=5, batch_size=4,
                          enable_double_dqn=double_dqn)
@@ -57,6 +57,63 @@ def test_multi_dqn_input():
                          processor=processor, enable_double_dqn=double_dqn)
         agent.compile('sgd')
         agent.fit(Env([(3,), (4,)]), nb_steps=10)
+
+
+def test_single_continuous_dqn_input():
+    nb_actions = 2
+
+    V_model = Sequential()
+    V_model.add(Flatten(input_shape=(2, 3)))
+    V_model.add(Dense(1))
+
+    mu_model = Sequential()
+    mu_model.add(Flatten(input_shape=(2, 3)))
+    mu_model.add(Dense(nb_actions))
+
+    L_input = Input(shape=(2, 3))
+    L_input_action = Input(shape=(nb_actions,))
+    x = merge([Flatten()(L_input), L_input_action], mode='concat')
+    x = Dense(((nb_actions * nb_actions + nb_actions) // 2))(x)
+    L_model = Model(input=[L_input_action, L_input], output=x)
+
+    memory = SequentialMemory(limit=10, window_length=2)
+    agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
+                               memory=memory, nb_steps_warmup=5, batch_size=5)
+    agent.compile('sgd')
+    agent.fit(Env((3,)), nb_steps=10)
+
+
+def test_multi_continuous_dqn_input():
+    nb_actions = 2
+
+    V_input1 = Input(shape=(2, 3))
+    V_input2 = Input(shape=(2, 4))
+    x = merge([V_input1, V_input2], mode='concat')
+    x = Flatten()(x)
+    x = Dense(1)(x)
+    V_model = Model(input=[V_input1, V_input2], output=x)
+
+    mu_input1 = Input(shape=(2, 3))
+    mu_input2 = Input(shape=(2, 4))
+    x = merge([mu_input1, mu_input2], mode='concat')
+    x = Flatten()(x)
+    x = Dense(nb_actions)(x)
+    mu_model = Model(input=[mu_input1, mu_input2], output=x)
+
+    L_input1 = Input(shape=(2, 3))
+    L_input2 = Input(shape=(2, 4))
+    L_input_action = Input(shape=(nb_actions,))
+    x = merge([L_input1, L_input2], mode='concat')
+    x = merge([Flatten()(x), L_input_action], mode='concat')
+    x = Dense(((nb_actions * nb_actions + nb_actions) // 2))(x)
+    L_model = Model(input=[L_input_action, L_input1, L_input2], output=x)
+
+    memory = SequentialMemory(limit=10, window_length=2)
+    processor = MultiInputProcessor(nb_inputs=2)
+    agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
+                               memory=memory, nb_steps_warmup=5, batch_size=5, processor=processor)
+    agent.compile('sgd')
+    agent.fit(Env([(3,), (4,)]), nb_steps=10)
 
 
 def test_naf_layer_full():

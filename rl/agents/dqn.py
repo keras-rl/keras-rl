@@ -419,7 +419,6 @@ class NAFLayer(Layer):
                     K.zeros((self.nb_actions, self.nb_actions)),
                 ]
                 P, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
-                print(P)
             elif K._BACKEND == 'tensorflow':
                 import tensorflow as tf
 
@@ -521,15 +520,18 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         self.target_V_model.compile(optimizer='sgd', loss='mse')
 
         # Build combined model.
-        observation_shape = self.V_model.input._keras_shape[1:]
         a_in = Input(shape=(self.nb_actions,), name='action_input')
-        o_in = Input(shape=observation_shape, name='observation_input')
-        L_out = self.L_model([a_in, o_in])
-        V_out = self.V_model(o_in)
-        mu_out = self.mu_model(o_in)
+        if type(self.V_model.input) is list:
+            observation_shapes = [i._keras_shape[1:] for i in self.V_model.input]
+        else:
+            observation_shapes = [self.V_model.input._keras_shape[1:]]
+        os_in = [Input(shape=shape, name='observation_input_{}'.format(idx)) for idx, shape in enumerate(observation_shapes)]
+        L_out = self.L_model([a_in] + os_in)
+        V_out = self.V_model(os_in)
+        mu_out = self.mu_model(os_in)
         A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)(merge([L_out, mu_out, a_in], mode='concat'))
         combined_out = merge([A_out, V_out], mode='sum')
-        combined = Model(input=[a_in, o_in], output=combined_out)
+        combined = Model(input=[a_in] + os_in, output=combined_out)
 
         # Compile combined model.
         if self.target_model_update < 1.:
@@ -625,7 +627,10 @@ class ContinuousDQNAgent(AbstractDQNAgent):
             assert Rs.shape == (self.batch_size,)
 
             # Finally, perform a single update on the entire batch.
-            metrics = self.combined_model.train_on_batch([action_batch, state0_batch], Rs)
+            if len(self.combined_model.input) == 2:
+                metrics = self.combined_model.train_on_batch([action_batch, state0_batch], Rs)
+            else:
+                metrics = self.combined_model.train_on_batch([action_batch] + state0_batch, Rs)
             if self.processor is not None:
                 metrics += self.processor.metrics
 

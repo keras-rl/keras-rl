@@ -4,6 +4,7 @@ import os
 
 import numpy as np
 import keras.backend as K
+import keras.optimizers as optimizers
 
 from rl.core import Agent
 from rl.random import OrnsteinUhlenbeckProcess
@@ -21,20 +22,15 @@ class DDPGAgent(Agent):
     def __init__(self, nb_actions, actor, critic, critic_action_input, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
                  train_interval=1, memory_interval=1, delta_range=(-np.inf, np.inf),
-                 random_process=OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=0.3),
-                 custom_model_objects={}, target_model_update=.001, **kwargs):
+                 random_process=None, custom_model_objects={}, target_model_update=.001, **kwargs):
         if hasattr(actor.output, '__len__') and len(actor.output) > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
-        if hasattr(actor.input, '__len__') and len(actor.input) != 1:
-            raise ValueError('Actor "{}" does have too many inputs. The actor must have at exactly one input for the observation.'.format(actor))
         if hasattr(critic.output, '__len__') and len(critic.output) > 1:
             raise ValueError('Critic "{}" has more than one output. DDPG expects a critic that has a single output.'.format(critic))
         if critic_action_input not in critic.input:
             raise ValueError('Critic "{}" does not have designated action input "{}".'.format(critic, critic_action_input))
-        if not hasattr(critic.input, '__len__') or len(critic.input) != 2:
+        if not hasattr(critic.input, '__len__') or len(critic.input) < 2:
             raise ValueError('Critic "{}" does not have enough inputs. The critic must have at exactly two inputs, one for the action and one for the observation.'.format(critic))
-        if critic_action_input._keras_shape != actor.output._keras_shape:
-            raise ValueError('Critic "{}" and actor "{}" do not have matching shapes')
 
         super(DDPGAgent, self).__init__(**kwargs)
 
@@ -79,13 +75,17 @@ class DDPGAgent(Agent):
     def compile(self, optimizer, metrics=[]):
         metrics += [mean_q]
 
-        if hasattr(optimizer, '__len__'):
+        if type(optimizer) in (list, tuple):
             if len(optimizer) != 2:
                 raise ValueError('More than two optimizers provided. Please only provide a maximum of two optimizers, the first one for the actor and the second one for the critic.')
             actor_optimizer, critic_optimizer = optimizer
         else:
             actor_optimizer = optimizer
             critic_optimizer = clone_optimizer(optimizer)
+        if type(actor_optimizer) is str:
+            actor_optimizer = optimizers.get(actor_optimizer)
+        if type(critic_optimizer) is str:
+            critic_optimizer = optimizers.get(critic_optimizer)
         assert actor_optimizer != critic_optimizer
 
         if len(metrics) == 2 and hasattr(metrics[0], '__len__') and hasattr(metrics[1], '__len__'):
@@ -161,12 +161,7 @@ class DDPGAgent(Agent):
         updates += self.actor.updates  # include other updates of the actor, e.g. for BN
 
         # Finally, combine it all into a callable function.
-        actor_inputs = None
-        if not hasattr(self.actor.input, '__len__'):
-            actor_inputs = [self.actor.input]
-        else:
-            actor_inputs = self.actor.input
-        inputs = actor_inputs + critic_inputs
+        inputs = self.actor.inputs[:] + critic_inputs
         if self.uses_learning_phase:
             inputs += [K.learning_phase()]
         self.actor_train_fn = K.function(inputs, [self.actor.output], updates=updates)
@@ -290,7 +285,10 @@ class DDPGAgent(Agent):
             if self.step > self.nb_steps_warmup_critic:
                 target_actions = self.target_actor.predict_on_batch(state1_batch)
                 assert target_actions.shape == (self.batch_size, self.nb_actions)
-                state1_batch_with_action = [state1_batch]
+                if len(self.critic.inputs) >= 3:
+                    state1_batch_with_action = state1_batch[:]
+                else:
+                    state1_batch_with_action = [state1_batch]
                 state1_batch_with_action.insert(self.critic_action_input_idx, target_actions)
                 target_q_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
                 assert target_q_values.shape == (self.batch_size,)
@@ -303,7 +301,10 @@ class DDPGAgent(Agent):
                 targets = (reward_batch + discounted_reward_batch).reshape(self.batch_size, 1)
                 
                 # Perform a single batch update on the critic network.
-                state0_batch_with_action = [state0_batch]
+                if len(self.critic.inputs) >= 3:
+                    state0_batch_with_action = state0_batch[:]
+                else:
+                    state0_batch_with_action = [state0_batch]
                 state0_batch_with_action.insert(self.critic_action_input_idx, action_batch)
                 metrics = self.critic.train_on_batch(state0_batch_with_action, targets)
                 if self.processor is not None:
@@ -312,7 +313,10 @@ class DDPGAgent(Agent):
             # Update actor, if warm up is over.
             if self.step > self.nb_steps_warmup_actor:
                 # TODO: implement metrics for actor
-                inputs = [state0_batch, state0_batch]
+                if len(self.actor.inputs) >= 2:
+                    inputs = state0_batch[:] + state0_batch[:]
+                else:
+                    inputs = [state0_batch, + state0_batch]
                 if self.uses_learning_phase:
                     inputs += [self.training]
                 action_values = self.actor_train_fn(inputs)[0]

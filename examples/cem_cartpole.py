@@ -6,7 +6,7 @@ from keras.layers import Dense, Activation, Flatten
 from keras.optimizers import Adam
 
 from rl.agents.cem import CEMAgent
-from rl.memory import SequentialMemory, EpisodeParameterMemory
+from rl.memory import EpisodeParameterMemory
 
 ENV_NAME = 'CartPole-v0'
 

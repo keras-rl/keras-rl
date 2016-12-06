@@ -345,7 +345,7 @@ class NAFLayer(Layer):
                 def fn(x, L_acc, LT_acc):
                     x_ = K.zeros((self.nb_actions, self.nb_actions))
                     x_ = T.set_subtensor(x_[np.tril_indices(self.nb_actions)], x)
-                    diag = K.exp(T.diag(x_))
+                    diag = K.exp(T.diag(x_) + K.epsilon())
                     x_ = T.set_subtensor(x_[np.diag_indices(self.nb_actions)], diag)
                     return x_, x_.T
 
@@ -390,7 +390,7 @@ class NAFLayer(Layer):
                 def fn(a, x):
                     # Exponentiate everything. This is much easier than only exponentiating
                     # the diagonal elements, and, usually, the action space is relatively low.
-                    x_ = K.exp(x)
+                    x_ = K.exp(x + K.epsilon())
                     # Only keep the diagonal elements.
                     x_ *= diag_mask
                     # Add the original, non-diagonal elements.
@@ -426,7 +426,6 @@ class NAFLayer(Layer):
                     K.zeros((self.nb_actions, self.nb_actions)),
                 ]
                 P, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
-                print(P)
             elif K._BACKEND == 'tensorflow':
                 import tensorflow as tf
 
@@ -528,15 +527,18 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         self.target_V_model.compile(optimizer='sgd', loss='mse')
 
         # Build combined model.
-        observation_shape = self.V_model.input._keras_shape[1:]
         a_in = Input(shape=(self.nb_actions,), name='action_input')
-        o_in = Input(shape=observation_shape, name='observation_input')
-        L_out = self.L_model([a_in, o_in])
-        V_out = self.V_model(o_in)
-        mu_out = self.mu_model(o_in)
+        if type(self.V_model.input) is list:
+            observation_shapes = [i._keras_shape[1:] for i in self.V_model.input]
+        else:
+            observation_shapes = [self.V_model.input._keras_shape[1:]]
+        os_in = [Input(shape=shape, name='observation_input_{}'.format(idx)) for idx, shape in enumerate(observation_shapes)]
+        L_out = self.L_model([a_in] + os_in)
+        V_out = self.V_model(os_in)
+        mu_out = self.mu_model(os_in)
         A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)(merge([L_out, mu_out, a_in], mode='concat'))
         combined_out = merge([A_out, V_out], mode='sum')
-        combined = Model(input=[a_in, o_in], output=combined_out)
+        combined = Model(input=[a_in] + os_in, output=combined_out)
 
         # Compile combined model.
         if self.target_model_update < 1.:
@@ -632,7 +634,10 @@ class ContinuousDQNAgent(AbstractDQNAgent):
             assert Rs.shape == (self.batch_size,)
 
             # Finally, perform a single update on the entire batch.
-            metrics = self.combined_model.train_on_batch([action_batch, state0_batch], Rs)
+            if len(self.combined_model.input) == 2:
+                metrics = self.combined_model.train_on_batch([action_batch, state0_batch], Rs)
+            else:
+                metrics = self.combined_model.train_on_batch([action_batch] + state0_batch, Rs)
             if self.processor is not None:
                 metrics += self.processor.metrics
 

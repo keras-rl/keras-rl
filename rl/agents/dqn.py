@@ -93,6 +93,8 @@ class DQNAgent(AbstractDQNAgent):
                 raise ValueError('Recurrent Q learning requires an episodic memory. You are trying to use it with memory={} instead.'.format(memory))
             if nb_max_steps_recurrent_unrolling and not model.stateful:
                 raise ValueError('Recurrent Q learning with max. unrolling requires a stateful model.')
+            if policy_model is None or not policy_model.stateful:
+                raise ValueError('Recurrent Q learning requires a separate stateful policy model with batch_size=1. Please refer to an example to see how to properly set it up.')
 
         # Parameters.
         self.enable_double_dqn = enable_double_dqn

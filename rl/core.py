@@ -61,6 +61,8 @@ class Agent(object):
                     # Obtain the initial observation by resetting the environment.
                     self.reset_states()
                     observation = deepcopy(env.reset())
+                    if self.processor is not None:
+                        observation = self.processor.process_observation(observation)
                     assert observation is not None
 
                     # Perform random starts at beginning of episode and do not record them into the experience.
@@ -80,6 +82,8 @@ class Agent(object):
                         if done:
                             warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(nb_random_start_steps))
                             observation = deepcopy(env.reset())
+                            if self.processor is not None:
+                                observation = self.processor.process_observation(observation)
                             break
 
                 # At this point, we expect to be fully initialized.
@@ -201,6 +205,8 @@ class Agent(object):
             # Obtain the initial observation by resetting the environment.
             self.reset_states()
             observation = deepcopy(env.reset())
+            if self.processor is not None:
+                observation = self.processor.process_observation(observation)
             assert observation is not None
 
             # Perform random starts at beginning of episode and do not record them into the experience.
@@ -220,6 +226,8 @@ class Agent(object):
                 if done:
                     warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(nb_random_start_steps))
                     observation = deepcopy(env.reset())
+                    if self.processor is not None:
+                        observation = self.processor.process_observation(observation)
                     break
 
             # Run the episode until we're done.

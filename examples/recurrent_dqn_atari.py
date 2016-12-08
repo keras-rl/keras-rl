@@ -67,11 +67,11 @@ def _step(a):
 env._step = _step
 
 
-def build_model(stateful):
+def build_model(stateful, batch_size=None):
     # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
     # TODO: fix TF
     if stateful:
-        input_shape = (1, 1, 1) + INPUT_SHAPE
+        input_shape = (batch_size, None, 1) + INPUT_SHAPE
     else:
         input_shape = (None, 1) + INPUT_SHAPE
     model = Sequential()
@@ -101,8 +101,9 @@ def build_model(stateful):
     model.add(Activation('linear'))
     return model
 
-model = build_model(stateful=False)
-stateful_model = build_model(stateful=True)
+batch_size = 32
+model = build_model(stateful=True, batch_size=batch_size)
+policy_model = build_model(stateful=True, batch_size=1)
 print(model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
@@ -126,8 +127,8 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
                processor=processor, nb_steps_warmup=50000, gamma=.99, delta_range=(-1., 1.),
-               target_model_update=10000, train_interval=10, stateful_model=stateful_model,
-               enable_double_dqn=False)
+               target_model_update=10000, train_interval=10, policy_model=policy_model,
+               enable_double_dqn=False, batch_size=batch_size)
 dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
 if args.mode == 'train':

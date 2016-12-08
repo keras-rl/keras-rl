@@ -19,8 +19,7 @@ def mean_q(y_true, y_pred):
 class AbstractDQNAgent(Agent):
     def __init__(self, nb_actions, memory, gamma=.99, batch_size=32, nb_steps_warmup=1000,
                  train_interval=1, memory_interval=1, target_model_update=10000,
-                 delta_range=(-np.inf, np.inf), custom_model_objects={},
-                 target_model=None, stateful_model=None, **kwargs):
+                 delta_range=(-np.inf, np.inf), custom_model_objects={}, **kwargs):
         super(AbstractDQNAgent, self).__init__(**kwargs)
 
         # Soft vs hard target model updates.
@@ -43,11 +42,6 @@ class AbstractDQNAgent(Agent):
         self.target_model_update = target_model_update
         self.delta_range = delta_range
         self.custom_model_objects = custom_model_objects
-        self.target_model = target_model
-        self.stateful_model = stateful_model
-
-        # TODO: auto-detect
-        self.is_recurrent = False
 
         # Related objects.
         self.memory = memory
@@ -55,31 +49,11 @@ class AbstractDQNAgent(Agent):
         # State.
         self.compiled = False
 
-    @property
-    def online_model(self):
-        if self.stateful_model is not None:
-            return self.stateful_model
-        else:
-            return self.model
-
     def process_state_batch(self, batch):
         batch = np.array(batch)
         if self.processor is None:
             return batch
         return self.processor.process_state_batch(batch)
-
-    def compute_batch_q_values(self, state_batch):
-        batch = self.process_state_batch(state_batch)
-        if self.is_recurrent:
-            # TODO: fix this
-            batch = batch.reshape((1,) + batch.shape)
-        q_values = self.online_model.predict_on_batch(batch)
-        return q_values
-
-    def compute_q_values(self, state):
-        q_values = self.compute_batch_q_values([state]).flatten()
-        assert q_values.shape == (self.nb_actions,)
-        return q_values
 
     def get_config(self):
         return {
@@ -99,20 +73,35 @@ class AbstractDQNAgent(Agent):
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(AbstractDQNAgent):
     def __init__(self, model, policy=EpsGreedyQPolicy(), enable_double_dqn=True,
-                 *args, **kwargs):
+                 target_model=None, policy_model=None,
+                 nb_max_steps_recurrent_unrolling=100, *args, **kwargs):
         super(DQNAgent, self).__init__(*args, **kwargs)
 
         # Validate (important) input.
         if hasattr(model.output, '__len__') and len(model.output) > 1:
             raise ValueError('Model "{}" has more than one output. DQN expects a model that has a single output.'.format(model))
-        if model.output._keras_shape != (None, self.nb_actions):
-            raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, nb_actions))
+        if model.output._keras_shape[-1] != self.nb_actions:
+            raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, self.nb_actions))
+
+        # Validate settings for recurrent DQN.
+        self.is_recurrent = is_recurrent(model)
+        if self.is_recurrent:
+            if enable_double_dqn:
+                raise ValueError('DoubleDQN (`enable_double_dqn = True`) is currently not supported for recurrent Q learning.')
+            memory = kwargs['memory']
+            if not memory.is_episodic:
+                raise ValueError('Recurrent Q learning requires an episodic memory. You are trying to use it with memory={} instead.'.format(memory))
+            if nb_max_steps_recurrent_unrolling and not model.stateful:
+                raise ValueError('Recurrent Q learning with max. unrolling requires a stateful model.')
 
         # Parameters.
         self.enable_double_dqn = enable_double_dqn
+        self.nb_max_steps_recurrent_unrolling = nb_max_steps_recurrent_unrolling
 
         # Related objects.
         self.model = model
+        self.target_model = target_model
+        self.policy_model = policy_model if policy_model is not None else model
         self.policy = policy
 
         # State.
@@ -121,6 +110,7 @@ class DQNAgent(AbstractDQNAgent):
     def get_config(self):
         config = super(DQNAgent, self).get_config()
         config['enable_double_dqn'] = self.enable_double_dqn
+        config['nb_max_steps_recurrent_unrolling'] = self.nb_max_steps_recurrent_unrolling
         config['model'] = get_object_config(self.model)
         config['policy'] = get_object_config(self.policy)
         if self.compiled:
@@ -141,9 +131,9 @@ class DQNAgent(AbstractDQNAgent):
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             updates += get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
-        if self.stateful_model is not None:
+        if self.policy_model is not None:
             # Update the stateful model after every training step.
-            updates += get_soft_target_model_updates(self.stateful_model, self.model, 1.)
+            updates += get_soft_target_model_updates(self.policy_model, self.model, 1.)
         if len(updates) > 0:
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
 
@@ -194,13 +184,22 @@ class DQNAgent(AbstractDQNAgent):
         if self.compiled:
             self.model.reset_states()
             self.target_model.reset_states()
-            if self.stateful_model is not None:
-                self.stateful_model.reset_states()
+            if self.policy_model is not None:
+                self.policy_model.reset_states()
 
     def update_target_model_hard(self):
         self.target_model.set_weights(self.model.get_weights())
-        if self.stateful_model is not None:
-            self.stateful_model.set_weights(self.model.get_weights())
+        if self.policy_model is not None:
+            self.policy_model.set_weights(self.model.get_weights())
+
+    def compute_q_values(self, state):
+        batch = self.process_state_batch([state])
+        if self.is_recurrent:
+            # Add time axis.
+            batch = batch.reshape((1,) + batch.shape)  # (1, 1, ...)
+        q_values = self.policy_model.predict_on_batch(batch).flatten()
+        assert q_values.shape == (self.nb_actions,)
+        return q_values
 
     def forward(self, observation):
         # Select an action.
@@ -300,6 +299,8 @@ class DQNAgent(AbstractDQNAgent):
                 # According to the paper "Deep Reinforcement Learning with Double Q-learning"
                 # (van Hasselt et al., 2015), in Double DQN, the online network predicts the actions
                 # while the target network is used to estimate the Q value.
+                if self.is_recurrent:
+                    self.model.reset_states()
                 q_values = self.model.predict_on_batch(state1_batch)
                 assert q_values.shape == (self.batch_size, self.nb_actions)
                 actions = np.argmax(q_values, axis=1)
@@ -307,6 +308,8 @@ class DQNAgent(AbstractDQNAgent):
 
                 # Now, estimate Q values using the target network but select the values with the
                 # highest Q value wrt to the online model (as computed above).
+                if self.is_recurrent:
+                    self.target_model.reset_states()
                 target_q_values = self.target_model.predict_on_batch(state1_batch)
                 assert target_q_values.shape == (self.batch_size, self.nb_actions)
                 q_batch = target_q_values[range(self.batch_size), actions]
@@ -358,13 +361,39 @@ class DQNAgent(AbstractDQNAgent):
 
             targets = np.array(targets).astype('float32')
             masks = np.array(masks).astype('float32')
-
-            # Finally, perform a single update on the entire batch. We use a dummy target since
-            # the actual loss is computed in a Lambda layer that needs more complex input. However,
-            # it is still useful to know the actual target to compute metrics properly.
             ins = [state0_batch] if type(self.model.input) is not list else state0_batch
-            metrics = self.trainable_model.train_on_batch(ins + [targets, masks], [dummy_targets, targets])
-            metrics = [metric for idx, metric in enumerate(metrics) if idx not in (1, 2)]  # throw away individual losses
+
+            # In the recurrent case, we support splitting the sequences into multiple
+            # chunks. Each chunk is then used as a training example. The reason for this is that,
+            # for too long episodes, the unrolling in time during backpropagation can exceed the
+            # memory of the GPU (or, to a lesser degree, the RAM if training on CPU).
+            if self.is_recurrent and self.nb_max_steps_recurrent_unrolling:
+                assert targets.ndim == 3
+                steps = targets.shape[1]  # (batch_size, steps, actions)
+                nb_chunks = int(np.ceil(float(steps) / float(self.nb_max_steps_recurrent_unrolling)))
+                chunks = []
+                for chunk_idx in range(nb_chunks):
+                    start = chunk_idx * self.nb_max_steps_recurrent_unrolling
+                    t = targets[:, start:start + self.nb_max_steps_recurrent_unrolling, ...]
+                    m = masks[:, start:start + self.nb_max_steps_recurrent_unrolling, ...]
+                    iss = [i[:, start:start + self.nb_max_steps_recurrent_unrolling, ...] for i in ins]
+                    dt = dummy_targets[:, start:start + self.nb_max_steps_recurrent_unrolling, ...]
+                    chunks.append((iss, t, m, dt))
+            else:
+                chunks = [(ins, targets, masks, dummy_targets)]
+
+            metrics = []
+            if self.is_recurrent:
+                # Reset states before training on the entire sequence.
+                self.trainable_model.reset_states()
+            for i, t, m, dt in chunks:
+                # Finally, perform a single update on the entire batch. We use a dummy target since
+                # the actual loss is computed in a Lambda layer that needs more complex input. However,
+                # it is still useful to know the actual target to compute metrics properly.
+                ms = self.trainable_model.train_on_batch(i + [t, m], [dt, t])
+                ms = [metric for idx, metric in enumerate(ms) if idx not in (1, 2)]  # throw away individual losses
+                metrics.append(ms)
+            metrics = np.mean(metrics, axis=0).tolist()
             metrics += self.policy.metrics
             if self.processor is not None:
                 metrics += self.processor.metrics
@@ -395,6 +424,7 @@ class DQNAgent(AbstractDQNAgent):
     def policy(self, policy):
         self.__policy = policy
         self.__policy._set_agent(self)
+
 
 class NAFLayer(Layer):
     def __init__(self, nb_actions, mode='full', **kwargs):

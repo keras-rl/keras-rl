@@ -203,6 +203,10 @@ class SequentialMemory(Memory):
         config['limit'] = self.limit
         return config
 
+    @property
+    def is_episodic(self):
+        return False
+
 
 class EpisodicMemory(Memory):
     def __init__(self, limit, **kwargs):
@@ -288,6 +292,10 @@ class EpisodicMemory(Memory):
         config['limit'] = self.limit
         return config
 
+    @property
+    def is_episodic(self):
+        return True
+
 
 class EpisodeParameterMemory(Memory):
     def __init__(self, limit, **kwargs):
@@ -329,3 +337,7 @@ class EpisodeParameterMemory(Memory):
         config = super(SequentialMemory, self).get_config()
         config['limit'] = self.limit
         return config
+
+    @property
+    def is_episodic(self):
+        return True

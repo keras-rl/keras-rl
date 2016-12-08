@@ -131,8 +131,8 @@ class DQNAgent(AbstractDQNAgent):
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             updates += get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
-        if self.policy_model is not None:
-            # Update the stateful model after every training step.
+        if self.policy_model is not self.model:
+            # Update the policy model after every training step.
             updates += get_soft_target_model_updates(self.policy_model, self.model, 1.)
         if len(updates) > 0:
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)

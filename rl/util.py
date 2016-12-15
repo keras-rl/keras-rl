@@ -1,6 +1,7 @@
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
 from keras.optimizers import optimizer_from_config, get
+from keras.layers import Recurrent
 
 
 def clone_model(model, custom_objects={}):
@@ -45,6 +46,13 @@ def get_object_config(o):
         'config': o.get_config()
     }
     return config
+
+
+def is_recurrent(model):
+    for layer in model.layers:
+        if isinstance(layer, Recurrent):
+            return True
+    return False
 
 
 class AdditionalUpdatesOptimizer(optimizers.Optimizer):

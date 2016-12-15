@@ -186,8 +186,7 @@ class DQNAgent(AbstractDQNAgent):
         if self.compiled:
             self.model.reset_states()
             self.target_model.reset_states()
-            if self.policy_model is not None:
-                self.policy_model.reset_states()
+            self.policy_model.reset_states()
 
     def update_target_model_hard(self):
         self.target_model.set_weights(self.model.get_weights())

@@ -1,6 +1,7 @@
 from __future__ import division
 from collections import deque
 from copy import deepcopy
+import warnings
 
 import numpy as np
 import keras.backend as K
@@ -19,7 +20,7 @@ def mean_q(y_true, y_pred):
 class AbstractDQNAgent(Agent):
     def __init__(self, nb_actions, memory, gamma=.99, batch_size=32, nb_steps_warmup=1000,
                  train_interval=1, memory_interval=1, target_model_update=10000,
-                 delta_range=(-np.inf, np.inf), custom_model_objects={}, **kwargs):
+                 delta_range=None, delta_clip=1., custom_model_objects={}, **kwargs):
         super(AbstractDQNAgent, self).__init__(**kwargs)
 
         # Soft vs hard target model updates.
@@ -32,6 +33,10 @@ class AbstractDQNAgent(Agent):
             # Soft update with `(1 - target_model_update) * old + target_model_update * new`.
             target_model_update = float(target_model_update)
 
+        if delta_range is not None:
+            warnings.warn('`delta_range` is deprecated. Please use `delta_clip` instead, which takes a single scalar. For now we\'re falling back to `delta_range[1] = {}`'.format(delta_range[1]))
+            delta_clip = delta_range[1]
+
         # Parameters.
         self.nb_actions = nb_actions
         self.gamma = gamma
@@ -40,7 +45,7 @@ class AbstractDQNAgent(Agent):
         self.train_interval = train_interval
         self.memory_interval = memory_interval
         self.target_model_update = target_model_update
-        self.delta_range = delta_range
+        self.delta_clip = delta_clip
         self.custom_model_objects = custom_model_objects
 
         # Related objects.
@@ -75,7 +80,7 @@ class AbstractDQNAgent(Agent):
             'train_interval': self.train_interval,
             'memory_interval': self.memory_interval,
             'target_model_update': self.target_model_update,
-            'delta_range': self.delta_range,
+            'delta_clip': self.delta_clip,
             'memory': get_object_config(self.memory),
         }
 
@@ -126,14 +131,11 @@ class DQNAgent(AbstractDQNAgent):
             updates = get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
 
-        def clipped_masked_mse(args):
+        def clipped_masked_error(args):
             y_true, y_pred, mask = args
-            delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
-            delta *= mask  # apply element-wise mask
-            loss = K.mean(K.square(delta), axis=-1)
-            # Multiply by the number of actions to reverse the effect of the mean.
-            loss *= float(self.nb_actions)
-            return loss
+            loss = huber_loss(y_true, y_pred, self.delta_clip)
+            loss *= mask  # apply element-wise mask
+            return K.sum(loss, axis=-1)
 
         # Create trainable model. The problem is that we need to mask the output since we only
         # ever want to update the Q values for a certain action. The way we achieve this is by
@@ -142,7 +144,7 @@ class DQNAgent(AbstractDQNAgent):
         y_pred = self.model.output
         y_true = Input(name='y_true', shape=(self.nb_actions,))
         mask = Input(name='mask', shape=(self.nb_actions,))
-        loss_out = Lambda(clipped_masked_mse, output_shape=(1,), name='loss')([y_pred, y_true, mask])
+        loss_out = Lambda(clipped_masked_error, output_shape=(1,), name='loss')([y_pred, y_true, mask])
         ins = [self.model.input] if type(self.model.input) is not list else self.model.input
         trainable_model = Model(input=ins + [y_true, mask], output=[loss_out, y_pred])
         assert len(trainable_model.output_names) == 2
@@ -546,11 +548,10 @@ class ContinuousDQNAgent(AbstractDQNAgent):
             updates = get_soft_target_model_updates(self.target_V_model, self.V_model, self.target_model_update)
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
         
-        def clipped_mse(y_true, y_pred):
-            delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
-            return K.mean(K.square(delta), axis=-1)
+        def clipped_error(y_true, y_pred):
+            return K.mean(huber_loss(y_true, y_pred, self.delta_clip), axis=-1)
         
-        combined.compile(loss=clipped_mse, optimizer=optimizer, metrics=metrics)
+        combined.compile(loss=clipped_error, optimizer=optimizer, metrics=metrics)
         self.combined_model = combined
 
         self.compiled = True

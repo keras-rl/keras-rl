@@ -1,6 +1,7 @@
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
 from keras.optimizers import optimizer_from_config, get
+import keras.backend as K
 
 
 def clone_model(model, custom_objects={}):
@@ -45,6 +46,26 @@ def get_object_config(o):
         'config': o.get_config()
     }
     return config
+
+
+def huber_loss(y_true, y_pred, clip_value):
+    # Huber loss, see https://en.wikipedia.org/wiki/Huber_loss and 
+    # https://medium.com/@karpathy/yes-you-should-understand-backprop-e2f06eab496b#.i6uw5v303
+    # for details.
+    assert clip_value > 0.
+    
+    x = y_true - y_pred
+    condition = K.abs(x) < clip_value
+    squared_loss = .5 * K.square(x)
+    linear_loss = clip_value * (K.abs(x) - .5 * clip_value)
+    if K._BACKEND == 'tensorflow':
+        import tensorflow as tf
+        return tf.select(condition, squared_loss, linear_loss)  # condition, true, false
+    elif K._BACKEND == 'theano':
+        from theano import tensor as T
+        return T.switch(condition, squared_loss, linear_loss)
+    else:
+        raise RuntimeError('Unknown backend "{}".'.format(K._BACKEND))
 
 
 class AdditionalUpdatesOptimizer(optimizers.Optimizer):

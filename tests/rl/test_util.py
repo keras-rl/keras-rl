@@ -8,7 +8,7 @@ from keras.layers import Input, Dense, merge
 from keras.optimizers import SGD
 import keras.backend as K
 
-from rl.util import clone_optimizer, clone_model
+from rl.util import clone_optimizer, clone_model, huber_loss
 
 
 def test_clone_sequential_model():
@@ -58,6 +58,13 @@ def test_clone_optimizer():
 def test_clone_optimizer_from_string():
     clone = clone_optimizer('sgd')
     assert isinstance(clone, SGD)
+
+
+def test_huber_loss():
+    a = np.array([1.,  1.5, 2., 4.])
+    b = np.array([1.5, 1.,  4., 2.])
+    assert_allclose(K.eval(huber_loss(a, b, 1.)), np.array([.125, .125, 1.5, 1.5]))
+    assert_allclose(K.eval(huber_loss(a, b, 3.)), np.array([.125, .125, 2., 2.]))
 
 
 if __name__ == '__main__':

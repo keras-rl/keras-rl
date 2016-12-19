@@ -1,6 +1,7 @@
 from __future__ import division
 from collections import deque
 import os
+import warnings
 
 import numpy as np
 import keras.backend as K
@@ -21,7 +22,7 @@ def mean_q(y_true, y_pred):
 class DDPGAgent(Agent):
     def __init__(self, nb_actions, actor, critic, critic_action_input, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
-                 train_interval=1, memory_interval=1, delta_range=(-np.inf, np.inf),
+                 train_interval=1, memory_interval=1, delta_range=None, delta_clip=1.,
                  random_process=None, custom_model_objects={}, target_model_update=.001, **kwargs):
         if hasattr(actor.output, '__len__') and len(actor.output) > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
@@ -44,12 +45,16 @@ class DDPGAgent(Agent):
             # Soft update with `(1 - target_model_update) * old + target_model_update * new`.
             target_model_update = float(target_model_update)
 
+        if delta_range is not None:
+            warnings.warn('`delta_range` is deprecated. Please use `delta_clip` instead, which takes a single scalar. For now we\'re falling back to `delta_range[1] = {}`'.format(delta_range[1]))
+            delta_clip = delta_range[1]
+        
         # Parameters.
         self.nb_actions = nb_actions
         self.nb_steps_warmup_actor = nb_steps_warmup_actor
         self.nb_steps_warmup_critic = nb_steps_warmup_critic
         self.random_process = random_process
-        self.delta_range = delta_range
+        self.delta_clip = delta_clip
         self.gamma = gamma
         self.target_model_update = target_model_update
         self.batch_size = batch_size
@@ -93,9 +98,8 @@ class DDPGAgent(Agent):
         else:
             actor_metrics = critic_metrics = metrics
 
-        def clipped_mse(y_true, y_pred):
-            delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
-            return K.mean(K.square(delta), axis=-1)
+        def clipped_error(y_true, y_pred):
+            return K.mean(huber_loss(y_true, y_pred, self.delta_clip), axis=-1)
 
         # Compile target networks. We only use them in feed-forward mode, hence we can pass any
         # optimizer and loss since we never use it anyway.
@@ -114,7 +118,7 @@ class DDPGAgent(Agent):
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             critic_updates = get_soft_target_model_updates(self.target_critic, self.critic, self.target_model_update)
             critic_optimizer = AdditionalUpdatesOptimizer(critic_optimizer, critic_updates)
-        self.critic.compile(optimizer=critic_optimizer, loss=clipped_mse, metrics=critic_metrics)
+        self.critic.compile(optimizer=critic_optimizer, loss=clipped_error, metrics=critic_metrics)
 
         # Combine actor and critic so that we can get the policy gradient.
         combined_inputs = []

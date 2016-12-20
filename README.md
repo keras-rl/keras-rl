@@ -84,6 +84,14 @@ That's it. However, if you want to run the examples, you'll also need the follow
 
 `keras-rl` also works with [TensorFlow](https://www.tensorflow.org/). To find out how to use TensorFlow instead of [Theano](http://deeplearning.net/software/theano/), please refer to the [Keras documentation](http://keras.io/#switching-from-theano-to-tensorflow).
 
+## Support
+You can ask questions and join the development discussion:
+
+- On the [Keras-RL Google group](https://groups.google.com/forum/#!forum/keras-rl-users).
+- On the [Keras-RL Gitter channel](https://gitter.im/keras-rl/Lobby).
+
+You can also post **bug reports and feature requests** (only!) in [Github issues](https://github.com/matthiasplappert/keras-rl/issues).
+
 ## Running the Tests
 To run the tests locally, you'll first have to install the following dependencies:
 ```bash
@@ -110,6 +118,7 @@ If you use `keras-rl` in your research, you can cite it as follows:
     howpublished = {\url{https://github.com/matthiasplappert/keras-rl}},
 }
 ```
+
 
 ## Acknowledgments
 The foundation for this library was developed during my work at the [High Performance Humanoid Technologies (H²T)](https://h2t.anthropomatik.kit.edu/) lab at the [Karlsruhe Institute of Technologie (KIT)](https://kit.edu).

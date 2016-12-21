@@ -65,6 +65,7 @@ def test_huber_loss():
     b = np.array([1.5, 1.,  4., 2.])
     assert_allclose(K.eval(huber_loss(a, b, 1.)), np.array([.125, .125, 1.5, 1.5]))
     assert_allclose(K.eval(huber_loss(a, b, 3.)), np.array([.125, .125, 2., 2.]))
+    assert_allclose(K.eval(huber_loss(a, b, np.inf)), np.array([.125, .125, 2., 2.]))
 
 
 if __name__ == '__main__':

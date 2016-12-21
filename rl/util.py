@@ -1,3 +1,5 @@
+import numpy as np
+
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
 from keras.optimizers import optimizer_from_config, get
@@ -50,11 +52,16 @@ def get_object_config(o):
 
 def huber_loss(y_true, y_pred, clip_value):
     # Huber loss, see https://en.wikipedia.org/wiki/Huber_loss and 
-    # https://medium.com/@karpathy/yes-you-should-understand-backprop-e2f06eab496b#.i6uw5v303
+    # https://medium.com/@karpathy/yes-you-should-understand-backprop-e2f06eab496b
     # for details.
     assert clip_value > 0.
-    
+
     x = y_true - y_pred
+    if np.isinf(clip_value):
+        # Spacial case for infinity since Tensorflow does have problems
+        # if we compare `K.abs(x) < np.inf`.
+        return .5 * K.square(x)
+    
     condition = K.abs(x) < clip_value
     squared_loss = .5 * K.square(x)
     linear_loss = clip_value * (K.abs(x) - .5 * clip_value)

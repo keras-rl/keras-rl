@@ -15,7 +15,7 @@ class Agent(object):
 
     def get_config(self):
         return {}
-        
+
     def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
             nb_max_episode_steps=None):
@@ -25,7 +25,7 @@ class Agent(object):
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
         self.training = True
-        
+
         callbacks = [] if not callbacks else callbacks[:]
 
         if verbose == 1:
@@ -37,9 +37,9 @@ class Agent(object):
         history = History()
         callbacks += [history]
         callbacks = CallbackList(callbacks)
-        callbacks._set_model(self)
+        callbacks.set_model(self)
         callbacks._set_env(env)
-        callbacks._set_params({
+        callbacks.set_params({
             'nb_steps': nb_steps,
         })
         self._on_train_begin()
@@ -92,7 +92,7 @@ class Agent(object):
                 assert observation is not None
 
                 # Run a single step.
-                callbacks.on_step_begin(episode_step)    
+                callbacks.on_step_begin(episode_step)
                 # This is were all of the work happens. We first perceive and compute the action
                 # (forward step) and then use the reward to improve (backward step).
                 action = self.forward(observation)
@@ -120,7 +120,7 @@ class Agent(object):
                     done = True
                 metrics = self.backward(reward, terminal=done)
                 episode_reward += reward
-                    
+
                 step_logs = {
                     'action': action,
                     'observation': observation,
@@ -179,7 +179,7 @@ class Agent(object):
 
         self.training = False
         self.step = 0
-        
+
         callbacks = [] if not callbacks else callbacks[:]
 
         if verbose >= 1:
@@ -189,9 +189,9 @@ class Agent(object):
         history = History()
         callbacks += [history]
         callbacks = CallbackList(callbacks)
-        callbacks._set_model(self)
+        callbacks.set_model(self)
         callbacks._set_env(env)
-        callbacks._set_params({
+        callbacks.set_params({
             'nb_episodes': nb_episodes,
         })
 
@@ -259,7 +259,7 @@ class Agent(object):
                     done = True
                 self.backward(reward, terminal=done)
                 episode_reward += reward
-                
+
                 step_logs = {
                     'action': action,
                     'observation': observation,

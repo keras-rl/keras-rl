@@ -10,7 +10,7 @@ setup(name='keras-rl',
       url='https://github.com/matthiasplappert/keras-rl',
       download_url='https://github.com/matthiasplappert/keras-rl/tarball/0.1',
       license='MIT',
-      install_requires=['keras>=1.0.7'],
+      install_requires=['keras>=1.2.1'],
       extras_require={
           'gym': ['gym'],
       },

@@ -51,7 +51,7 @@ def get_object_config(o):
 
 
 def huber_loss(y_true, y_pred, clip_value):
-    # Huber loss, see https://en.wikipedia.org/wiki/Huber_loss and 
+    # Huber loss, see https://en.wikipedia.org/wiki/Huber_loss and
     # https://medium.com/@karpathy/yes-you-should-understand-backprop-e2f06eab496b
     # for details.
     assert clip_value > 0.
@@ -61,13 +61,13 @@ def huber_loss(y_true, y_pred, clip_value):
         # Spacial case for infinity since Tensorflow does have problems
         # if we compare `K.abs(x) < np.inf`.
         return .5 * K.square(x)
-    
+
     condition = K.abs(x) < clip_value
     squared_loss = .5 * K.square(x)
     linear_loss = clip_value * (K.abs(x) - .5 * clip_value)
     if K._BACKEND == 'tensorflow':
         import tensorflow as tf
-        return tf.select(condition, squared_loss, linear_loss)  # condition, true, false
+        return tf.where(condition, squared_loss, linear_loss)  # condition, true, false
     elif K._BACKEND == 'theano':
         from theano import tensor as T
         return T.switch(condition, squared_loss, linear_loss)

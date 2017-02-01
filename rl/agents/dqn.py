@@ -376,7 +376,10 @@ class NAFLayer(Layer):
                 # element when gathering L_flat into a lower triangular matrix L.
                 nb_rows = tf.shape(L_flat)[0]
                 zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
-                L_flat = tf.concat_v2([zeros, L_flat], 1)
+                if hasattr(tf, 'concat_v2'):
+                    L_flat = tf.concat_v2([zeros, L_flat], 1)
+                else:
+                    L_flat = tf.concat(1, [zeros, L_flat])
 
                 # Create mask that can be used to gather elements from L_flat and put them
                 # into a lower triangular matrix.
@@ -440,7 +443,10 @@ class NAFLayer(Layer):
                 # element when gathering L_flat into a lower triangular matrix L.
                 nb_rows = tf.shape(L_flat)[0]
                 zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
-                L_flat = tf.concat_v2([zeros, L_flat], 1)
+                if hasattr(tf, 'concat_v2'):
+                    L_flat = tf.concat_v2([zeros, L_flat], 1)
+                else:
+                    L_flat = tf.concat(1, [zeros, L_flat])
 
                 # Finally, process each element of the batch.
                 def fn(a, x):

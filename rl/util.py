@@ -67,7 +67,7 @@ def huber_loss(y_true, y_pred, clip_value):
     linear_loss = clip_value * (K.abs(x) - .5 * clip_value)
     if K._BACKEND == 'tensorflow':
         import tensorflow as tf
-        return tf.where(condition, squared_loss, linear_loss)  # condition, true, false
+        return tf.select(condition, squared_loss, linear_loss)  # condition, true, false
     elif K._BACKEND == 'theano':
         from theano import tensor as T
         return T.switch(condition, squared_loss, linear_loss)

@@ -3,9 +3,9 @@ dist: trusty
 language: python
 matrix:
     include:
-        - python: 3.4
+        - python: 3.5
           env: KERAS_BACKEND=theano
-        - python: 3.4
+        - python: 3.5
           env: KERAS_BACKEND=tensorflow
         - python: 2.7
           env: KERAS_BACKEND=theano
@@ -15,11 +15,11 @@ matrix:
           env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8
         - python: 2.7
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
-        - python: 3.4
+        - python: 3.5
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
         - python: 2.7
           env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
-        - python: 3.4
+        - python: 3.5
           env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
 install:
   # Adopted from https://github.com/fchollet/keras/blob/master/.travis.yml.
@@ -47,9 +47,9 @@ install:
 
   # Install TensorFlow.
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.9.0-cp27-none-linux_x86_64.whl;
-    elif [[ "$TRAVIS_PYTHON_VERSION" == "3.4" ]]; then
-      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.9.0-cp34-cp34m-linux_x86_64.whl;
+      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.12.1-cp27-none-linux_x86_64.whl;
+    elif [[ "$TRAVIS_PYTHON_VERSION" == "3.5" ]]; then
+      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.12.1-cp35-cp35m-linux_x86_64.whl;
     fi
 
   - python setup.py install

@@ -18,7 +18,7 @@ Furthermore, `keras-rl` works with [OpenAI Gym](https://gym.openai.com/) out of 
 Of course you can extend `keras-rl` according to your own needs. You can use built-in Keras callbacks and metrics or define your own.
 Even more so, it is easy to implement your own environments and even algorithms by simply extending some simple abstract classes.
 
-In a nutshell: `keras-rl` makes it really easy to run state-of-the-art deep reinforcement learning algorithms, uses Keras and thus Theano and TensorFlow and was built with OpenAI Gym in mind.
+In a nutshell: `keras-rl` makes it really easy to run state-of-the-art deep reinforcement learning algorithms, uses Keras and thus Theano or TensorFlow and was built with OpenAI Gym in mind.
 
 ## What is included?
 As of today, the following algorithms have been implemented:
@@ -76,7 +76,7 @@ You can load the weights using the `load_weights` method on the respective agent
 
 ## Requirements
 - Python 2.7
-- [Keras](http://keras.io) >= 1.0.7
+- [Keras](http://keras.io) >= 1.2.1
 
 That's it. However, if you want to run the examples, you'll also need the following dependencies:
 - [OpenAI Gym](https://github.com/openai/gym)
@@ -121,7 +121,7 @@ If you use `keras-rl` in your research, you can cite it as follows:
 
 
 ## Acknowledgments
-The foundation for this library was developed during my work at the [High Performance Humanoid Technologies (H²T)](https://h2t.anthropomatik.kit.edu/) lab at the [Karlsruhe Institute of Technologie (KIT)](https://kit.edu).
+The foundation for this library was developed during my work at the [High Performance Humanoid Technologies (H²T)](https://h2t.anthropomatik.kit.edu/) lab at the [Karlsruhe Institute of Technology (KIT)](https://kit.edu).
 It has since been adapted to become a general-purpose library.
 
 ## References

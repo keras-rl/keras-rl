@@ -40,9 +40,7 @@ Notice that these are **only experimental** and might currently not even run.
 ## How do I install it and how do I get started?
 Installing `keras-rl` is easy. Just run the following commands and you should be good to go:
 ```bash
-git clone https://github.com/matthiasplappert/keras-rl.git
-cd keras-rl
-python setup.py install
+pip install keras-rl
 ```
 This will install `keras-rl` and all necessary dependencies.
 

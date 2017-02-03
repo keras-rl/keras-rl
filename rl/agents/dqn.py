@@ -88,7 +88,7 @@ class AbstractDQNAgent(Agent):
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(AbstractDQNAgent):
-    def __init__(self, model, policy=EpsGreedyQPolicy(), enable_double_dqn=True,
+    def __init__(self, model, policy=None, enable_double_dqn=True,
                  *args, **kwargs):
         super(DQNAgent, self).__init__(*args, **kwargs)
 
@@ -103,6 +103,8 @@ class DQNAgent(AbstractDQNAgent):
 
         # Related objects.
         self.model = model
+        if policy is None:
+            policy = EpsGreedyQPolicy()
         self.policy = policy
 
         # State.

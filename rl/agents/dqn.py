@@ -5,7 +5,7 @@ import warnings
 
 import numpy as np
 import keras.backend as K
-from keras.layers import Lambda, Input, merge, Layer
+from keras.layers import Lambda, Input, merge, Layer, Dense
 from keras.models import Model
 
 from rl.core import Agent
@@ -88,8 +88,8 @@ class AbstractDQNAgent(Agent):
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(AbstractDQNAgent):
-    def __init__(self, model, policy=None, enable_double_dqn=True,
-                 *args, **kwargs):
+    def __init__(self, model, policy=None, enable_double_dqn=True, enable_dueling_network = False,
+                 dueling_type = 'avg', *args, **kwargs):
         super(DQNAgent, self).__init__(*args, **kwargs)
 
         # Validate (important) input.
@@ -100,6 +100,32 @@ class DQNAgent(AbstractDQNAgent):
 
         # Parameters.
         self.enable_double_dqn = enable_double_dqn
+        self.enable_dueling_network = enable_dueling_network
+        self.advantage = dueling_type
+        if(self.enable_dueling_network == True):
+            layer = model.layers[-1]
+            nb_action = model.output._keras_shape[-1]
+            # layer y has a shape (nb_action+1,)
+            # y[:,0] represents V(s;theta)
+            # y[:,1:] represents A(s,a;theta)
+            y = Dense(nb_action + 1, activation='relu')(layer.output)
+            # caculate the Q(s,a;theta)
+            # dueling_type == 'avg'
+            # Q(s,a;theta) = V(s;theta) + (A(s,a;theta)-Avg_a(A(s,a;theta)))
+            # dueling_type == 'max'
+            # Q(s,a;theta) = V(s;theta) + (A(s,a;theta)-max_a(A(s,a;theta)))
+            # dueling_type == 'naive'
+            # Q(s,a;theta) = V(s;theta) + A(s,a;theta)
+            if self.advantage == 'avg':
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:] - K.mean(a[:, 1:], keepdims=True),
+                           output_shape=(nb_action,))(y)
+            elif self.advantage == 'max':
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:] - K.max(a[:, 1:], keepdims=True),
+                           output_shape=(nb_action,))(y)
+            elif self.advantage == 'naive':
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:], output_shape=(nb_action,))(y)
+
+            model = Model(input=model.input, output=outputlayer)
 
         # Related objects.
         self.model = model

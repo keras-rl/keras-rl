@@ -19,13 +19,18 @@ np.random.seed(123)
 env.seed(123)
 nb_actions = env.action_space.n
 
-# Next, we build a very simple model.
+# Next, we build a very simple model regardless of the dueling architecture
+# if you enable dueling network in DQN , DQN will build a dueling network base on your model automatically
+# Also, you can build a dueling network by yourself and turn off the dueling network in DQN.
 model = Sequential()
 model.add(Flatten(input_shape=(1,) + env.observation_space.shape))
 model.add(Dense(16))
 model.add(Activation('relu'))
-model.add(Dense(nb_actions))
-model.add(Activation('linear'))
+model.add(Dense(16))
+model.add(Activation('relu'))
+model.add(Dense(16))
+model.add(Activation('relu'))
+model.add(Dense(nb_actions, activation='linear'))
 print(model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and

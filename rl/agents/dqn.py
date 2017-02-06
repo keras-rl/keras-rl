@@ -103,7 +103,8 @@ class DQNAgent(AbstractDQNAgent):
         self.enable_dueling_network = enable_dueling_network
         self.advantage = dueling_type
         if self.enable_dueling_network is True:
-            layer = model.layers[-1]
+            # get the second last layer of the model, abandon the last layer
+            layer = model.layers[-2]
             nb_action = model.output._keras_shape[-1]
             # layer y has a shape (nb_action+1,)
             # y[:,0] represents V(s;theta)
@@ -122,6 +123,8 @@ class DQNAgent(AbstractDQNAgent):
                 outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:] - K.max(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
             elif self.advantage == 'naive':
                 outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:], output_shape=(nb_action,))(y)
+            else:
+                assert False
 
             model = Model(input=model.input, output=outputlayer)
 

@@ -100,7 +100,6 @@ def test_duel_dqn():
     model.add(Activation('relu'))
     model.add(Dense(nb_actions, activation='linear'))
 
-
     memory = SequentialMemory(limit=1000, window_length=1)
     policy = EpsGreedyQPolicy(eps=.1)
     dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=50,

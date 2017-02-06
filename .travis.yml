@@ -42,15 +42,8 @@ install:
   # See https://github.com/pytest-dev/pytest-cov/issues/124 for details
   - pip install pytest-cov==2.2.1 python-coveralls coverage==3.7.1
   - pip install pep8 pytest-pep8
-  - pip install git+git://github.com/Theano/Theano.git
+  - pip install theano tensorflow
   - pip install gym
-
-  # Install TensorFlow.
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.12.1-cp27-none-linux_x86_64.whl;
-    elif [[ "$TRAVIS_PYTHON_VERSION" == "3.5" ]]; then
-      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.12.1-cp35-cp35m-linux_x86_64.whl;
-    fi
 
   - python setup.py install
 

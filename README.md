@@ -28,6 +28,7 @@ As of today, the following algorithms have been implemented:
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
 - Continuous DQN (CDQN or NAF) [[6]](http://arxiv.org/abs/1603.00748)
 - Cross-Entropy Method (CEM) [[7]](http://learning.mpi-sws.org/mlss2016/slides/2016-MLSS-RL.pdf), [[8]](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.81.6579&rep=rep1&type=pdf)
+- Dueling network DQN (Dueling DQN) [[9]](https://arxiv.org/abs/1511.06581)
 
 You can find more information on each agent in the [wiki](https://github.com/matthiasplappert/keras-rl/wiki/Agent-Overview).
 
@@ -131,6 +132,7 @@ It has since been adapted to become a general-purpose library.
 6. *Continuous Deep Q-Learning with Model-based Acceleration*, Gu et al., 2016
 7. *Learning Tetris Using the Noisy Cross-Entropy Method*, Szita et al., 2006
 8. *Deep Reinforcement Learning (MLSS lecture notes)*, John Schulman, 2016.
+9. *Dueling Network Architectures for Deep Reinforcement Learning*, Ziyu Wang et al., 2016.
 
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.

@@ -40,7 +40,7 @@ def test_cdqn():
     x = merge([action_input, Flatten()(observation_input)], mode='concat')
     x = Dense(16)(x)
     x = Activation('relu')(x)
-    x = Dense(((nb_actions * nb_actions + nb_actions) / 2))(x)
+    x = Dense(((nb_actions * nb_actions + nb_actions) // 2))(x)
     x = Activation('linear')(x)
     L_model = Model(input=[action_input, observation_input], output=x)
 

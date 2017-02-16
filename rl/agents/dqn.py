@@ -369,7 +369,7 @@ class NAFLayer(Layer):
             # Create L and L^T matrix, which we use to construct the positive-definite matrix P.
             L = None
             LT = None
-            if K._BACKEND == 'theano':
+            if K.backend() == 'theano':
                 import theano.tensor as T
                 import theano
 
@@ -386,7 +386,7 @@ class NAFLayer(Layer):
                 ]
                 results, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
                 L, LT = results
-            elif K._BACKEND == 'tensorflow':
+            elif K.backend() == 'tensorflow':
                 import tensorflow as tf
 
                 # Number of elements in a triangular matrix.
@@ -444,12 +444,12 @@ class NAFLayer(Layer):
                     L = tmp[:, 0, :, :]
                     LT = tmp[:, 1, :, :]
             else:
-                raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
+                raise RuntimeError('Unknown Keras backend "{}".'.format(K.backend()))
             assert L is not None
             assert LT is not None
             P = K.batch_dot(L, LT)
         elif self.mode == 'diag':
-            if K._BACKEND == 'theano':
+            if K.backend() == 'theano':
                 import theano.tensor as T
                 import theano
 
@@ -462,7 +462,7 @@ class NAFLayer(Layer):
                     K.zeros((self.nb_actions, self.nb_actions)),
                 ]
                 P, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
-            elif K._BACKEND == 'tensorflow':
+            elif K.backend() == 'tensorflow':
                 import tensorflow as tf
 
                 # Create mask that can be used to gather elements from L_flat and put them
@@ -488,7 +488,7 @@ class NAFLayer(Layer):
 
                 P = tf.scan(fn, L_flat, initializer=K.zeros((self.nb_actions, self.nb_actions)))
             else:
-                raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
+                raise RuntimeError('Unknown Keras backend "{}".'.format(K.backend()))
         assert P is not None
         assert K.ndim(P) == 3
 

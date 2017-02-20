@@ -140,6 +140,7 @@ class DQNAgent(AbstractDQNAgent):
     def get_config(self):
         config = super(DQNAgent, self).get_config()
         config['enable_double_dqn'] = self.enable_double_dqn
+        config['enable_dueling_network'] = self.enable_dueling_network
         config['model'] = get_object_config(self.model)
         config['policy'] = get_object_config(self.policy)
         if self.compiled:

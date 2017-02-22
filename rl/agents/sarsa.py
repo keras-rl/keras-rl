@@ -294,7 +294,6 @@ class Sarsa(DQNAgent):
             assert terminal1_batch.shape == reward_batch.shape
             assert len(action_batch) == len(reward_batch)
 
-
             batch = self.process_state_batch(state1_batch)
             # assert batch is not None
             # print batch
@@ -361,11 +360,18 @@ class Sarsa(DQNAgent):
         history = History()
         callbacks += [history]
         callbacks = CallbackList(callbacks)
-        callbacks._set_model(self)
+        if hasattr(callbacks, 'set_model'):
+            callbacks.set_model(self)
+        else:
+            callbacks._set_model(self)
         callbacks._set_env(env)
-        callbacks._set_params({
+        params = {
             'nb_episodes': nb_episodes,
-        })
+        }
+        if hasattr(callbacks, 'set_params'):
+            callbacks.set_params(params)
+        else:
+            callbacks._set_params(params)
 
         self._on_test_begin()
         callbacks.on_train_begin()

@@ -130,7 +130,7 @@ def test_sarsa():
     sarsa = Sarsa(model=model, nb_actions=nb_actions, memory=None, nb_steps_warmup=50, policy=policy)
     sarsa.compile(Adam(lr=1e-3))
 
-    sarsa.fit(env, nb_steps=2000, visualize=False, verbose=0)
+    sarsa.fit(env, nb_steps=20000, visualize=False, verbose=0)
     policy.eps = 0.
     h = sarsa.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)

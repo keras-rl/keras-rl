@@ -8,7 +8,7 @@ from keras.callbacks import History
 from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Visualizer, CallbackList
 from rl.agents.dqn import mean_q
 from rl.util import huber_loss
-from keras.layers import Dense, Input, Lambda
+from keras.layers import Input, Lambda
 from keras.models import Model
 import keras.backend as K
 
@@ -94,9 +94,7 @@ class Sarsa(DQNAgent):
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
             nb_max_episode_steps=None):
         if not self.compiled:
-            raise RuntimeError(
-                'Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
-
+            raise RuntimeError('Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
@@ -113,11 +111,18 @@ class Sarsa(DQNAgent):
         history = History()
         callbacks += [history]
         callbacks = CallbackList(callbacks)
-        callbacks._set_model(self)
+        if hasattr(callbacks, 'set_model'):
+            callbacks.set_model(self)
+        else:
+            callbacks._set_model(self)
         callbacks._set_env(env)
-        callbacks._set_params({
+        params = {
             'nb_steps': nb_steps,
-        })
+        }
+        if hasattr(callbacks, 'set_params'):
+            callbacks.set_params(params)
+        else:
+            callbacks._set_params(params)
         self._on_train_begin()
         callbacks.on_train_begin()
 

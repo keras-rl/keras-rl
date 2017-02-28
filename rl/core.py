@@ -80,6 +80,8 @@ class Agent(object):
                             action = env.action_space.sample()
                         else:
                             action = start_step_policy(observation)
+                        if self.processor is not None:
+                            action = self.processor.process_action(action)
                         callbacks.on_action_begin(action)
                         observation, reward, done, info = env.step(action)
                         observation = deepcopy(observation)
@@ -103,6 +105,8 @@ class Agent(object):
                 # This is were all of the work happens. We first perceive and compute the action
                 # (forward step) and then use the reward to improve (backward step).
                 action = self.forward(observation)
+                if self.processor is not None:
+                    action = self.processor.process_action(action)
                 reward = 0.
                 accumulated_info = {}
                 done = False
@@ -231,6 +235,8 @@ class Agent(object):
                     action = env.action_space.sample()
                 else:
                     action = start_step_policy(observation)
+                if self.processor is not None:
+                    action = self.processor.process_action(action)
                 callbacks.on_action_begin(action)
                 observation, r, done, info = env.step(action)
                 observation = deepcopy(observation)
@@ -250,6 +256,8 @@ class Agent(object):
                 callbacks.on_step_begin(episode_step)
 
                 action = self.forward(observation)
+                if self.processor is not None:
+                    action = self.processor.process_action(action)
                 reward = 0.
                 accumulated_info = {}
                 for _ in range(action_repetition):

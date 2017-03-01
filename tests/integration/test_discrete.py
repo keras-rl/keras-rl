@@ -127,7 +127,7 @@ def test_sarsa():
     model.add(Dense(nb_actions, activation='linear'))
 
     policy = EpsGreedyQPolicy(eps=.1)
-    sarsa = Sarsa(model=model, nb_actions=nb_actions, memory=None, nb_steps_warmup=50, policy=policy)
+    sarsa = Sarsa(model=model, nb_actions=nb_actions, nb_steps_warmup=50, policy=policy)
     sarsa.compile(Adam(lr=1e-3))
 
     sarsa.fit(env, nb_steps=20000, visualize=False, verbose=0)

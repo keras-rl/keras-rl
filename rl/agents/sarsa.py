@@ -1,4 +1,4 @@
-from rl.agents.dqn import DQNAgent
+from rl.core import Agent
 import warnings
 from copy import deepcopy
 
@@ -11,15 +11,55 @@ from rl.util import huber_loss
 from keras.layers import Input, Lambda
 from keras.models import Model
 import keras.backend as K
+from rl.policy import EpsGreedyQPolicy
 
 
-class Sarsa(DQNAgent):
-    def __init__(self, model, *args, **kwargs):
-        super(Sarsa, self).__init__(model, *args, **kwargs)
+class Sarsa(Agent):
+    def __init__(self, model, nb_actions, policy=EpsGreedyQPolicy(), gamma=.99, nb_steps_warmup=10,
+                 train_interval=1, delta_range=None, delta_clip=np.inf, *args, **kwargs):
+        super(Sarsa, self).__init__(*args, **kwargs)
 
         self.state0 = None
         self.action0 = None
         self.next_action = None
+        self.model = model
+        self.nb_actions = nb_actions
+        self.policy = policy
+        self.gamma = gamma
+        self.nb_steps_warmup = nb_steps_warmup
+        self.train_interval = train_interval
+        if delta_range is not None:
+            warnings.warn('`delta_range` is deprecated. Please use `delta_clip` instead, which takes a single scalar. For now we\'re falling back to `delta_range[1] = {}`'.format(delta_range[1]))
+            delta_clip = delta_range[1]
+
+        self.delta_clip = delta_clip
+        self.compiled = False
+
+    def compute_batch_q_values(self, state_batch):
+        batch = self.process_state_batch(state_batch)
+        q_values = self.model.predict_on_batch(batch)
+        assert q_values.shape == (len(state_batch), self.nb_actions)
+        return q_values
+
+    def compute_q_values(self, state):
+        q_values = self.compute_batch_q_values([state]).flatten()
+        assert q_values.shape == (self.nb_actions,)
+        return q_values
+
+    def process_state_batch(self, batch):
+        batch = np.array(batch)
+        if self.processor is None:
+            return batch
+        return self.processor.process_state_batch(batch)
+
+    def get_config(self):
+        return {
+            'nb_actions': self.nb_actions,
+            'gamma': self.gamma,
+            'nb_steps_warmup': self.nb_steps_warmup,
+            'train_interval': self.train_interval,
+            'delta_clip': self.delta_clip,
+        }
 
     def compile(self, optimizer, metrics=[]):
         metrics += [mean_q]  # register default metrics

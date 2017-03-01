@@ -32,7 +32,7 @@ print(model.summary())
 
 # Sarsa.py in rl.agent update every experience on policy, memory is not used.
 policy = BoltzmannQPolicy()
-sarsa = Sarsa(model=model, nb_actions=nb_actions, memory=None, nb_steps_warmup=10, policy=policy)
+sarsa = Sarsa(model=model, nb_actions=nb_actions, nb_steps_warmup=10, policy=policy)
 sarsa.compile(Adam(lr=1e-3), metrics=['mae'])
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this

@@ -19,25 +19,10 @@ class Sarsa(DQNAgent):
 
         self.state0 = None
         self.action0 = None
-        self.nextAction = None
+        self.next_action = None
 
     def compile(self, optimizer, metrics=[]):
         metrics += [mean_q]  # register default metrics
-
-        """
-        # there is no need of target model in SARSA Algorithm
-        # update target model will reduce the efficiency of training process
-
-        self.target_model = clone_model(self.model, self.custom_model_objects)
-        self.target_model.compile(optimizer='sgd', loss='mse')
-        self.model.compile(optimizer='sgd', loss='mse')
-
-        if self.target_model_update < 1.:
-            # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
-            updates = get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
-            optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
-
-        """
 
         def clipped_masked_error(args):
             y_true, y_pred, mask = args
@@ -68,27 +53,13 @@ class Sarsa(DQNAgent):
 
     def load_weights(self, filepath):
         self.model.load_weights(filepath)
-        """
-        # there is no need of target model in SARSA Algorithm
-        self.update_target_model_hard()
-        """
 
     def save_weights(self, filepath, overwrite=False):
         self.model.save_weights(filepath, overwrite=overwrite)
 
     def reset_states(self):
-        self.recent_action = None
-        self.recent_observation = None
         if self.compiled:
             self.model.reset_states()
-
-            """
-            # there is no need of target model in SARSA Algorithm
-            self.target_model.reset_states()
-            """
-
-    def update_target_model_hard(self):
-        assert False, 'target model is disabled in SARSA'
 
     def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
@@ -234,7 +205,7 @@ class Sarsa(DQNAgent):
                     callbacks.on_episode_end(episode, episode_logs)
 
                     episode += 1
-                    self.nextAction = None
+                    self.next_action = None
                     observation = None
                     episode_step = None
                     episode_reward = None
@@ -250,7 +221,7 @@ class Sarsa(DQNAgent):
 
     def forward(self, observation):
         # on policy algorithms follow the next action calculated in update formula in backward method
-        if self.nextAction is None:
+        if self.next_action is None:
             q_values = self.compute_q_values([observation])
             action = self.policy.select_action(q_values=q_values)
             if self.processor is not None:
@@ -264,8 +235,8 @@ class Sarsa(DQNAgent):
         else:
             # SARSA needs to know (State0, Action0)
             self.state0 = observation
-            self.action0 = self.nextAction
-            return self.nextAction
+            self.action0 = self.next_action
+            return self.next_action
 
     def backward(self, reward, observation, terminal):
 
@@ -304,7 +275,7 @@ class Sarsa(DQNAgent):
             if self.processor is not None:
                 action = self.processor.process_action(action)
 
-            self.nextAction = action[0]
+            self.next_action = action[0]
             q_batch = q_values[0, action]
 
             assert q_batch.shape == (1,)
@@ -349,7 +320,7 @@ class Sarsa(DQNAgent):
 
         self.training = False
         self.step = 0
-        self.nextAction = None
+        self.next_action = None
 
         callbacks = [] if not callbacks else callbacks[:]
 

@@ -193,5 +193,4 @@ class Sarsa(Agent):
             metrics += self.policy.metrics
             if self.processor is not None:
                 metrics += self.processor.metrics
-
         return metrics

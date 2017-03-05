@@ -42,7 +42,7 @@ class AtariProcessor(Processor):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', choices=['train', 'test'], default='train')
-parser.add_argument('--env-name', type=str, default='Breakout-v0')
+parser.add_argument('--env-name', type=str, default='BreakoutDeterministic-v3')
 parser.add_argument('--weights', type=str, default=None)
 args = parser.parse_args()
 
@@ -51,20 +51,6 @@ env = gym.make(args.env_name)
 np.random.seed(123)
 env.seed(123)
 nb_actions = env.action_space.n
-
-# We patch the environment to be closer to what Mnih et al. actually do: The environment
-# repeats the action 4 times and a game is considered to be over during training as soon as a live
-# is lost.
-def _step(a):
-    reward = 0.0
-    action = env._action_set[a]
-    lives_before = env.ale.lives()
-    for _ in range(4):
-        reward += env.ale.act(action)
-    ob = env._get_obs()
-    done = env.ale.game_over() or (args.mode == 'train' and lives_before != env.ale.lives())
-    return ob, reward, done, {}
-env._step = _step
 
 # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
 input_shape = (WINDOW_LENGTH,) + INPUT_SHAPE

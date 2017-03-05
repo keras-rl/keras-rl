@@ -54,23 +54,23 @@ class Agent(object):
 
         episode = 0
         self.step = 0
-        self.observation = None
+        observation = None
         episode_reward = None
         episode_step = None
         did_abort = False
         try:
             while self.step < nb_steps:
-                if self.observation is None:  # start of a new episode
+                if observation is None:  # start of a new episode
                     callbacks.on_episode_begin(episode)
                     episode_step = 0
                     episode_reward = 0.
 
                     # Obtain the initial observation by resetting the environment.
                     self.reset_states()
-                    self.observation = deepcopy(env.reset())
+                    observation = deepcopy(env.reset())
                     if self.processor is not None:
-                        self.observation = self.processor.process_observation(self.observation)
-                    assert self.observation is not None
+                        observation = self.processor.process_observation(observation)
+                    assert observation is not None
 
                     # Perform random starts at beginning of episode and do not record them into the experience.
                     # This slightly changes the start position between games.
@@ -79,46 +79,43 @@ class Agent(object):
                         if start_step_policy is None:
                             action = env.action_space.sample()
                         else:
-                            action = start_step_policy(self.observation)
+                            action = start_step_policy(observation)
                         if self.processor is not None:
                             action = self.processor.process_action(action)
-
                         callbacks.on_action_begin(action)
-                        self.observation, reward, done, info = env.step(action)
-                        self.observation = deepcopy(self.observation)
+                        observation, reward, done, info = env.step(action)
+                        observation = deepcopy(observation)
                         if self.processor is not None:
-                            self.observation, reward, done, info = self.processor.process_step(self.observation, reward, done, info)
+                            observation, reward, done, info = self.processor.process_step(observation, reward, done, info)
                         callbacks.on_action_end(action)
                         if done:
                             warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(nb_random_start_steps))
-                            self.observation = deepcopy(env.reset())
+                            observation = deepcopy(env.reset())
                             if self.processor is not None:
-                                self.observation = self.processor.process_observation(self.observation)
+                                observation = self.processor.process_observation(observation)
                             break
 
                 # At this point, we expect to be fully initialized.
                 assert episode_reward is not None
                 assert episode_step is not None
-                assert self.observation is not None
+                assert observation is not None
 
                 # Run a single step.
                 callbacks.on_step_begin(episode_step)
                 # This is were all of the work happens. We first perceive and compute the action
                 # (forward step) and then use the reward to improve (backward step).
-
-                action = self.forward(self.observation)
+                action = self.forward(observation)
                 if self.processor is not None:
                     action = self.processor.process_action(action)
-
                 reward = 0.
                 accumulated_info = {}
                 done = False
                 for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
-                    self.observation, r, done, info = env.step(action)
-                    self.observation = deepcopy(self.observation)
+                    observation, r, done, info = env.step(action)
+                    observation = deepcopy(observation)
                     if self.processor is not None:
-                        self.observation, r, done, info = self.processor.process_step(self.observation, r, done, info)
+                        observation, r, done, info = self.processor.process_step(observation, r, done, info)
                     for key, value in info.items():
                         if not np.isreal(value):
                             continue
@@ -137,7 +134,7 @@ class Agent(object):
 
                 step_logs = {
                     'action': action,
-                    'observation': self.observation,
+                    'observation': observation,
                     'reward': reward,
                     'metrics': metrics,
                     'episode': episode,
@@ -153,7 +150,8 @@ class Agent(object):
                     # resetting the environment. We need to pass in `terminal=False` here since
                     # the *next* state, that is the state of the newly reset environment, is
                     # always non-terminal by convention.
-                    self.clean_on_eposide_end()
+                    self.forward(observation)
+                    self.backward(0., terminal=False)
 
                     # This episode is finished, report and reset.
                     episode_logs = {
@@ -164,7 +162,7 @@ class Agent(object):
                     callbacks.on_episode_end(episode, episode_logs)
 
                     episode += 1
-                    self.observation = None
+                    observation = None
                     episode_step = None
                     episode_reward = None
         except KeyboardInterrupt:
@@ -224,10 +222,10 @@ class Agent(object):
 
             # Obtain the initial observation by resetting the environment.
             self.reset_states()
-            self.observation = deepcopy(env.reset())
+            observation = deepcopy(env.reset())
             if self.processor is not None:
-                self.observation = self.processor.process_observation(self.observation)
-            assert self.observation is not None
+                observation = self.processor.process_observation(observation)
+            assert observation is not None
 
             # Perform random starts at beginning of episode and do not record them into the experience.
             # This slightly changes the start position between games.
@@ -236,37 +234,38 @@ class Agent(object):
                 if start_step_policy is None:
                     action = env.action_space.sample()
                 else:
-                    action = start_step_policy(self.observation)
+                    action = start_step_policy(observation)
                 if self.processor is not None:
                     action = self.processor.process_action(action)
                 callbacks.on_action_begin(action)
-                self.observation, r, done, info = env.step(action)
-                self.observation = deepcopy(self.observation)
+                observation, r, done, info = env.step(action)
+                observation = deepcopy(observation)
                 if self.processor is not None:
-                    self.observation, r, done, info = self.processor.process_step(self.observation, r, done, info)
+                    observation, r, done, info = self.processor.process_step(observation, r, done, info)
                 callbacks.on_action_end(action)
                 if done:
                     warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(nb_random_start_steps))
-                    self.observation = deepcopy(env.reset())
+                    observation = deepcopy(env.reset())
                     if self.processor is not None:
-                        self.observation = self.processor.process_observation(self.observation)
+                        observation = self.processor.process_observation(observation)
                     break
 
             # Run the episode until we're done.
             done = False
             while not done:
                 callbacks.on_step_begin(episode_step)
-                action = self.forward(self.observation)
+
+                action = self.forward(observation)
                 if self.processor is not None:
                     action = self.processor.process_action(action)
                 reward = 0.
                 accumulated_info = {}
                 for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
-                    self.observation, r, d, info = env.step(action)
-                    self.observation = deepcopy(self.observation)
+                    observation, r, d, info = env.step(action)
+                    observation = deepcopy(observation)
                     if self.processor is not None:
-                        self.observation, r, d, info = self.processor.process_step(self.observation, r, d, info)
+                        observation, r, d, info = self.processor.process_step(observation, r, d, info)
                     callbacks.on_action_end(action)
                     reward += r
                     for key, value in info.items():
@@ -285,7 +284,7 @@ class Agent(object):
 
                 step_logs = {
                     'action': action,
-                    'observation': self.observation,
+                    'observation': observation,
                     'reward': reward,
                     'episode': episode,
                     'info': accumulated_info,
@@ -299,7 +298,8 @@ class Agent(object):
             # resetting the environment. We need to pass in `terminal=False` here since
             # the *next* state, that is the state of the newly reset environment, is
             # always non-terminal by convention.
-            self.clean_on_eposide_end()
+            self.forward(observation)
+            self.backward(0., terminal=False)
 
             # Report end of episode.
             episode_logs = {
@@ -335,10 +335,6 @@ class Agent(object):
 
     def save_weights(self, filepath, overwrite=False):
         raise NotImplementedError()
-
-    def clean_on_eposide_end(self):
-        self.forward(self.observation)
-        self.backward(0., terminal=False)
 
     @property
     def metrics_names(self):

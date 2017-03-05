@@ -5,7 +5,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten
 from keras.optimizers import Adam
 
-from rl.agents.sarsa import Sarsa
+from rl.agents.sarsa import SarsaAgent
 from rl.policy import BoltzmannQPolicy
 
 
@@ -32,13 +32,13 @@ print(model.summary())
 
 # Sarsa.py in rl.agent update every experience on policy, memory is not used.
 policy = BoltzmannQPolicy()
-sarsa = Sarsa(model=model, nb_actions=nb_actions, nb_steps_warmup=10, policy=policy)
+sarsa = SarsaAgent(model=model, nb_actions=nb_actions, nb_steps_warmup=10, policy=policy)
 sarsa.compile(Adam(lr=1e-3), metrics=['mae'])
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this
 # slows down training quite a lot. You can always safely abort the training prematurely using
 # Ctrl + C.
-sarsa.fit(env, nb_steps=50000, visualize=False, verbose=2)
+sarsa.fit(env, nb_steps=5000, visualize=False, verbose=2)
 
 # After training is done, we save the final weights.
 sarsa.save_weights('sarsa_{}_weights.h5f'.format(ENV_NAME), overwrite=True)

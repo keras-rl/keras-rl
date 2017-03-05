@@ -1,7 +1,7 @@
 from rl.core import Agent
 import warnings
 from copy import deepcopy
-
+import collections
 import numpy as np
 from keras.callbacks import History
 
@@ -15,26 +15,26 @@ from rl.policy import EpsGreedyQPolicy
 from rl.util import get_object_config
 
 
-class Sarsa(Agent):
-    def __init__(self, model, nb_actions, policy=EpsGreedyQPolicy(), gamma=.99, nb_steps_warmup=10,
-                 train_interval=1, delta_range=None, delta_clip=np.inf, *args, **kwargs):
-        super(Sarsa, self).__init__(*args, **kwargs)
+class SarsaAgent(Agent):
+    def __init__(self, model, nb_actions, policy=None, gamma=.99, nb_steps_warmup=10,
+                 train_interval=1, delta_clip=np.inf, *args, **kwargs):
+        super(SarsaAgent, self).__init__(*args, **kwargs)
 
-        self.state0 = None
-        self.action0 = None
-        self.next_action = None
         self.model = model
         self.nb_actions = nb_actions
-        self.policy = policy
+        if policy is None:
+            self.policy = EpsGreedyQPolicy()
+        else:
+            self.policy = policy
         self.gamma = gamma
         self.nb_steps_warmup = nb_steps_warmup
         self.train_interval = train_interval
-        if delta_range is not None:
-            warnings.warn('`delta_range` is deprecated. Please use `delta_clip` instead, which takes a single scalar. For now we\'re falling back to `delta_range[1] = {}`'.format(delta_range[1]))
-            delta_clip = delta_range[1]
 
         self.delta_clip = delta_clip
         self.compiled = False
+        self.actions = None
+        self.observations = None
+        self.rewards = None
 
     def compute_batch_q_values(self, state_batch):
         batch = self.process_state_batch(state_batch)
@@ -54,7 +54,7 @@ class Sarsa(Agent):
         return self.processor.process_state_batch(batch)
 
     def get_config(self):
-        config = super(Sarsa, self).get_config()
+        config = super(SarsaAgent, self).get_config()
         config['nb_actions'] = self.nb_actions
         config['gamma'] = self.gamma
         config['nb_steps_warmup'] = self.nb_steps_warmup
@@ -101,30 +101,29 @@ class Sarsa(Agent):
         self.model.save_weights(filepath, overwrite=overwrite)
 
     def reset_states(self):
+        # the other stuff as well + the 3 lines
+        self.actions = collections.deque(maxlen=2)
+        self.observations = collections.deque(maxlen=2)
+        self.rewards = collections.deque(maxlen=2)
         if self.compiled:
             self.model.reset_states()
 
-    def clean_on_eposide_end(self):
-        self.next_action = None
-
     def forward(self, observation):
-        # on policy algorithms follow the next action calculated in update formula in backward method
-        if self.next_action is None or self.training is False:
+        self.observations.append(observation)
+        if self.training is True:
             q_values = self.compute_q_values([observation])
             action = self.policy.select_action(q_values=q_values)
             if self.processor is not None:
                 action = self.processor.process_action(action)
-
-            # SARSA needs to know (State0, Action0)
-            self.state0 = observation
-            self.action0 = action
-
+            self.actions.append(action)
             return action
         else:
-            # SARSA needs to know (State0, Action0)
-            self.state0 = observation
-            self.action0 = self.next_action
-            return self.next_action
+            q_values = self.compute_q_values([observation])
+            action = np.argmax(q_values)
+            if self.processor is not None:
+                action = self.processor.process_action(action)
+            self.actions.append(action)
+            return action
 
     def backward(self, reward, terminal):
         metrics = [np.nan for _ in self.metrics_names]
@@ -137,11 +136,16 @@ class Sarsa(Agent):
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
 
             # Start by extracting the necessary parameters (we use a vectorized implementation).
-            state0_batch = [self.state0]
-            reward_batch = [reward]
-            action_batch = [self.action0]
+            self.rewards.append(reward)
+            if len(self.observations) < 2:
+                return  # not enough data yet
+
+            state0_batch = [self.observations[0]]
+            reward_batch = [self.rewards[0]]
+            action_batch = [self.actions[0]]
             terminal1_batch = [0.] if terminal else [1.]
-            state1_batch = [self.observation]
+            state1_batch = [self.observations[1]]
+            action1_batch = [self.actions[1]]
 
             # Prepare and validate parameters.
             state0_batch = self.process_state_batch(state0_batch)
@@ -153,17 +157,10 @@ class Sarsa(Agent):
             assert len(action_batch) == len(reward_batch)
 
             batch = self.process_state_batch(state1_batch)
-            # assert batch is not None
-            # print batch
             q_values = self.compute_q_values(batch)
             q_values = q_values.reshape((1, self.nb_actions))
 
-            action = [self.policy.select_action(q_values=q_values[0, :])]
-            if self.processor is not None:
-                action = self.processor.process_action(action)
-
-            self.next_action = action[0]
-            q_batch = q_values[0, action]
+            q_batch = q_values[0, action1_batch]
 
             assert q_batch.shape == (1,)
             targets = np.zeros((1, self.nb_actions))

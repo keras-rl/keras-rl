@@ -582,8 +582,7 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         mu_out = self.mu_model(os_in)
         A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)(merge([L_out, mu_out, a_in], mode='concat'))
         A_out_shape = A_out._keras_shape
-        V_out = Lambda(lambda x: K.repeat_elements(x, A_out_shape[1], axis=1),
-            output_shape=(A_out_shape[1],))(V_out)
+        V_out = Lambda(lambda x: K.repeat_elements(x, A_out_shape[1], axis=1), output_shape=(A_out_shape[1],))(V_out)
         combined_out = merge([A_out, V_out], mode='sum')
         combined = Model(input=[a_in] + os_in, output=combined_out)
 

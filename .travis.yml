@@ -12,6 +12,8 @@ matrix:
         - python: 2.7
           env: KERAS_BACKEND=tensorflow
         - python: 2.7
+          env: KERAS_BACKEND=tensorflow LEGACY_KERAS=1
+        - python: 2.7
           env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8
         - python: 2.7
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
@@ -44,6 +46,11 @@ install:
   - pip install pep8 pytest-pep8
   - pip install theano tensorflow
   - pip install gym
+  - if [[ "$LEGACY_KERAS" == "1" ]]; then
+      pip install keras==1.2.2
+    else
+      pip install keras
+    fi
 
   - python setup.py install
 
@@ -55,11 +62,11 @@ script:
   - sed -i -e 's/"backend":[[:space:]]*"[^"]*/"backend":\ "'$KERAS_BACKEND'/g' ~/.keras/keras.json;
   - echo -e "Running tests with the following config:\n$(cat ~/.keras/keras.json)"
   - if [[ "$TEST_MODE" == "INTEGRATION" ]]; then
-       PYTHONPATH=$PWD:$PYTHONPATH py.test tests/integration;
+      PYTHONPATH=$PWD:$PYTHONPATH py.test tests/integration;
     elif [[ "$TEST_MODE" == "PEP8" ]]; then
-       PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8 -m pep8 -n0;
+      PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8 -m pep8 -n0;
     else
-       PYTHONPATH=$PWD:$PYTHONPATH py.test tests/;
+      PYTHONPATH=$PWD:$PYTHONPATH py.test tests/;
     fi
 after_success:
   - coveralls

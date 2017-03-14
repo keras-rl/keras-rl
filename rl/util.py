@@ -2,7 +2,6 @@ import numpy as np
 
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
-from keras.optimizers import optimizer_from_config, get
 import keras.backend as K
 
 
@@ -19,14 +18,18 @@ def clone_model(model, custom_objects={}):
 
 def clone_optimizer(optimizer):
     if type(optimizer) is str:
-        return get(optimizer)
+        return optimizers.get(optimizer)
     # Requires Keras 1.0.7 since get_config has breaking changes.
     params = dict([(k, v) for k, v in optimizer.get_config().items()])
     config = {
         'class_name': optimizer.__class__.__name__,
         'config': params,
     }
-    clone = optimizer_from_config(config)
+    if hasattr(optimizers, 'optimizer_from_config'):
+        # COMPATIBILITY: Keras < 2.0
+        clone = optimizers.optimizer_from_config(config)
+    else:
+        clone = optimizers.deserialize(config)
     return clone
 
 

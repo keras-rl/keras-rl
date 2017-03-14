@@ -118,11 +118,11 @@ class DQNAgent(AbstractDQNAgent):
             # dueling_type == 'naive'
             # Q(s,a;theta) = V(s;theta) + A(s,a;theta)
             if self.dueling_type == 'avg':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:] - K.mean(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.mean(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
             elif self.dueling_type == 'max':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:] - K.max(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.max(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
             elif self.dueling_type == 'naive':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:], output_shape=(nb_action,))(y)
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:], output_shape=(nb_action,))(y)
             else:
                 assert False, "dueling_type must be one of {'avg','max','naive'}"
 
@@ -499,8 +499,8 @@ class NAFLayer(Layer):
         # TensorFlow handles vector * P slightly suboptimal, hence we convert the vectors to
         # 1xd/dx1 matrices and finally flatten the resulting 1x1 matrix into a scalar. All
         # operations happen over the batch size, which is dimension 0.
-        prod = K.batch_dot(K.expand_dims(a - mu, dim=1), P)
-        prod = K.batch_dot(prod, K.expand_dims(a - mu, dim=-1))
+        prod = K.batch_dot(K.expand_dims(a - mu, 1), P)
+        prod = K.batch_dot(prod, K.expand_dims(a - mu, -1))
         A = -.5 * K.batch_flatten(prod)
         assert K.ndim(A) == 2
         return A
@@ -578,8 +578,11 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         os_in = [Input(shape=shape, name='observation_input_{}'.format(idx)) for idx, shape in enumerate(observation_shapes)]
         L_out = self.L_model([a_in] + os_in)
         V_out = self.V_model(os_in)
+
         mu_out = self.mu_model(os_in)
         A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)(merge([L_out, mu_out, a_in], mode='concat'))
+        A_out_shape = A_out._keras_shape
+        V_out = Lambda(lambda x: K.repeat_elements(x, A_out_shape[1], axis=1), output_shape=(A_out_shape[1],))(V_out)
         combined_out = merge([A_out, V_out], mode='sum')
         combined = Model(input=[a_in] + os_in, output=combined_out)
 

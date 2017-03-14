@@ -44,7 +44,8 @@ install:
   # See https://github.com/pytest-dev/pytest-cov/issues/124 for details
   - pip install pytest-cov==2.2.1 python-coveralls coverage==3.7.1
   - pip install pep8 pytest-pep8
-  - pip install theano tensorflow
+  - pip install tensorflow
+  - pip install theano>=0.9.0rc1
   - pip install gym
   - if [[ "$LEGACY_KERAS" == "1" ]]; then
       pip install keras==1.2.2;

@@ -27,7 +27,7 @@ def clone_optimizer(optimizer):
     }
     if hasattr(optimizers, 'optimizer_from_config'):
         # COMPATIBILITY: Keras < 2.0
-        clone = optimizer_from_config(config)
+        clone = optimizers.optimizer_from_config(config)
     else:
         clone = optimizers.deserialize(config)
     return clone

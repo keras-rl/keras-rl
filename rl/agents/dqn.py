@@ -585,7 +585,7 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         V_out = Lambda(lambda x: K.repeat_elements(x, A_out_shape[1], axis=1),
             output_shape=(A_out_shape[1],))(V_out)
         combined_out = merge([A_out, V_out], mode='sum')
-        combined = Model(inputs=[a_in] + os_in, outputs=combined_out)
+        combined = Model(input=[a_in] + os_in, output=combined_out)
 
         # Compile combined model.
         if self.target_model_update < 1.:

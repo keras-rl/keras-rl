@@ -1,16 +1,13 @@
 from __future__ import division
-from collections import deque
-from copy import deepcopy
 import warnings
 
-import numpy as np
 import keras.backend as K
-from keras.layers import Lambda, Input, merge, Layer, Dense
-from keras.models import Model
+from keras.layers import Lambda, Input, Layer, Dense
 
 from rl.core import Agent
 from rl.policy import EpsGreedyQPolicy, GreedyQPolicy
 from rl.util import *
+from rl.keras_future import Model
 
 
 def mean_q(y_true, y_pred):
@@ -118,11 +115,11 @@ class DQNAgent(AbstractDQNAgent):
             # dueling_type == 'naive'
             # Q(s,a;theta) = V(s;theta) + A(s,a;theta)
             if self.dueling_type == 'avg':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:] - K.mean(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.mean(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
             elif self.dueling_type == 'max':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:] - K.max(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.max(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
             elif self.dueling_type == 'naive':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], dim=-1) + a[:, 1:], output_shape=(nb_action,))(y)
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:], output_shape=(nb_action,))(y)
             else:
                 assert False, "dueling_type must be one of {'avg','max','naive'}"
 
@@ -367,22 +364,10 @@ class NAFLayer(Layer):
     def call(self, x, mask=None):
         # TODO: validate input shape
 
-        # The input of this layer is [L, mu, a] in concatenated form. We first split
-        # those up.
-        idx = 0
-        if self.mode == 'full':
-            L_flat = x[:, idx:idx + (self.nb_actions * self.nb_actions + self.nb_actions) // 2]
-            idx += (self.nb_actions * self.nb_actions + self.nb_actions) // 2
-        elif self.mode == 'diag':
-            L_flat = x[:, idx:idx + self.nb_actions]
-            idx += self.nb_actions
-        else:
-            L_flat = None
-        assert L_flat is not None
-        mu = x[:, idx:idx + self.nb_actions]
-        idx += self.nb_actions
-        a = x[:, idx:idx + self.nb_actions]
-        idx += self.nb_actions
+        assert (len(x) == 3)
+        L_flat = x[0]
+        mu = x[1]
+        a = x[2]
 
         if self.mode == 'full':
             # Create L and L^T matrix, which we use to construct the positive-definite matrix P.
@@ -395,7 +380,7 @@ class NAFLayer(Layer):
                 def fn(x, L_acc, LT_acc):
                     x_ = K.zeros((self.nb_actions, self.nb_actions))
                     x_ = T.set_subtensor(x_[np.tril_indices(self.nb_actions)], x)
-                    diag = K.exp(T.diag(x_) + K.epsilon())
+                    diag = K.exp(T.diag(x_)) + K.epsilon()
                     x_ = T.set_subtensor(x_[np.diag_indices(self.nb_actions)], diag)
                     return x_, x_.T
 
@@ -445,7 +430,7 @@ class NAFLayer(Layer):
                 def fn(a, x):
                     # Exponentiate everything. This is much easier than only exponentiating
                     # the diagonal elements, and, usually, the action space is relatively low.
-                    x_ = K.exp(x + K.epsilon())
+                    x_ = K.exp(x) + K.epsilon()
                     # Only keep the diagonal elements.
                     x_ *= diag_mask
                     # Add the original, non-diagonal elements.
@@ -516,29 +501,38 @@ class NAFLayer(Layer):
         # TensorFlow handles vector * P slightly suboptimal, hence we convert the vectors to
         # 1xd/dx1 matrices and finally flatten the resulting 1x1 matrix into a scalar. All
         # operations happen over the batch size, which is dimension 0.
-        prod = K.batch_dot(K.expand_dims(a - mu, dim=1), P)
-        prod = K.batch_dot(prod, K.expand_dims(a - mu, dim=-1))
+        prod = K.batch_dot(K.expand_dims(a - mu, 1), P)
+        prod = K.batch_dot(prod, K.expand_dims(a - mu, -1))
         A = -.5 * K.batch_flatten(prod)
         assert K.ndim(A) == 2
         return A
 
     def get_output_shape_for(self, input_shape):
-        shape = list(input_shape)
-        if len(shape) != 2:
-            raise RuntimeError('Input tensor must be 2D, has shape {} instead.'.format(input_shape))
+        return self.compute_output_shape(input_shape)
+
+    def compute_output_shape(self, input_shape):
+        if len(input_shape) != 3:
+            raise RuntimeError("Expects 3 inputs: L, mu, a")
+        for i, shape in enumerate(input_shape):
+            if len(shape) != 2:
+                raise RuntimeError("Input {} has {} dimensions but should have 2".format(i, len(shape)))
+        assert self.mode in ('full','diag')
         if self.mode == 'full':
-            expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) // 2 + self.nb_actions + self.nb_actions
+            expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) // 2
         elif self.mode == 'diag':
-            expected_elements = self.nb_actions + self.nb_actions + self.nb_actions
+            expected_elements = self.nb_actions
         else:
             expected_elements = None
         assert expected_elements is not None
-        if shape[-1] != expected_elements:
-            raise RuntimeError(('Last dimension of input tensor must have exactly {} elements, ' +
-                                'has {} elements instead. This layer expects the input in the ' +
-                                'following order: [L_flat, mu, action].').format(expected_elements, shape[-1]))
-        shape[-1] = 1
-        return tuple(shape)
+        if input_shape[0][1] != expected_elements:
+            raise RuntimeError("Input 0 (L) should have {} elements but has {}".format(input_shape[0][1]))
+        if input_shape[1][1] != self.nb_actions:
+            raise RuntimeError(
+                "Input 1 (mu) should have {} elements but has {}".format(self.nb_actions, input_shape[1][1]))
+        if input_shape[2][1] != self.nb_actions:
+            raise RuntimeError(
+                "Input 2 (action) should have {} elements but has {}".format(self.nb_actions, input_shape[1][1]))
+        return input_shape[0][0], 1
 
 
 class ContinuousDQNAgent(AbstractDQNAgent):
@@ -595,11 +589,11 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         os_in = [Input(shape=shape, name='observation_input_{}'.format(idx)) for idx, shape in enumerate(observation_shapes)]
         L_out = self.L_model([a_in] + os_in)
         V_out = self.V_model(os_in)
-        mu_out = self.mu_model(os_in)
-        A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)(merge([L_out, mu_out, a_in], mode='concat'))
-        combined_out = merge([A_out, V_out], mode='sum')
-        combined = Model(input=[a_in] + os_in, output=combined_out)
 
+        mu_out = self.mu_model(os_in)
+        A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)([L_out, mu_out, a_in])
+        combined_out = Lambda(lambda x: x[0]+x[1], output_shape=lambda x: x[0])([A_out, V_out])
+        combined = Model(input=[a_in] + os_in, output=[combined_out])
         # Compile combined model.
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.

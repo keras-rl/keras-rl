@@ -19,3 +19,6 @@ class MultiInputTestEnv(Env):
             return [np.random.random(s) for s in self.observation_shape]
         else:
             return np.random.random(self.observation_shape)
+
+    def __del__(self):
+        pass

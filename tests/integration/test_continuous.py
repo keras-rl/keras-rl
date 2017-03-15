@@ -1,17 +1,16 @@
 import random
 
 import numpy as np
-from numpy.testing import assert_allclose
 import gym
 
 from keras.models import Sequential
-from keras.layers import Dense, Activation, Flatten, Input, Concatenate
+from keras.layers import Dense, Activation, Flatten, Input
 from keras.optimizers import Adam
 
 from rl.agents import ContinuousDQNAgent, DDPGAgent
 from rl.random import OrnsteinUhlenbeckProcess
 from rl.memory import SequentialMemory
-from rl.keras_future import Model
+from rl.keras_future import Model, concatenate
 
 
 def test_cdqn():
@@ -36,7 +35,7 @@ def test_cdqn():
     
     action_input = Input(shape=(nb_actions,), name='action_input')
     observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
-    x = Concatenate()([action_input, Flatten()(observation_input)])
+    x = concatenate([action_input, Flatten()(observation_input)])
     x = Dense(16)(x)
     x = Activation('relu')(x)
     x = Dense(((nb_actions * nb_actions + nb_actions) // 2))(x)
@@ -72,7 +71,7 @@ def test_ddpg():
     action_input = Input(shape=(nb_actions,), name='action_input')
     observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
     flattened_observation = Flatten()(observation_input)
-    x = Concatenate()([action_input, flattened_observation])
+    x = concatenate([action_input, flattened_observation])
     x = Dense(16)(x)
     x = Activation('relu')(x)
     x = Dense(1)(x)

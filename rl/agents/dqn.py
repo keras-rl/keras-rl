@@ -5,7 +5,7 @@ import warnings
 
 import numpy as np
 import keras.backend as K
-from keras.layers import Lambda, Input, merge, Layer, Dense
+from keras.layers import Lambda, Input, Add, Layer, Dense
 from keras.models import Model
 
 from rl.core import Agent
@@ -350,22 +350,10 @@ class NAFLayer(Layer):
     def call(self, x, mask=None):
         # TODO: validate input shape
 
-        # The input of this layer is [L, mu, a] in concatenated form. We first split
-        # those up.
-        idx = 0
-        if self.mode == 'full':
-            L_flat = x[:, idx:idx + (self.nb_actions * self.nb_actions + self.nb_actions) // 2]
-            idx += (self.nb_actions * self.nb_actions + self.nb_actions) // 2
-        elif self.mode == 'diag':
-            L_flat = x[:, idx:idx + self.nb_actions]
-            idx += self.nb_actions
-        else:
-            L_flat = None
-        assert L_flat is not None
-        mu = x[:, idx:idx + self.nb_actions]
-        idx += self.nb_actions
-        a = x[:, idx:idx + self.nb_actions]
-        idx += self.nb_actions
+        assert (len(x) == 3)
+        L_flat = x[0]
+        mu = x[1]
+        a = x[2]
 
         if self.mode == 'full':
             # Create L and L^T matrix, which we use to construct the positive-definite matrix P.
@@ -506,22 +494,29 @@ class NAFLayer(Layer):
         return A
 
     def get_output_shape_for(self, input_shape):
-        shape = list(input_shape)
-        if len(shape) != 2:
-            raise RuntimeError('Input tensor must be 2D, has shape {} instead.'.format(input_shape))
+        if len(input_shape) != 3:
+            raise RuntimeError("Expects 3 inputs: L, mu, a")
+        for i, shape in enumerate(input_shape):
+            if len(shape) != 2:
+                raise RuntimeError("Input {} has {} dimensions but should have 2".format(i, len(shape)))
+        assert self.mode in ('full','diag')
         if self.mode == 'full':
-            expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) // 2 + self.nb_actions + self.nb_actions
+            expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) // 2
         elif self.mode == 'diag':
-            expected_elements = self.nb_actions + self.nb_actions + self.nb_actions
+            expected_elements = self.nb_actions
         else:
             expected_elements = None
         assert expected_elements is not None
-        if shape[-1] != expected_elements:
-            raise RuntimeError(('Last dimension of input tensor must have exactly {} elements, ' +
-                                'has {} elements instead. This layer expects the input in the ' +
-                                'following order: [L_flat, mu, action].').format(expected_elements, shape[-1]))
-        shape[-1] = 1
-        return tuple(shape)
+        if input_shape[0][1] != expected_elements:
+            raise RuntimeError("Input 0 (L) should have {} elements but has {}".format(input_shape[0][1]))
+        if input_shape[1][1] != self.nb_actions:
+            raise RuntimeError(
+                "Input 1 (mu) should have {} elements but has {}".format(self.nb_actions, input_shape[1][1]))
+        if input_shape[2][1] != self.nb_actions:
+            raise RuntimeError(
+                "Input 2 (action) should have {} elements but has {}".format(self.nb_actions, input_shape[1][1]))
+
+        return input_shape[2]
 
 
 class ContinuousDQNAgent(AbstractDQNAgent):
@@ -580,11 +575,11 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         V_out = self.V_model(os_in)
 
         mu_out = self.mu_model(os_in)
-        A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)(merge([L_out, mu_out, a_in], mode='concat'))
+        A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)([L_out, mu_out, a_in])
         A_out_shape = A_out._keras_shape
         V_out = Lambda(lambda x: K.repeat_elements(x, A_out_shape[1], axis=1), output_shape=(A_out_shape[1],))(V_out)
-        combined_out = merge([A_out, V_out], mode='sum')
-        combined = Model(input=[a_in] + os_in, output=combined_out)
+        combined_out = Add()([A_out, V_out])
+        combined = Model(inputs=[a_in] + os_in, outputs=combined_out)
 
         # Compile combined model.
         if self.target_model_update < 1.:

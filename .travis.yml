@@ -48,10 +48,10 @@ install:
   # Bleeding-edge: pip install git+https://github.com/Theano/Theano.git
   - pip install theano>=0.9.0rc1
   - pip install gym
+  # Bleeding-edge: pip install git+https://github.com/fchollet/keras.git;
   - if [[ "$LEGACY_KERAS" == "1" ]]; then
       pip install keras==1.2.2;
     else
-      # Bleeding-edge: pip install git+https://github.com/fchollet/keras.git;
       pip install keras;
     fi
 

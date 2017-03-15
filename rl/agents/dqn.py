@@ -515,7 +515,7 @@ class NAFLayer(Layer):
         if input_shape[2][1] != self.nb_actions:
             raise RuntimeError(
                 "Input 2 (action) should have {} elements but has {}".format(self.nb_actions, input_shape[1][1]))
-        return input_shape[2]
+        return input_shape[0][0], 1
 
 
 class ContinuousDQNAgent(AbstractDQNAgent):

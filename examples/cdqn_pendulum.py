@@ -103,7 +103,7 @@ def main(argv):
         # Okay, now it's time to learn something! We visualize the training here for show, but this
         # slows down training quite a lot. You can always safely abort the training prematurely using
         # Ctrl + C.
-        agent.fit(env, nb_steps=args.steps, visualize=args.quiet, verbose=1, nb_max_episode_steps=200)
+        agent.fit(env, nb_steps=args.steps, visualize=not args.quiet, verbose=1, nb_max_episode_steps=200)
 
         # After training is done, we save the final weights.
         agent.save_weights(args.path, overwrite=True)

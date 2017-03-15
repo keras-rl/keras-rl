@@ -385,26 +385,15 @@ class NAFLayer(Layer):
             elif K.backend() == 'tensorflow':
                 import tensorflow as tf
 
-                tril_indices = tf.constant(np.vstack(np.expand_dims(i,0) for i in np.tril_indices(self.nb_actions)))
-                p_shape = tf.constant([self.nb_actions, self.nb_actions])
-
                 def fn(_, x):
-                    x_ = tf.scatter_nb(tril_indices, p_shape, x)
+                    tril_indices = np.hstack(np.expand_dims(i,1) for i in np.tril_indices(self.nb_actions))
+                    p_shape = [self.nb_actions, self.nb_actions]
+                    x_ = tf.scatter_nd(tril_indices, x, p_shape)
                     x_ = K.dot(x_, tf.transpose(x_)) + (K.epsilon()*tf.eye(self.nb_actions))
                     return x_
 
-                init = [
-                    K.zeros((self.nb_actions, self.nb_actions)),
-                    K.zeros((self.nb_actions, self.nb_actions)),
-                ]
-
-                tmp = tf.scan(fn, L_flat, initializer=init)
-                if isinstance(tmp, (list, tuple)):
-                    # TensorFlow 0.10 now returns a tuple of tensors.
-                    P = tmp[0]
-                else:
-                    # Old TensorFlow < 0.10 returns a shared tensor.
-                    P = tmp
+                init = K.zeros((self.nb_actions, self.nb_actions))
+                P = tf.scan(fn, L_flat, initializer=init)
             else:
                 raise RuntimeError('Unknown Keras backend "{}".'.format(K.backend()))
         elif self.mode == 'diag':

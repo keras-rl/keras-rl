@@ -89,6 +89,3 @@ def test_ddpg():
     agent.fit(env, nb_steps=400, visualize=False, verbose=0, nb_max_episode_steps=100)
     h = agent.test(env, nb_episodes=2, visualize=False, nb_max_episode_steps=100)
     # TODO: evaluate history
-
-test_cdqn()
-test_ddpg()

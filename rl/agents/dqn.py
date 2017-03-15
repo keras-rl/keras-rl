@@ -1,16 +1,13 @@
 from __future__ import division
-from collections import deque
-from copy import deepcopy
 import warnings
 
-import numpy as np
 import keras.backend as K
 from keras.layers import Lambda, Input, Layer, Dense
 
 from rl.core import Agent
 from rl.policy import EpsGreedyQPolicy
 from rl.util import *
-from rl.keras_future import add, Model
+from rl.keras_future import Model
 
 
 def mean_q(y_true, y_pred):
@@ -578,10 +575,7 @@ class ContinuousDQNAgent(AbstractDQNAgent):
 
         mu_out = self.mu_model(os_in)
         A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)([L_out, mu_out, a_in])
-        A_out_shape = A_out._keras_shape
-        V_out2 = Lambda(lambda x: K.repeat_elements(x, A_out_shape[1], axis=1),
-                       output_shape=lambda shape: (shape[0], A_out_shape[1]))(V_out)
-        combined_out = add([A_out, V_out2])
+        combined_out = Lambda(lambda x: x[0]+x[1], output_shape=lambda x: x[0])([A_out, V_out])
         combined = Model(input=[a_in] + os_in, output=[combined_out])
         # Compile combined model.
         if self.target_model_update < 1.:

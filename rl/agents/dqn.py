@@ -5,7 +5,7 @@ import keras.backend as K
 from keras.layers import Lambda, Input, Layer, Dense
 
 from rl.core import Agent
-from rl.policy import EpsGreedyQPolicy
+from rl.policy import EpsGreedyQPolicy, GreedyQPolicy
 from rl.util import *
 from rl.keras_future import Model
 
@@ -85,7 +85,7 @@ class AbstractDQNAgent(Agent):
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(AbstractDQNAgent):
-    def __init__(self, model, policy=None, enable_double_dqn=True, enable_dueling_network=False,
+    def __init__(self, model, policy=None, test_policy=None, enable_double_dqn=True, enable_dueling_network=False,
                  dueling_type='avg', *args, **kwargs):
         super(DQNAgent, self).__init__(*args, **kwargs)
 
@@ -129,7 +129,10 @@ class DQNAgent(AbstractDQNAgent):
         self.model = model
         if policy is None:
             policy = EpsGreedyQPolicy()
+        if test_policy is None:
+            test_policy = GreedyQPolicy()
         self.policy = policy
+        self.test_policy = test_policy
 
         # State.
         self.reset_states()
@@ -141,6 +144,7 @@ class DQNAgent(AbstractDQNAgent):
         config['enable_dueling_network'] = self.enable_dueling_network
         config['model'] = get_object_config(self.model)
         config['policy'] = get_object_config(self.policy)
+        config['test_policy'] = get_object_config(self.test_policy)
         if self.compiled:
             config['target_model'] = get_object_config(self.target_model)
         return config
@@ -207,7 +211,10 @@ class DQNAgent(AbstractDQNAgent):
         # Select an action.
         state = self.memory.get_recent_state(observation)
         q_values = self.compute_q_values(state)
-        action = self.policy.select_action(q_values=q_values)
+        if self.training:
+            action = self.policy.select_action(q_values=q_values)
+        else:
+            action = self.test_policy.select_action(q_values=q_values)
         if self.processor is not None:
             action = self.processor.process_action(action)
 
@@ -334,6 +341,16 @@ class DQNAgent(AbstractDQNAgent):
     def policy(self, policy):
         self.__policy = policy
         self.__policy._set_agent(self)
+
+    @property
+    def test_policy(self):
+        return self.__test_policy
+
+    @test_policy.setter
+    def test_policy(self, policy):
+        self.__test_policy = policy
+        self.__test_policy._set_agent(self)
+
 
 class NAFLayer(Layer):
     def __init__(self, nb_actions, mode='full', **kwargs):

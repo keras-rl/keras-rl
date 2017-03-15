@@ -91,6 +91,13 @@ class EpsGreedyQPolicy(Policy):
         return config
 
 
+class GreedyQPolicy(Policy):
+    def select_action(self, q_values):
+        assert q_values.ndim == 1
+        action = np.argmax(q_values)
+        return action
+
+
 class BoltzmannQPolicy(Policy):
     def __init__(self, tau=1., clip=(-500., 500.)):
         super(BoltzmannQPolicy, self).__init__()

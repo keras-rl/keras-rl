@@ -193,3 +193,34 @@ class SarsaAgent(Agent):
             if self.processor is not None:
                 metrics += self.processor.metrics
         return metrics
+
+    @property
+    def metrics_names(self):
+        # Throw away individual losses and replace output name since this is hidden from the user.
+        assert len(self.trainable_model.output_names) == 2
+        dummy_output_name = self.trainable_model.output_names[1]
+        model_metrics = [name for idx, name in enumerate(self.trainable_model.metrics_names) if idx not in (1, 2)]
+        model_metrics = [name.replace(dummy_output_name + '_', '') for name in model_metrics]
+
+        names = model_metrics + self.policy.metrics_names[:]
+        if self.processor is not None:
+            names += self.processor.metrics_names[:]
+        return names
+
+    @property
+    def policy(self):
+        return self.__policy
+
+    @policy.setter
+    def policy(self, policy):
+        self.__policy = policy
+        self.__policy._set_agent(self)
+
+    @property
+    def test_policy(self):
+        return self.__test_policy
+
+    @test_policy.setter
+    def test_policy(self, policy):
+        self.__test_policy = policy
+        self.__test_policy._set_agent(self)

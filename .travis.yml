@@ -45,12 +45,13 @@ install:
   - pip install pytest-cov==2.2.1 python-coveralls coverage==3.7.1
   - pip install pep8 pytest-pep8
   - pip install tensorflow
-  - pip install theano>=0.9.0rc1
+  # Using bleeding-edge theano and keras. Old commands for reference: pip install theano>=0.9.0rc1, pip install keras;
+  - pip install git+https://github.com/Theano/Theano.git
   - pip install gym
   - if [[ "$LEGACY_KERAS" == "1" ]]; then
       pip install keras==1.2.2;
     else
-      pip install keras;
+      pip install git+https://github.com/fchollet/keras.git;
     fi
 
   - python setup.py install

@@ -7,7 +7,7 @@ def concatenate(x):
     if hasattr(keras.layers, 'Concatenate'):
         return keras.layers.Concatenate()(x)
     else:
-        return keras.layers.merge(x, mode='concatenate')
+        return keras.layers.merge(x, mode='concat')
 
 
 def add(x):

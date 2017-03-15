@@ -1,31 +1,35 @@
-from rl.core import Agent
-import warnings
-from copy import deepcopy
 import collections
-import numpy as np
-from keras.callbacks import History
 
-from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Visualizer, CallbackList
+import numpy as np
+
+from keras.callbacks import History
+from keras.layers import Input, Lambda
+import keras.backend as K
+
+from rl.core import Agent
 from rl.agents.dqn import mean_q
 from rl.util import huber_loss
-from keras.layers import Input, Lambda
-from keras.models import Model
-import keras.backend as K
-from rl.policy import EpsGreedyQPolicy
+from rl.policy import EpsGreedyQPolicy, GreedyQPolicy
 from rl.util import get_object_config
+from rl.keras_future import Model
 
 
 class SarsaAgent(Agent):
-    def __init__(self, model, nb_actions, policy=None, gamma=.99, nb_steps_warmup=10,
+    def __init__(self, model, nb_actions, policy=None, test_policy=None, gamma=.99, nb_steps_warmup=10,
                  train_interval=1, delta_clip=np.inf, *args, **kwargs):
         super(SarsaAgent, self).__init__(*args, **kwargs)
 
+        # Do not use defaults in constructor because that would mean that each instance shares the same
+        # policy.
+        if policy is None:
+            policy = EpsGreedyQPolicy()
+        if test_policy is None:
+            test_policy = GreedyQPolicy()
+
         self.model = model
         self.nb_actions = nb_actions
-        if policy is None:
-            self.policy = EpsGreedyQPolicy()
-        else:
-            self.policy = policy
+        self.policy = policy
+        self.test_policy = policy
         self.gamma = gamma
         self.nb_steps_warmup = nb_steps_warmup
         self.train_interval = train_interval
@@ -62,6 +66,7 @@ class SarsaAgent(Agent):
         config['delta_clip'] = self.delta_clip
         config['model'] = get_object_config(self.model)
         config['policy'] = get_object_config(self.policy)
+        config['test_policy'] = get_object_config(self.test_policy)
         return config
 
     def compile(self, optimizer, metrics=[]):
@@ -101,7 +106,6 @@ class SarsaAgent(Agent):
         self.model.save_weights(filepath, overwrite=overwrite)
 
     def reset_states(self):
-        # the other stuff as well + the 3 lines
         self.actions = collections.deque(maxlen=2)
         self.observations = collections.deque(maxlen=2)
         self.rewards = collections.deque(maxlen=2)
@@ -109,21 +113,20 @@ class SarsaAgent(Agent):
             self.model.reset_states()
 
     def forward(self, observation):
-        self.observations.append(observation)
-        if self.training is True:
-            q_values = self.compute_q_values([observation])
+        # Select an action.
+        q_values = self.compute_q_values([observation])
+        if self.training:
             action = self.policy.select_action(q_values=q_values)
-            if self.processor is not None:
-                action = self.processor.process_action(action)
-            self.actions.append(action)
-            return action
         else:
-            q_values = self.compute_q_values([observation])
-            action = np.argmax(q_values)
-            if self.processor is not None:
-                action = self.processor.process_action(action)
-            self.actions.append(action)
-            return action
+            action = self.test_policy.select_action(q_values=q_values)
+        if self.processor is not None:
+            action = self.processor.process_action(action)
+
+        # Book-keeping.
+        self.observations.append(observation)
+        self.actions.append(action)
+
+        return action
 
     def backward(self, reward, terminal):
         metrics = [np.nan for _ in self.metrics_names]
@@ -134,11 +137,10 @@ class SarsaAgent(Agent):
 
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
-
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             self.rewards.append(reward)
             if len(self.observations) < 2:
-                return  # not enough data yet
+                return metrics  # not enough data yet
 
             state0_batch = [self.observations[0]]
             reward_batch = [self.rewards[0]]

@@ -6,12 +6,11 @@ import warnings
 import numpy as np
 import keras.backend as K
 from keras.layers import Lambda, Input, Layer, Dense
-from keras.models import Model
 
 from rl.core import Agent
 from rl.policy import EpsGreedyQPolicy
 from rl.util import *
-from rl.keras_future import add
+from rl.keras_future import add, Model
 
 
 def mean_q(y_true, y_pred):
@@ -495,6 +494,9 @@ class NAFLayer(Layer):
         return A
 
     def get_output_shape_for(self, input_shape):
+        return self.compute_output_shape(input_shape)
+
+    def compute_output_shape(self, input_shape):
         if len(input_shape) != 3:
             raise RuntimeError("Expects 3 inputs: L, mu, a")
         for i, shape in enumerate(input_shape):
@@ -516,7 +518,6 @@ class NAFLayer(Layer):
         if input_shape[2][1] != self.nb_actions:
             raise RuntimeError(
                 "Input 2 (action) should have {} elements but has {}".format(self.nb_actions, input_shape[1][1]))
-
         return input_shape[2]
 
 
@@ -578,10 +579,10 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         mu_out = self.mu_model(os_in)
         A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)([L_out, mu_out, a_in])
         A_out_shape = A_out._keras_shape
-        V_out = Lambda(lambda x: K.repeat_elements(x, A_out_shape[1], axis=1), output_shape=(A_out_shape[1],))(V_out)
-        combined_out = add([A_out, V_out])
-        combined = Model(inputs=[a_in] + os_in, outputs=combined_out)
-
+        V_out2 = Lambda(lambda x: K.repeat_elements(x, K.shape(A_out)[1], axis=1),
+                       output_shape=lambda shape: (shape[0], A_out_shape[1]))(V_out)
+        combined_out = add([A_out, V_out2])
+        combined = Model(input=[a_in] + os_in, output=[combined_out])
         # Compile combined model.
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.

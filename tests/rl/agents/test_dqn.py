@@ -75,14 +75,14 @@ def test_multi_continuous_dqn_input():
 
     V_input1 = Input(shape=(2, 3))
     V_input2 = Input(shape=(2, 4))
-    x = merge([V_input1, V_input2], mode='concat')
+    x = concatenate([V_input1, V_input2])
     x = Flatten()(x)
     x = Dense(1)(x)
     V_model = Model(input=[V_input1, V_input2], output=x)
 
     mu_input1 = Input(shape=(2, 3))
     mu_input2 = Input(shape=(2, 4))
-    x = merge([mu_input1, mu_input2], mode='concat')
+    x = concatenate([mu_input1, mu_input2])
     x = Flatten()(x)
     x = Dense(nb_actions)(x)
     mu_model = Model(input=[mu_input1, mu_input2], output=x)
@@ -90,8 +90,8 @@ def test_multi_continuous_dqn_input():
     L_input1 = Input(shape=(2, 3))
     L_input2 = Input(shape=(2, 4))
     L_input_action = Input(shape=(nb_actions,))
-    x = merge([L_input1, L_input2], mode='concat')
-    x = merge([Flatten()(x), L_input_action], mode='concat')
+    x = concatenate([L_input1, L_input2])
+    x = concatenate([Flatten()(x), L_input_action])
     x = Dense(((nb_actions * nb_actions + nb_actions) // 2))(x)
     L_model = Model(input=[L_input_action, L_input1, L_input2], output=x)
 

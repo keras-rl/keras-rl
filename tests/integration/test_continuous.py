@@ -5,7 +5,7 @@ from numpy.testing import assert_allclose
 import gym
 
 from keras.models import Model, Sequential
-from keras.layers import Dense, Activation, Flatten, Input, merge
+from keras.layers import Dense, Activation, Flatten, Input, Concatenate
 from keras.optimizers import Adam
 
 from rl.agents import ContinuousDQNAgent, DDPGAgent
@@ -26,23 +26,20 @@ def test_cdqn():
     V_model.add(Dense(16))
     V_model.add(Activation('relu'))
     V_model.add(Dense(1))
-    V_model.add(Activation('linear'))
 
     mu_model = Sequential()
     mu_model.add(Flatten(input_shape=(1,) + env.observation_space.shape))
     mu_model.add(Dense(16))
     mu_model.add(Activation('relu'))
     mu_model.add(Dense(nb_actions))
-    mu_model.add(Activation('linear'))
     
     action_input = Input(shape=(nb_actions,), name='action_input')
     observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
-    x = merge([action_input, Flatten()(observation_input)], mode='concat')
+    x = Concatenate()([action_input, Flatten()(observation_input)])
     x = Dense(16)(x)
     x = Activation('relu')(x)
     x = Dense(((nb_actions * nb_actions + nb_actions) // 2))(x)
-    x = Activation('linear')(x)
-    L_model = Model(input=[action_input, observation_input], output=x)
+    L_model = Model(inputs=[action_input, observation_input], outputs=x)
 
     memory = SequentialMemory(limit=1000, window_length=1)
     random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3, size=nb_actions)
@@ -74,12 +71,12 @@ def test_ddpg():
     action_input = Input(shape=(nb_actions,), name='action_input')
     observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
     flattened_observation = Flatten()(observation_input)
-    x = merge([action_input, flattened_observation], mode='concat')
+    x = Concatenate()([action_input, flattened_observation])
     x = Dense(16)(x)
     x = Activation('relu')(x)
     x = Dense(1)(x)
     x = Activation('linear')(x)
-    critic = Model(input=[action_input, observation_input], output=x)
+    critic = Model(inputs=[action_input, observation_input], outputs=x)
     
     memory = SequentialMemory(limit=1000, window_length=1)
     random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3)

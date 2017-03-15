@@ -110,8 +110,7 @@ def test_naf_layer_full():
         L_flat_input = Input(shape=((nb_actions * nb_actions + nb_actions) // 2,))
         mu_input = Input(shape=(nb_actions,))
         action_input = Input(shape=(nb_actions,))
-        x = merge([L_flat_input, mu_input, action_input], mode='concat')
-        x = NAFLayer(nb_actions, mode='full')(x)
+        x = NAFLayer(nb_actions, mode='full')([L_flat_input, mu_input, action_input])
         model = Model(input=[L_flat_input, mu_input, action_input], output=x)
         model.compile(loss='mse', optimizer='sgd')
         
@@ -145,8 +144,7 @@ def test_naf_layer_diag():
         L_flat_input = Input(shape=(nb_actions,))
         mu_input = Input(shape=(nb_actions,))
         action_input = Input(shape=(nb_actions,))
-        x = merge([L_flat_input, mu_input, action_input], mode='concat')
-        x = NAFLayer(nb_actions, mode='diag')(x)
+        x = NAFLayer(nb_actions, mode='diag')([L_flat_input, mu_input, action_input])
         model = Model(input=[L_flat_input, mu_input, action_input], output=x)
         model.compile(loss='mse', optimizer='sgd')
         

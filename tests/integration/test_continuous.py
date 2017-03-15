@@ -4,13 +4,14 @@ import numpy as np
 from numpy.testing import assert_allclose
 import gym
 
-from keras.models import Model, Sequential
+from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Input, Concatenate
 from keras.optimizers import Adam
 
 from rl.agents import ContinuousDQNAgent, DDPGAgent
 from rl.random import OrnsteinUhlenbeckProcess
 from rl.memory import SequentialMemory
+from rl.keras_future import Model
 
 
 def test_cdqn():
@@ -39,7 +40,7 @@ def test_cdqn():
     x = Dense(16)(x)
     x = Activation('relu')(x)
     x = Dense(((nb_actions * nb_actions + nb_actions) // 2))(x)
-    L_model = Model(inputs=[action_input, observation_input], outputs=x)
+    L_model = Model(input=[action_input, observation_input], output=x)
 
     memory = SequentialMemory(limit=1000, window_length=1)
     random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3, size=nb_actions)
@@ -76,7 +77,7 @@ def test_ddpg():
     x = Activation('relu')(x)
     x = Dense(1)(x)
     x = Activation('linear')(x)
-    critic = Model(inputs=[action_input, observation_input], outputs=x)
+    critic = Model(input=[action_input, observation_input], output=x)
     
     memory = SequentialMemory(limit=1000, window_length=1)
     random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3)
@@ -88,3 +89,6 @@ def test_ddpg():
     agent.fit(env, nb_steps=400, visualize=False, verbose=0, nb_max_episode_steps=100)
     h = agent.test(env, nb_episodes=2, visualize=False, nb_max_episode_steps=100)
     # TODO: evaluate history
+
+test_cdqn()
+test_ddpg()

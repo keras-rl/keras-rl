@@ -1,15 +1,15 @@
 import numpy as np
 import gym
 
-from keras.models import Sequential, Model
-from keras.layers import Dense, Activation, Flatten, Input, Concatenate
+from keras.models import Sequential
+from keras.layers import Dense, Activation, Flatten, Input
 from keras.optimizers import Adam
 
 from rl.agents import ContinuousDQNAgent
 from rl.memory import SequentialMemory
 from rl.random import OrnsteinUhlenbeckProcess
 from rl.core import Processor
-
+from rl.keras_future import concatenate, Model
 
 class PendulumProcessor(Processor):
     def process_reward(self, reward):
@@ -56,7 +56,7 @@ print(mu_model.summary())
 
 action_input = Input(shape=(nb_actions,), name='action_input')
 observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
-x = Concatenate()([action_input, Flatten()(observation_input)])
+x = concatenate([action_input, Flatten()(observation_input)])
 x = Dense(32)(x)
 x = Activation('relu')(x)
 x = Dense(32)(x)
@@ -65,7 +65,7 @@ x = Dense(32)(x)
 x = Activation('relu')(x)
 x = Dense(((nb_actions * nb_actions + nb_actions) / 2))(x)
 x = Activation('linear')(x)
-L_model = Model(inputs=[action_input, observation_input], outputs=x)
+L_model = Model(input=[action_input, observation_input], output=x)
 print(L_model.summary())
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and

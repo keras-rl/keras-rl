@@ -134,7 +134,7 @@ It has since been adapted to become a general-purpose library.
 7. *Learning Tetris Using the Noisy Cross-Entropy Method*, Szita et al., 2006
 8. *Deep Reinforcement Learning (MLSS lecture notes)*, John Schulman, 2016.
 9. *Dueling Network Architectures for Deep Reinforcement Learning*, Ziyu Wang et al., 2016.
-10. *Reinforcement learning: An introduction*, Sutton and Barto*, 2011.
+10. *Reinforcement learning: An introduction*, Sutton and Barto, 2011.
 
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.

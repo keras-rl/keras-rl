@@ -214,6 +214,7 @@ class DQNAgent(AbstractDQNAgent):
         if self.training:
             action = self.policy.select_action(q_values=q_values)
         else:
+            self.save_current_state(state)
             action = self.test_policy.select_action(q_values=q_values)
         if self.processor is not None:
             action = self.processor.process_action(action)

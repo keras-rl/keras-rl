@@ -143,6 +143,5 @@ It has since been adapted to become a general-purpose library.
 10. *Reinforcement learning: An introduction*, Sutton and Barto, 2011
 
 ## Todos
-- Tests: I haven't yet had time to get started, but this is important.
-- Documentation: Currently, the documentation is pretty much non-existent.
+- Documentation: Work on the documentation has begun but not everything is documented in code yet. Additionally, it would be super nice to have guides for each agents that describe the basic ideas behind it.
 - TRPO, priority-based memory, A3C, async DQN, ...

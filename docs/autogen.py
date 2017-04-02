@@ -16,6 +16,7 @@ if sys.version[0] == '2':
 
 import rl
 import rl.core
+import rl.agents
 
 
 EXCLUDE = {
@@ -25,15 +26,43 @@ EXCLUDE = {
 PAGES = [
     {
         'page': 'core.md',
-        'classes': [rl.core.Agent, rl.core.Env, rl.core.Space],
+        'all_module_classes': [rl.core],
+    },
+    {
+        'page': 'agents/api.md',
         'functions': [
             rl.core.Agent.fit,
             rl.core.Agent.test,
+            rl.core.Agent.compile,
+            rl.core.Agent.get_config,
+            rl.core.Agent.reset_states,
+            rl.core.Agent.load_weights,
+            rl.core.Agent.save_weights,
         ],
+    },
+    {
+        'page': 'agents/dqn.md',
+        'classes': [rl.agents.DQNAgent],
+    },
+    {
+        'page': 'agents/naf.md',
+        'classes': [rl.agents.NAFAgent],
+    },
+    {
+        'page': 'agents/ddpg.md',
+        'classes': [rl.agents.DDPGAgent],
+    },
+    {
+        'page': 'agents/sarsa.md',
+        'classes': [rl.agents.SarsaAgent],
+    },
+    {
+        'page': 'agents/cem.md',
+        'classes': [rl.agents.CEMAgent],
     },
 ]
 
-ROOT = 'http://keras.io/'
+
 ROOT_MODULE_NAME = 'rl.'
 
 
@@ -101,14 +130,6 @@ def get_class_signature(cls):
     return class_signature
 
 
-def class_to_docs_link(cls):
-    module_name = cls.__module__
-    assert module_name.startswith(ROOT_MODULE_NAME)
-    module_name = module_name[len(ROOT_MODULE_NAME):]
-    link = ROOT + module_name.replace('.', '/') + '#' + cls.__name__.lower()
-    return link
-
-
 def class_to_source_link(cls):
     module_name = cls.__module__
     assert module_name.startswith(ROOT_MODULE_NAME)
@@ -131,8 +152,8 @@ def process_class_docstring(docstring):
                        r'\n    __\1__\n\n',
                        docstring)
 
-    docstring = re.sub(r'    ([^\s\\]+):(.*)\n',
-                       r'    - __\1__:\2\n',
+    docstring = re.sub(r'    ([^\s\\]+) \((.*)\n',
+                       r'    - __\1__ (\2\n',
                        docstring)
 
     docstring = docstring.replace('    ' * 5, '\t\t')
@@ -149,8 +170,8 @@ def process_function_docstring(docstring):
                        r'\n        __\1__\n\n',
                        docstring)
 
-    docstring = re.sub(r'    ([^\s\\]+):(.*)\n',
-                       r'    - __\1__:\2\n',
+    docstring = re.sub(r'    ([^\s\\]+) \((.*)\n',
+                       r'    - __\1__ (\2\n',
                        docstring)
 
     docstring = docstring.replace('    ' * 6, '\t\t')

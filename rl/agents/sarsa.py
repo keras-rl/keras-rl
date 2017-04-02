@@ -15,6 +15,8 @@ from rl.keras_future import Model
 
 
 class SarsaAgent(Agent):
+    """Write me
+    """
     def __init__(self, model, nb_actions, policy=None, test_policy=None, gamma=.99, nb_steps_warmup=10,
                  train_interval=1, delta_clip=np.inf, *args, **kwargs):
         super(SarsaAgent, self).__init__(*args, **kwargs)

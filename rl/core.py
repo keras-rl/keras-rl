@@ -28,7 +28,7 @@ class Agent(object):
     - `save_weights`
 
     # Arguments
-        processor: A `Processor` instance. See `Processor` for details.
+        processor (`Processor` instance): See [Processor](#processor) for details.
     """
     def __init__(self, processor=None):
         self.processor = processor
@@ -36,10 +36,7 @@ class Agent(object):
         self.step = 0
 
     def get_config(self):
-        """Configuration of the agent.
-
-        # Returns
-            A (potentially deeply nested) dictionary with the entire configuration of the agent.
+        """Configuration of the agent for serialization.
         """
         return {}
 
@@ -49,25 +46,25 @@ class Agent(object):
         """Trains the agent on the given environment.
 
         # Arguments
-            env: `Env` instance. Environment that the agent interacts with. See `Env` for details.
-            nb_steps: integer. Number of training steps to be performed.
-            action_repetition: integer. Number of times the agent repeats the same action without
+            env: (`Env` instance): Environment that the agent interacts with. See [Env](#env) for details.
+            nb_steps (integer): Number of training steps to be performed.
+            action_repetition (integer): Number of times the agent repeats the same action without
                 observing the environment again. Setting this to a value > 1 can be useful
                 if a single action only has a very small effect on the environment.
-             callbacks: list of `keras.callbacks.Callback` or `rl.callbacks.Callback` instances.
+            callbacks (list of `keras.callbacks.Callback` or `rl.callbacks.Callback` instances):
                 List of callbacks to apply during training. See [callbacks](/callbacks) for details.
-            verbose: 0 for no logging, 1 for interval logging (compare `log_interval`), 2 for episode logging
-            visualize: boolean. If `True`, the environment is visualized during training. However,
+            verbose (integer): 0 for no logging, 1 for interval logging (compare `log_interval`), 2 for episode logging
+            visualize (boolean): If `True`, the environment is visualized during training. However,
                 this is likely going to slow down training significantly and is thus intended to be
                 a debugging instrument.
-            nb_max_start_steps: integer. Number of maximum steps that the agent performs at the beginning
+            nb_max_start_steps (integer): Number of maximum steps that the agent performs at the beginning
                 of each episode using `start_step_policy`. Notice that this is an upper limit since
                 the exact number of steps to be performed is sampled uniformly from [0, max_start_steps]
                 at the beginning of each episode.
-            start_step_policy: function that takes an observation and returns an action. The policy
+            start_step_policy (`lambda observation: action`): The policy
                 to follow if `nb_max_start_steps` > 0. If set to `None`, a random action is performed.
-            log_interval: integer. If `verbose` = 1, the number of steps that are considered to be an interval.
-            nb_max_episode_steps: integer. Number of steps per episode that the agent performs before
+            log_interval (integer): If `verbose` = 1, the number of steps that are considered to be an interval.
+            nb_max_episode_steps (integer): Number of steps per episode that the agent performs before
                 automatically resetting the environment. Set to `None` if each episode should run
                 (potentially indefinitely) until the environment signals a terminal state.
 
@@ -390,9 +387,20 @@ class Agent(object):
         raise NotImplementedError()
 
     def load_weights(self, filepath):
+        """Loads the weights of an agent from an HDF5 file.
+
+        # Arguments
+            filepath (str): The path to the HDF5 file.
+        """
         raise NotImplementedError()
 
     def save_weights(self, filepath, overwrite=False):
+        """Saves the weights of an agent as an HDF5 file.
+
+        # Arguments
+            filepath (str): The path to where the weights should be saved.
+            overwrite (boolean): If `False` and `filepath` already exists, raises an error.
+        """
         raise NotImplementedError()
 
     @property
@@ -401,32 +409,62 @@ class Agent(object):
 
 
 class Processor(object):
-    """Write me
+    """Abstract base class for implementing processors.
+
+    A processor acts as a coupling mechanism between an `Agent` and its `Env`. This can
+    be necessary if your agent has different requirements with respect to the form of the
+    observations, actions, and rewards of the environment. By implementing a custom processor,
+    you can effectively translate between the two without having to change the underlaying
+    implementation of the agent or environment.
+
+    Do not use this abstract base class directly but instead use one of the concrete implementations
+    or write your own.
     """
+
     def process_step(self, observation, reward, done, info):
+        """Processes an entire step by applying the processor to the observation, reward, and info arguments.
+
+        # Arguments
+            observation (object): An observation as obtained by the environment.
+            reward (float): A reward as obtained by the environment.
+            done (boolean): `True` if the environment is in a terminal state, `False` otherwise.
+            info (dict): The debug info dictionary as obtained by the environment.
+
+        # Returns
+            The tupel (observation, reward, done, reward) with with all elements after being processed.
+        """
         observation = self.process_observation(observation)
         reward = self.process_reward(reward)
         info = self.process_info(info)
         return observation, reward, done, info
 
     def process_observation(self, observation):
-        """Processed observation will be stored in memory
+        """Processes the observation as obtained from the environment for use in an agent and
+        returns it.
         """
         return observation
 
     def process_reward(self, reward):
+        """Processes the reward as obtained from the environment for use in an agent and
+        returns it.
+        """
         return reward
 
     def process_info(self, info):
+        """Processes the info as obtained from the environment for use in an agent and
+        returns it.
+        """
         return info
 
+    def process_action(self, action):
+        """Processes an action predicted by an agent but before execution in an environment.
+        """
+        return action
+
     def process_state_batch(self, batch):
-        """Process for input into NN
+        """Processes an entire batch of states and returns it.
         """
         return batch
-
-    def process_action(self, action):
-        return action
 
     @property
     def metrics_names(self):
@@ -473,44 +511,35 @@ class Env(object):
     def step(self, action):
         """Run one timestep of the environment's dynamics.
         Accepts an action and returns a tuple (observation, reward, done, info).
-        Args:
-            action (object): an action provided by the environment
-        Returns:
-            observation (object): agent's observation of the current environment
-            reward (float) : amount of reward returned after previous action
-            done (boolean): whether the episode has ended, in which case further step() calls will return undefined results
-            info (dict): contains auxiliary diagnostic information (helpful for debugging, and sometimes learning)
+
+        # Arguments
+            action (object): An action provided by the environment.
+
+        # Returns
+            observation (object): Agent's observation of the current environment.
+            reward (float) : Amount of reward returned after previous action.
+            done (boolean): Whether the episode has ended, in which case further step() calls will return undefined results.
+            info (dict): Contains auxiliary diagnostic information (helpful for debugging, and sometimes learning).
         """
         raise NotImplementedError()
 
     def reset(self):
         """
         Resets the state of the environment and returns an initial observation.
-        Returns:
-            observation (object): the initial observation of the space. (Initial reward is assumed to be 0.)
+        
+        # Returns
+            observation (object): The initial observation of the space. Initial reward is assumed to be 0.
         """
         raise NotImplementedError()
 
     def render(self, mode='human', close=False):
         """Renders the environment.
         The set of supported modes varies per environment. (And some
-        environments do not support rendering at all.) By convention,
-        if mode is:
-        - human: render to the current display or terminal and
-          return nothing. Usually for human consumption.
-        - rgb_array: Return an numpy.ndarray with shape (x, y, 3),
-          representing RGB values for an x-by-y pixel image, suitable
-          for turning into a video.
-        - ansi: Return a string (str) or StringIO.StringIO containing a
-          terminal-style text representation. The text can include newlines
-          and ANSI escape sequences (e.g. for colors).
-        Note:
-            Make sure that your class's metadata 'render.modes' key includes
-              the list of supported modes. It's recommended to call super()
-              in implementations to use the functionality of this method.
-        Args:
-            mode (str): the mode to render with
-            close (bool): close all open renderings
+        environments do not support rendering at all.) 
+        
+        # Arguments
+            mode (str): The mode to render with.
+            close (bool): Close all open renderings.
         """
         raise NotImplementedError()
 
@@ -523,16 +552,9 @@ class Env(object):
 
     def seed(self, seed=None):
         """Sets the seed for this env's random number generator(s).
-        Note:
-            Some environments use multiple pseudorandom number generators.
-            We want to capture all such seeds used in order to ensure that
-            there aren't accidental correlations between multiple generators.
-        Returns:
-            list<bigint>: Returns the list of seeds used in this env's random
-              number generators. The first value in the list should be the
-              "main" seed, or the value which a reproducer should pass to
-              'seed'. Often, the main seed equals the provided 'seed', but
-              this won't be true if seed=None, for example.
+        
+        # Returns
+            Returns the list of seeds used in this env's random number generators
         """
         raise NotImplementedError()
 

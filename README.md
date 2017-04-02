@@ -1,5 +1,6 @@
 # Deep Reinforcement Learning for Keras
 [![Build Status](https://api.travis-ci.org/matthiasplappert/keras-rl.svg?branch=master)](https://travis-ci.org/matthiasplappert/keras-rl)
+[![Documentation](https://readthedocs.org/projects/keras-rl/badge/)](http://keras-rl.readthedocs.io/)
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/matthiasplappert/keras-rl/blob/master/LICENSE)
 [![Join the chat at https://gitter.im/keras-rl/Lobby](https://badges.gitter.im/keras-rl/Lobby.svg)](https://gitter.im/keras-rl/Lobby)
 
@@ -83,6 +84,11 @@ That's it. However, if you want to run the examples, you'll also need the follow
 - [h5py](https://pypi.python.org/pypi/h5py)
 
 `keras-rl` also works with [TensorFlow](https://www.tensorflow.org/). To find out how to use TensorFlow instead of [Theano](http://deeplearning.net/software/theano/), please refer to the [Keras documentation](http://keras.io/#switching-from-theano-to-tensorflow).
+
+## Documentation
+We are currently in the process of getting a proper documentation going. [The latest version of the
+documentation is available online](http://keras-rl.readthedocs.org). All contributions to the
+documentation are greatly appreciated!
 
 ## Support
 You can ask questions and join the development discussion:

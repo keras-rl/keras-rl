@@ -376,88 +376,32 @@ class NAFLayer(Layer):
         a = x[2]
 
         if self.mode == 'full':
-            # Create L and L^T matrix, which we use to construct the positive-definite matrix P.
-            L = None
-            LT = None
             if K.backend() == 'theano':
                 import theano.tensor as T
                 import theano
 
-                def fn(x, L_acc, LT_acc):
+                def fn(x, _):
                     x_ = K.zeros((self.nb_actions, self.nb_actions))
                     x_ = T.set_subtensor(x_[np.tril_indices(self.nb_actions)], x)
-                    diag = K.exp(T.diag(x_)) + K.epsilon()
-                    x_ = T.set_subtensor(x_[np.diag_indices(self.nb_actions)], diag)
-                    return x_, x_.T
+                    x_ = K.dot(x_, x_.T) + (K.epsilon()*T.eye(self.nb_actions))
+                    return x_
 
-                outputs_info = [
-                    K.zeros((self.nb_actions, self.nb_actions)),
-                    K.zeros((self.nb_actions, self.nb_actions)),
-                ]
-                results, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
-                L, LT = results
+                outputs_info = [K.zeros((self.nb_actions, self.nb_actions))]
+                P, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
             elif K.backend() == 'tensorflow':
                 import tensorflow as tf
 
-                # Number of elements in a triangular matrix.
-                nb_elems = (self.nb_actions * self.nb_actions + self.nb_actions) // 2
+                def fn(_, x):
+                    tril_indices = np.hstack(np.expand_dims(i,1) for i in np.tril_indices(self.nb_actions))
+                    p_shape = [self.nb_actions, self.nb_actions]
+                    x_ = tf.scatter_nd(tril_indices, x, p_shape)
+                    x_ = K.dot(x_, tf.transpose(x_)) + (K.epsilon()*tf.eye(self.nb_actions))
+                    return x_
 
-                # Create mask for the diagonal elements in L_flat. This is used to exponentiate
-                # only the diagonal elements, which is done before gathering.
-                diag_indeces = [0]
-                for row in range(1, self.nb_actions):
-                    diag_indeces.append(diag_indeces[-1] + (row + 1))
-                diag_mask = np.zeros(1 + nb_elems)  # +1 for the leading zero
-                diag_mask[np.array(diag_indeces) + 1] = 1
-                diag_mask = K.variable(diag_mask)
-
-                # Add leading zero element to each element in the L_flat. We use this zero
-                # element when gathering L_flat into a lower triangular matrix L.
-                nb_rows = tf.shape(L_flat)[0]
-                zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
-                try:
-                    # Old TF behavior.
-                    L_flat = tf.concat(1, [zeros, L_flat])
-                except TypeError:
-                    # New TF behavior
-                    L_flat = tf.concat([zeros, L_flat], 1)
-
-                # Create mask that can be used to gather elements from L_flat and put them
-                # into a lower triangular matrix.
-                tril_mask = np.zeros((self.nb_actions, self.nb_actions), dtype='int32')
-                tril_mask[np.tril_indices(self.nb_actions)] = range(1, nb_elems + 1)
-
-                # Finally, process each element of the batch.
-                init = [
-                    K.zeros((self.nb_actions, self.nb_actions)),
-                    K.zeros((self.nb_actions, self.nb_actions)),
-                ]
-
-                def fn(a, x):
-                    # Exponentiate everything. This is much easier than only exponentiating
-                    # the diagonal elements, and, usually, the action space is relatively low.
-                    x_ = K.exp(x) + K.epsilon()
-                    # Only keep the diagonal elements.
-                    x_ *= diag_mask
-                    # Add the original, non-diagonal elements.
-                    x_ += x * (1. - diag_mask)
-                    # Finally, gather everything into a lower triangular matrix.
-                    L_ = tf.gather(x_, tril_mask)
-                    return [L_, tf.transpose(L_)]
-
-                tmp = tf.scan(fn, L_flat, initializer=init)
-                if isinstance(tmp, (list, tuple)):
-                    # TensorFlow 0.10 now returns a tuple of tensors.
-                    L, LT = tmp
-                else:
-                    # Old TensorFlow < 0.10 returns a shared tensor.
-                    L = tmp[:, 0, :, :]
-                    LT = tmp[:, 1, :, :]
+                init = K.zeros((self.nb_actions, self.nb_actions))
+                P = tf.scan(fn, L_flat, initializer=init)
             else:
                 raise RuntimeError('Unknown Keras backend "{}".'.format(K.backend()))
-            assert L is not None
-            assert LT is not None
-            P = K.batch_dot(L, LT)
         elif self.mode == 'diag':
             if K.backend() == 'theano':
                 import theano.tensor as T

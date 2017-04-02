@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import warnings
 from copy import deepcopy
 
@@ -8,17 +9,71 @@ from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Vi
 
 
 class Agent(object):
+    """Abstract base class for all implemented agents.
+
+    Each agent interacts with the environment (as defined by the `Env` class) by first observing the
+    state of the environment. Based on this observation the agent changes the environment by performing
+    an action.
+
+    Do not use this abstract base class directly but instead use one of the concrete agents implemented.
+    Each agent realizes a reinforcement learning algorithm. Since all agents conform to the same
+    interface, you can use them interchangeably.
+
+    To implement your own agent, you have to implement the following methods:
+
+    - `forward`
+    - `backward`
+    - `compile`
+    - `load_weights`
+    - `save_weights`
+
+    # Arguments
+        processor: A `Processor` instance. See `Processor` for details.
+    """
     def __init__(self, processor=None):
         self.processor = processor
         self.training = False
         self.step = 0
 
     def get_config(self):
+        """Configuration of the agent.
+
+        # Returns
+            A (potentially deeply nested) dictionary with the entire configuration of the agent.
+        """
         return {}
 
     def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
             nb_max_episode_steps=None):
+        """Trains the agent on the given environment.
+
+        # Arguments
+            env: `Env` instance. Environment that the agent interacts with. See `Env` for details.
+            nb_steps: integer. Number of training steps to be performed.
+            action_repetition: integer. Number of times the agent repeats the same action without
+                observing the environment again. Setting this to a value > 1 can be useful
+                if a single action only has a very small effect on the environment.
+             callbacks: list of `keras.callbacks.Callback` or `rl.callbacks.Callback` instances.
+                List of callbacks to apply during training. See [callbacks](/callbacks) for details.
+            verbose: 0 for no logging, 1 for interval logging (compare `log_interval`), 2 for episode logging
+            visualize: boolean. If `True`, the environment is visualized during training. However,
+                this is likely going to slow down training significantly and is thus intended to be
+                a debugging instrument.
+            nb_max_start_steps: integer. Number of maximum steps that the agent performs at the beginning
+                of each episode using `start_step_policy`. Notice that this is an upper limit since
+                the exact number of steps to be performed is sampled uniformly from [0, max_start_steps]
+                at the beginning of each episode.
+            start_step_policy: function that takes an observation and returns an action. The policy
+                to follow if `nb_max_start_steps` > 0. If set to `None`, a random action is performed.
+            log_interval: integer. If `verbose` = 1, the number of steps that are considered to be an interval.
+            nb_max_episode_steps: integer. Number of steps per episode that the agent performs before
+                automatically resetting the environment. Set to `None` if each episode should run
+                (potentially indefinitely) until the environment signals a terminal state.
+
+        # Returns
+            A `keras.callbacks.History` instance that recorded the entire training process.
+        """
         if not self.compiled:
             raise RuntimeError('Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
@@ -319,9 +374,13 @@ class Agent(object):
         pass
 
     def reset_states(self):
+        """Resets all internally kept states after an episode is completed.
+        """
         pass
 
     def forward(self, observation):
+        """
+        """
         raise NotImplementedError()
 
     def backward(self, reward, terminal):
@@ -342,6 +401,8 @@ class Agent(object):
 
 
 class Processor(object):
+    """Write me
+    """
     def process_step(self, observation, reward, done, info):
         observation = self.process_observation(observation)
         reward = self.process_reward(reward)
@@ -377,6 +438,8 @@ class Processor(object):
 
 
 class MultiInputProcessor(Processor):
+    """Write me
+    """
     def __init__(self, nb_inputs):
         self.nb_inputs = nb_inputs
 

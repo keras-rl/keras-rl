@@ -1,0 +1,11 @@
+site_name: Keras-RL Documentation
+theme: readthedocs
+docs_dir: sources
+repo_url: https://github.com/matthiasplappert/keras-rl
+site_description: 'Documentation for Keras-RL, a library for Deep Reinforcement Learning with Keras.'
+
+dev_addr: '0.0.0.0:8000'
+
+pages:
+- Home: index.md
+- Core: core.md

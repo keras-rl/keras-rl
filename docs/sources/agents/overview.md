@@ -16,6 +16,8 @@ All agents share a common API. This allows you to easily switch between differen
 That being said, keep in mind that some agents make assumptions regarding the action space, i.e. assume discrete
 or continuous actions.
 
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L43)</span>
+
 ### fit
 
 
@@ -56,6 +58,8 @@ A `keras.callbacks.History` instance that recorded the entire training process.
 
 ----
 
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L230)</span>
+
 ### test
 
 
@@ -67,6 +71,8 @@ test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=Tr
 Callback that is called before training begins."
 
 ----
+
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L390)</span>
 
 ### compile
 
@@ -85,6 +91,8 @@ __Arguments__
 
 ----
 
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L38)</span>
+
 ### get_config
 
 
@@ -97,6 +105,8 @@ Configuration of the agent for serialization.
 
 ----
 
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L363)</span>
+
 ### reset_states
 
 
@@ -108,6 +118,8 @@ reset_states(self)
 Resets all internally kept states after an episode is completed.
 
 ----
+
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L399)</span>
 
 ### load_weights
 
@@ -124,6 +136,8 @@ __Arguments__
 - __filepath__ (str): The path to the HDF5 file.
 
 ----
+
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L407)</span>
 
 ### save_weights
 

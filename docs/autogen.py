@@ -140,6 +140,16 @@ def class_to_source_link(cls):
     return '[[source]](' + link + ')'
 
 
+def function_to_source_link(fn):
+    module_name = fn.__module__
+    assert module_name.startswith(ROOT_MODULE_NAME)
+    path = module_name.replace('.', '/')
+    path += '.py'
+    line = inspect.getsourcelines(fn)[-1]
+    link = 'https://github.com/matthiasplappert/keras-rl/blob/master/' + path + '#L' + str(line)
+    return '[[source]](' + link + ')'
+
+
 def code_snippet(snippet):
     result = '```python\n'
     result += snippet + '\n'
@@ -250,6 +260,7 @@ for page_data in PAGES:
         subblocks = []
         signature = get_function_signature(function, method=False)
         signature = signature.replace(function.__module__ + '.', '')
+        subblocks.append('<span style="float:right;">' + function_to_source_link(function) + '</span>')
         subblocks.append('### ' + function.__name__ + '\n')
         subblocks.append(code_snippet(signature))
         docstring = function.__doc__

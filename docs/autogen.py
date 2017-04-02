@@ -29,7 +29,7 @@ PAGES = [
         'all_module_classes': [rl.core],
     },
     {
-        'page': 'agents/api.md',
+        'page': 'agents/overview.md',
         'functions': [
             rl.core.Agent.fit,
             rl.core.Agent.test,
@@ -54,7 +54,7 @@ PAGES = [
     },
     {
         'page': 'agents/sarsa.md',
-        'classes': [rl.agents.SarsaAgent],
+        'classes': [rl.agents.SARSAAgent],
     },
     {
         'page': 'agents/cem.md',

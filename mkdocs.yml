@@ -12,9 +12,9 @@ pages:
 - Home: index.md
 - Core: core.md
 - Agents:
-  - Common API: agents/api.md
+  - Overview: agents/overview.md
   - DQNAgent: agents/dqn.md
   - NAFAgent: agents/naf.md
   - DDPGAgent: agents/ddpg.md
-  - SarsaAgent: agents/sarsa.md
+  - SARSAAgent: agents/sarsa.md
   - CEMAgent: agents/cem.md

@@ -7,8 +7,7 @@ from gym.envs.debugging.two_round_deterministic_reward import TwoRoundDeterminis
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten
 from keras.optimizers import Adam
-from rl.agents.sarsa import SarsaAgent
-from rl.agents import DQNAgent, CEMAgent
+from rl.agents import DQNAgent, CEMAgent, SARSAAgent
 from rl.policy import EpsGreedyQPolicy
 from rl.memory import SequentialMemory, EpisodeParameterMemory
 
@@ -127,7 +126,7 @@ def test_sarsa():
     model.add(Dense(nb_actions, activation='linear'))
 
     policy = EpsGreedyQPolicy(eps=.1)
-    sarsa = SarsaAgent(model=model, nb_actions=nb_actions, nb_steps_warmup=50, policy=policy)
+    sarsa = SARSAAgent(model=model, nb_actions=nb_actions, nb_steps_warmup=50, policy=policy)
     sarsa.compile(Adam(lr=1e-3))
 
     sarsa.fit(env, nb_steps=20000, visualize=False, verbose=0)

@@ -7,7 +7,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Input
 from keras.optimizers import Adam
 
-from rl.agents import ContinuousDQNAgent, DDPGAgent
+from rl.agents import NAFAgent, DDPGAgent
 from rl.random import OrnsteinUhlenbeckProcess
 from rl.memory import SequentialMemory
 from rl.keras_future import Model, concatenate
@@ -43,9 +43,9 @@ def test_cdqn():
 
     memory = SequentialMemory(limit=1000, window_length=1)
     random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3, size=nb_actions)
-    agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
-                               memory=memory, nb_steps_warmup=50, random_process=random_process,
-                               gamma=.99, target_model_update=1e-3)
+    agent = NAFAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
+                     memory=memory, nb_steps_warmup=50, random_process=random_process,
+                     gamma=.99, target_model_update=1e-3)
     agent.compile(Adam(lr=1e-3))
 
     agent.fit(env, nb_steps=400, visualize=False, verbose=0, nb_max_episode_steps=100)

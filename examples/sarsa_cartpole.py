@@ -5,7 +5,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten
 from keras.optimizers import Adam
 
-from rl.agents.sarsa import SarsaAgent
+from rl.agents import SARSAAgent
 from rl.policy import BoltzmannQPolicy
 
 
@@ -30,9 +30,9 @@ model.add(Dense(nb_actions))
 model.add(Activation('linear'))
 print(model.summary())
 
-# Sarsa.py in rl.agent update every experience on policy, memory is not used.
+# SARSA does not require a memory.
 policy = BoltzmannQPolicy()
-sarsa = SarsaAgent(model=model, nb_actions=nb_actions, nb_steps_warmup=10, policy=policy)
+sarsa = SARSAAgent(model=model, nb_actions=nb_actions, nb_steps_warmup=10, policy=policy)
 sarsa.compile(Adam(lr=1e-3), metrics=['mae'])
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this

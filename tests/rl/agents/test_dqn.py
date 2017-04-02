@@ -8,7 +8,7 @@ from numpy.testing import assert_allclose
 from keras.models import Sequential
 from keras.layers import Input, merge, Dense, Flatten
 
-from rl.agents.dqn import NAFLayer, DQNAgent, ContinuousDQNAgent
+from rl.agents.dqn import NAFLayer, DQNAgent, NAFAgent
 from rl.memory import SequentialMemory
 from rl.core import MultiInputProcessor
 from rl.keras_future import concatenate, Model
@@ -64,8 +64,8 @@ def test_single_continuous_dqn_input():
     L_model = Model(input=[L_input_action, L_input], output=x)
 
     memory = SequentialMemory(limit=10, window_length=2)
-    agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
-                               memory=memory, nb_steps_warmup=5, batch_size=4)
+    agent = NAFAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
+                     memory=memory, nb_steps_warmup=5, batch_size=4)
     agent.compile('sgd')
     agent.fit(MultiInputTestEnv((3,)), nb_steps=10)
 
@@ -97,8 +97,8 @@ def test_multi_continuous_dqn_input():
 
     memory = SequentialMemory(limit=10, window_length=2)
     processor = MultiInputProcessor(nb_inputs=2)
-    agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
-                               memory=memory, nb_steps_warmup=5, batch_size=4, processor=processor)
+    agent = NAFAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
+                     memory=memory, nb_steps_warmup=5, batch_size=4, processor=processor)
     agent.compile('sgd')
     agent.fit(MultiInputTestEnv([(3,), (4,)]), nb_steps=10)
 

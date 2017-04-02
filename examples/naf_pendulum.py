@@ -5,7 +5,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten, Input
 from keras.optimizers import Adam
 
-from rl.agents import ContinuousDQNAgent
+from rl.agents import NAFAgent
 from rl.memory import SequentialMemory
 from rl.random import OrnsteinUhlenbeckProcess
 from rl.core import Processor
@@ -73,9 +73,9 @@ print(L_model.summary())
 processor = PendulumProcessor()
 memory = SequentialMemory(limit=100000, window_length=1)
 random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3, size=nb_actions)
-agent = ContinuousDQNAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
-                           memory=memory, nb_steps_warmup=100, random_process=random_process,
-                           gamma=.99, target_model_update=1e-3, processor=processor)
+agent = NAFAgent(nb_actions=nb_actions, V_model=V_model, L_model=L_model, mu_model=mu_model,
+                 memory=memory, nb_steps_warmup=100, random_process=random_process,
+                 gamma=.99, target_model_update=1e-3, processor=processor)
 agent.compile(Adam(lr=.001, clipnorm=1.), metrics=['mae'])
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this

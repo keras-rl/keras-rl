@@ -1,5 +1,6 @@
 # Deep Reinforcement Learning for Keras
 [![Build Status](https://api.travis-ci.org/matthiasplappert/keras-rl.svg?branch=master)](https://travis-ci.org/matthiasplappert/keras-rl)
+[![Documentation](https://readthedocs.org/projects/keras-rl/badge/)](http://keras-rl.readthedocs.io/)
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/matthiasplappert/keras-rl/blob/master/LICENSE)
 [![Join the chat at https://gitter.im/keras-rl/Lobby](https://badges.gitter.im/keras-rl/Lobby.svg)](https://gitter.im/keras-rl/Lobby)
 
@@ -84,6 +85,11 @@ That's it. However, if you want to run the examples, you'll also need the follow
 
 `keras-rl` also works with [TensorFlow](https://www.tensorflow.org/). To find out how to use TensorFlow instead of [Theano](http://deeplearning.net/software/theano/), please refer to the [Keras documentation](http://keras.io/#switching-from-theano-to-tensorflow).
 
+## Documentation
+We are currently in the process of getting a proper documentation going. [The latest version of the
+documentation is available online](http://keras-rl.readthedocs.org). All contributions to the
+documentation are greatly appreciated!
+
 ## Support
 You can ask questions and join the development discussion:
 
@@ -132,9 +138,9 @@ It has since been adapted to become a general-purpose library.
 5. *Asynchronous Methods for Deep Reinforcement Learning*, Mnih et al., 2016
 6. *Continuous Deep Q-Learning with Model-based Acceleration*, Gu et al., 2016
 7. *Learning Tetris Using the Noisy Cross-Entropy Method*, Szita et al., 2006
-8. *Deep Reinforcement Learning (MLSS lecture notes)*, John Schulman, 2016.
-9. *Dueling Network Architectures for Deep Reinforcement Learning*, Ziyu Wang et al., 2016.
-10. *Reinforcement learning: An introduction*, Sutton and Barto, 2011.
+8. *Deep Reinforcement Learning (MLSS lecture notes)*, Schulman, 2016
+9. *Dueling Network Architectures for Deep Reinforcement Learning*, Wang et al., 2016
+10. *Reinforcement learning: An introduction*, Sutton and Barto, 2011
 
 ## Todos
 - Tests: I haven't yet had time to get started, but this is important.

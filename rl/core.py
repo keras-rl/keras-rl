@@ -227,14 +227,10 @@ class Agent(object):
 
         return history
 
-    def _on_train_begin(self):
-        pass
-
-    def _on_train_end(self):
-        pass
-
     def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
              nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1):
+        """Callback that is called before training begins."
+        """
         if not self.compiled:
             raise RuntimeError('Your tried to test your agent but it hasn\'t been compiled yet. Please call `compile()` before `test()`.')
         if action_repetition < 1:
@@ -364,26 +360,40 @@ class Agent(object):
 
         return history
 
-    def _on_test_begin(self):
-        pass
-
-    def _on_test_end(self):
-        pass
-
     def reset_states(self):
         """Resets all internally kept states after an episode is completed.
         """
         pass
 
     def forward(self, observation):
-        """
+        """Takes the an observation from the environment and returns the action to be taken next.
+        If the policy is implemented by a neural network, this corresponds to a forward (inference) pass.
+
+        # Argument
+            observation (object): The current observation from the environment.
+
+        # Returns
+            The next action to be executed in the environment.
         """
         raise NotImplementedError()
 
     def backward(self, reward, terminal):
+        """Updates the agent after having executed the action returned by `forward`.
+        If the policy is implemented by a neural network, this corresponds to a weight update using back-prop.
+
+        # Argument
+            reward (float): The observed reward after executing the action returned by `forward`.
+            terminal (boolean): `True` if the new state of the environment is terminal.
+        """
         raise NotImplementedError()
 
     def compile(self, optimizer, metrics=[]):
+        """Compiles an agent and the underlaying models to be used for training and testing.
+
+        # Arguments
+            optimizer (`keras.optimizers.Optimizer` instance): The optimizer to be used during training.
+            metrics (list of functions `lambda y_true, y_pred: metric`): The metrics to run during training.
+        """
         raise NotImplementedError()
 
     def load_weights(self, filepath):
@@ -405,7 +415,30 @@ class Agent(object):
 
     @property
     def metrics_names(self):
+        """The human-readable names of the agent's metrics. Must return as many names as there
+        are metrics (see also `compile`).
+        """
         return []
+
+    def _on_train_begin(self):
+        """Callback that is called before training begins."
+        """
+        pass
+
+    def _on_train_end(self):
+        """Callback that is called after training ends."
+        """
+        pass
+
+    def _on_test_begin(self):
+        """Callback that is called before testing begins."
+        """
+        pass
+
+    def _on_test_end(self):
+        """Callback that is called after testing ends."
+        """
+        pass
 
 
 class Processor(object):
@@ -467,16 +500,38 @@ class Processor(object):
         return batch
 
     @property
-    def metrics_names(self):
+    def metrics(self):
+        """The metrics of the processor, which will be reported during training.
+
+        # Returns
+            List of `lambda y_true, y_pred: metric` functions.
+        """
         return []
 
     @property
-    def metrics(self):
+    def metrics_names(self):
+        """The human-readable names of the agent's metrics. Must return as many names as there
+        are metrics (see also `compile`).
+        """
         return []
 
 
 class MultiInputProcessor(Processor):
-    """Write me
+    """Converts observations from an environment with multiple observations for use in a neural network
+    policy.
+
+    In some cases, you have environments that return multiple different observations per timestep 
+    (in a robotics context, for example, a camera may be used to view the scene and a joint encoder may
+    be used to report the angles for each joint). Usually, this can be handled by a policy that has
+    multiple inputs, one for each modality. However, observations are returned by the environment
+    in the form of a tuple `[(modality1_t, modality2_t, ..., modalityn_t) for t in T]` but the neural network
+    expects them in per-modality batches like so: `[[modality1_1, ..., modality1_T], ..., [[modalityn_1, ..., modalityn_T]]`.
+    This processor converts observations appropriate for this use case.
+
+    # Arguments
+        nb_inputs (integer): The number of inputs, that is different modalities, to be used.
+            Your neural network that you use for the policy must have a corresponding number of
+            inputs.
     """
     def __init__(self, nb_inputs):
         self.nb_inputs = nb_inputs

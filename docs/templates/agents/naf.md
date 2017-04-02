@@ -7,3 +7,4 @@
 ---
 
 ### References
+- [Continuous Deep Q-Learning with Model-based Acceleration](https://arxiv.org/abs/1603.00748), Gu et al., 2016

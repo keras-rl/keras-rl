@@ -31,7 +31,7 @@ class SARSAAgent(Agent):
         self.model = model
         self.nb_actions = nb_actions
         self.policy = policy
-        self.test_policy = policy
+        self.test_policy = test_policy
         self.gamma = gamma
         self.nb_steps_warmup = nb_steps_warmup
         self.train_interval = train_interval

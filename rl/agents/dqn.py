@@ -325,6 +325,10 @@ class DQNAgent(AbstractDQNAgent):
         return metrics
 
     @property
+    def layers(self):
+        return self.model.layers[:]
+
+    @property
     def metrics_names(self):
         # Throw away individual losses and replace output name since this is hidden from the user.
         assert len(self.trainable_model.output_names) == 2
@@ -706,6 +710,10 @@ class NAFAgent(AbstractDQNAgent):
             self.update_target_model_hard()
 
         return metrics
+
+    @property
+    def layers(self):
+        return self.combined_model.layers[:]
 
     def get_config(self):
         config = super(NAFAgent, self).get_config()

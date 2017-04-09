@@ -26,6 +26,7 @@ class Agent(object):
     - `compile`
     - `load_weights`
     - `save_weights`
+    - `layers`
 
     # Arguments
         processor (`Processor` instance): See [Processor](#processor) for details.
@@ -410,6 +411,15 @@ class Agent(object):
         # Arguments
             filepath (str): The path to where the weights should be saved.
             overwrite (boolean): If `False` and `filepath` already exists, raises an error.
+        """
+        raise NotImplementedError()
+
+    @property
+    def layers(self):
+        """Returns all layers of the underlying model(s).
+        
+        If the concrete implementation uses multiple internal models,
+        this method returns them in a concatenated list.
         """
         raise NotImplementedError()
 

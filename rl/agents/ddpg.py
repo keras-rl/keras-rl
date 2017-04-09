@@ -240,6 +240,10 @@ class DDPGAgent(Agent):
         return action
 
     @property
+    def layers(self):
+        return self.actor.layers[:] + self.critic.layers[:]
+
+    @property
     def metrics_names(self):
         names = self.critic.metrics_names[:]
         if self.processor is not None:
@@ -296,6 +300,7 @@ class DDPGAgent(Agent):
                 else:
                     state1_batch_with_action = [state1_batch]
                 state1_batch_with_action.insert(self.critic_action_input_idx, target_actions)
+                print [x.shape for x in state1_batch_with_action]
                 target_q_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
                 assert target_q_values.shape == (self.batch_size,)
                 

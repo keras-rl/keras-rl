@@ -22,6 +22,7 @@ To implement your own agent, you have to implement the following methods:
 - `compile`
 - `load_weights`
 - `save_weights`
+- `layers`
 
 __Arguments__
 
@@ -29,7 +30,7 @@ __Arguments__
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L444)</span>
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L454)</span>
 ### Processor
 
 ```python
@@ -49,7 +50,7 @@ or write your own.
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L519)</span>
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L529)</span>
 ### MultiInputProcessor
 
 ```python
@@ -75,7 +76,7 @@ __Arguments__
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L556)</span>
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L566)</span>
 ### Env
 
 ```python
@@ -89,7 +90,7 @@ implementation.
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L632)</span>
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L642)</span>
 ### Space
 
 ```python

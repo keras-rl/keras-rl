@@ -125,6 +125,10 @@ class CEMAgent(Agent):
         self.recent_action = action
 
         return action
+
+    @property
+    def layers(self):
+        return self.model.layers[:]
          
     def backward(self, reward, terminal):
         # Store most recent experience in memory.

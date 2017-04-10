@@ -72,3 +72,6 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# ignore weights
+*.h5f

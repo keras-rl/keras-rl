@@ -423,6 +423,12 @@ class Agent(object):
         """
         raise NotImplementedError()
 
+    def save_current_state(self, state, filepath="states/state_{}.png"):
+        assert type(state) == list
+        import scipy.misc
+        state_image = np.concatenate(tuple(state), axis=1)
+        scipy.misc.imsave(filepath.format(str(self.step)), state_image)
+
     @property
     def metrics_names(self):
         """The human-readable names of the agent's metrics. Must return as many names as there

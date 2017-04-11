@@ -13,7 +13,7 @@ from rl.keras_future import concatenate, Model
 
 class LunarLanderContinuousProcessor(Processor):
     def process_action(self, action):
-        return np.array(map(lambda x: min(max(x,-1),1), action))
+        return np.clip(action, -1., 1.)
 
 ENV_NAME = 'LunarLanderContinuous-v2'
 gym.undo_logger_setup()

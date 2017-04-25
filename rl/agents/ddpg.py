@@ -136,7 +136,8 @@ class DDPGAgent(Agent):
 
         combined_output = self.critic(combined_inputs)
 
-        updates = actor_optimizer.get_updates(self.actor.trainable_weights, self.actor.constraints, loss=[-combined_output])
+        updates = actor_optimizer.get_updates(self.actor.trainable_weights, self.actor.constraints,
+                                              loss=-K.mean(combined_output))
         if self.target_model_update < 1.:
             # Include soft target model updates.
             updates += get_soft_target_model_updates(self.target_actor, self.actor, self.target_model_update)

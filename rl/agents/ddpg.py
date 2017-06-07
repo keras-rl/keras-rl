@@ -300,7 +300,7 @@ class DDPGAgent(Agent):
                 else:
                     state1_batch_with_action = [state1_batch]
                 state1_batch_with_action.insert(self.critic_action_input_idx, target_actions)
-                target_q_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
+                target_q_values = np.max(self.target_critic.predict_on_batch(state1_batch_with_action), axis=1).flatten()
                 assert target_q_values.shape == (self.batch_size,)
                 
                 # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target ys accordingly,

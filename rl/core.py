@@ -208,9 +208,9 @@ class Agent(object):
 
                     # This episode is finished, report and reset.
                     episode_logs = {
-                        'episode_reward': episode_reward,
-                        'nb_episode_steps': episode_step,
-                        'nb_steps': self.step,
+                        'episode_reward': np.float_(episode_reward),
+                        'nb_episode_steps': np.float_(episode_step),
+                        'nb_steps': np.float_(self.step),
                     }
                     callbacks.on_episode_end(episode, episode_logs)
 
@@ -417,7 +417,7 @@ class Agent(object):
     @property
     def layers(self):
         """Returns all layers of the underlying model(s).
-        
+
         If the concrete implementation uses multiple internal models,
         this method returns them in a concatenated list.
         """
@@ -530,7 +530,7 @@ class MultiInputProcessor(Processor):
     """Converts observations from an environment with multiple observations for use in a neural network
     policy.
 
-    In some cases, you have environments that return multiple different observations per timestep 
+    In some cases, you have environments that return multiple different observations per timestep
     (in a robotics context, for example, a camera may be used to view the scene and a joint encoder may
     be used to report the angles for each joint). Usually, this can be handled by a policy that has
     multiple inputs, one for each modality. However, observations are returned by the environment
@@ -591,7 +591,7 @@ class Env(object):
     def reset(self):
         """
         Resets the state of the environment and returns an initial observation.
-        
+
         # Returns
             observation (object): The initial observation of the space. Initial reward is assumed to be 0.
         """
@@ -600,8 +600,8 @@ class Env(object):
     def render(self, mode='human', close=False):
         """Renders the environment.
         The set of supported modes varies per environment. (And some
-        environments do not support rendering at all.) 
-        
+        environments do not support rendering at all.)
+
         # Arguments
             mode (str): The mode to render with.
             close (bool): Close all open renderings.
@@ -617,7 +617,7 @@ class Env(object):
 
     def seed(self, seed=None):
         """Sets the seed for this env's random number generator(s).
-        
+
         # Returns
             Returns the list of seeds used in this env's random number generators
         """

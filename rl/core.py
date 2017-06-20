@@ -99,8 +99,7 @@ class Agent(object):
         callbacks._set_env(env)
         params = {
             'nb_steps': nb_steps,
-            'epoch': self.epoch,
-        })
+            'epoch': self.epoch
         }
         if hasattr(callbacks, 'set_params'):
             callbacks.set_params(params)

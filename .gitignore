@@ -1,5 +1,6 @@
 # OS X
 .DS_Store
+docs/site/*
 
 # Ubuntu
 *~

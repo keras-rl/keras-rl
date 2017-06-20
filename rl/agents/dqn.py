@@ -1,15 +1,13 @@
 from __future__ import division
-from collections import deque
-from copy import deepcopy
+import warnings
 
-import numpy as np
 import keras.backend as K
-from keras.layers import Lambda, Input, merge, Layer
-from keras.models import Model
+from keras.layers import Lambda, Input, Layer, Dense
 
 from rl.core import Agent
-from rl.policy import EpsGreedyQPolicy
+from rl.policy import EpsGreedyQPolicy, GreedyQPolicy
 from rl.util import *
+from rl.keras_future import Model
 
 
 def mean_q(y_true, y_pred):
@@ -17,9 +15,11 @@ def mean_q(y_true, y_pred):
 
 
 class AbstractDQNAgent(Agent):
+    """Write me
+    """
     def __init__(self, nb_actions, memory, gamma=.99, batch_size=32, nb_steps_warmup=1000,
                  train_interval=1, memory_interval=1, target_model_update=10000,
-                 delta_range=(-np.inf, np.inf), custom_model_objects={}, **kwargs):
+                 delta_range=None, delta_clip=np.inf, custom_model_objects={}, **kwargs):
         super(AbstractDQNAgent, self).__init__(**kwargs)
 
         # Soft vs hard target model updates.
@@ -32,6 +32,10 @@ class AbstractDQNAgent(Agent):
             # Soft update with `(1 - target_model_update) * old + target_model_update * new`.
             target_model_update = float(target_model_update)
 
+        if delta_range is not None:
+            warnings.warn('`delta_range` is deprecated. Please use `delta_clip` instead, which takes a single scalar. For now we\'re falling back to `delta_range[1] = {}`'.format(delta_range[1]))
+            delta_clip = delta_range[1]
+
         # Parameters.
         self.nb_actions = nb_actions
         self.gamma = gamma
@@ -40,7 +44,7 @@ class AbstractDQNAgent(Agent):
         self.train_interval = train_interval
         self.memory_interval = memory_interval
         self.target_model_update = target_model_update
-        self.delta_range = delta_range
+        self.delta_clip = delta_clip
         self.custom_model_objects = custom_model_objects
 
         # Related objects.
@@ -75,7 +79,7 @@ class AbstractDQNAgent(Agent):
             'train_interval': self.train_interval,
             'memory_interval': self.memory_interval,
             'target_model_update': self.target_model_update,
-            'delta_range': self.delta_range,
+            'delta_clip': self.delta_clip,
             'memory': get_object_config(self.memory),
         }
 
@@ -83,23 +87,56 @@ class AbstractDQNAgent(Agent):
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(AbstractDQNAgent):
-    def __init__(self, model, policy=EpsGreedyQPolicy(), enable_double_dqn=True,
-                 *args, **kwargs):
+    """Write me
+    """
+    def __init__(self, model, policy=None, test_policy=None, enable_double_dqn=True, enable_dueling_network=False,
+                 dueling_type='avg', *args, **kwargs):
         super(DQNAgent, self).__init__(*args, **kwargs)
 
         # Validate (important) input.
         if hasattr(model.output, '__len__') and len(model.output) > 1:
             raise ValueError('Model "{}" has more than one output. DQN expects a model that has a single output.'.format(model))
         if model.output._keras_shape != (None, self.nb_actions):
-            raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, nb_actions))
+            raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, self.nb_actions))
 
         # Parameters.
         self.enable_double_dqn = enable_double_dqn
+        self.enable_dueling_network = enable_dueling_network
+        self.dueling_type = dueling_type
+        if self.enable_dueling_network:
+            # get the second last layer of the model, abandon the last layer
+            layer = model.layers[-2]
+            nb_action = model.output._keras_shape[-1]
+            # layer y has a shape (nb_action+1,)
+            # y[:,0] represents V(s;theta)
+            # y[:,1:] represents A(s,a;theta)
+            y = Dense(nb_action + 1, activation='linear')(layer.output)
+            # caculate the Q(s,a;theta)
+            # dueling_type == 'avg'
+            # Q(s,a;theta) = V(s;theta) + (A(s,a;theta)-Avg_a(A(s,a;theta)))
+            # dueling_type == 'max'
+            # Q(s,a;theta) = V(s;theta) + (A(s,a;theta)-max_a(A(s,a;theta)))
+            # dueling_type == 'naive'
+            # Q(s,a;theta) = V(s;theta) + A(s,a;theta)
+            if self.dueling_type == 'avg':
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.mean(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
+            elif self.dueling_type == 'max':
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.max(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
+            elif self.dueling_type == 'naive':
+                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:], output_shape=(nb_action,))(y)
+            else:
+                assert False, "dueling_type must be one of {'avg','max','naive'}"
+
+            model = Model(input=model.input, output=outputlayer)
 
         # Related objects.
         self.model = model
+        if policy is None:
+            policy = EpsGreedyQPolicy()
+        if test_policy is None:
+            test_policy = GreedyQPolicy()
         self.policy = policy
-        self.policy._set_agent(self)
+        self.test_policy = test_policy
 
         # State.
         self.reset_states()
@@ -107,8 +144,11 @@ class DQNAgent(AbstractDQNAgent):
     def get_config(self):
         config = super(DQNAgent, self).get_config()
         config['enable_double_dqn'] = self.enable_double_dqn
+        config['dueling_type'] = self.dueling_type
+        config['enable_dueling_network'] = self.enable_dueling_network
         config['model'] = get_object_config(self.model)
         config['policy'] = get_object_config(self.policy)
+        config['test_policy'] = get_object_config(self.test_policy)
         if self.compiled:
             config['target_model'] = get_object_config(self.target_model)
         return config
@@ -120,21 +160,18 @@ class DQNAgent(AbstractDQNAgent):
         self.target_model = clone_model(self.model, self.custom_model_objects)
         self.target_model.compile(optimizer='sgd', loss='mse')
         self.model.compile(optimizer='sgd', loss='mse')
-        
+
         # Compile model.
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             updates = get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
 
-        def clipped_masked_mse(args):
+        def clipped_masked_error(args):
             y_true, y_pred, mask = args
-            delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
-            delta *= mask  # apply element-wise mask
-            loss = K.mean(K.square(delta), axis=-1)
-            # Multiply by the number of actions to reverse the effect of the mean.
-            loss *= float(self.nb_actions)
-            return loss
+            loss = huber_loss(y_true, y_pred, self.delta_clip)
+            loss *= mask  # apply element-wise mask
+            return K.sum(loss, axis=-1)
 
         # Create trainable model. The problem is that we need to mask the output since we only
         # ever want to update the Q values for a certain action. The way we achieve this is by
@@ -143,7 +180,7 @@ class DQNAgent(AbstractDQNAgent):
         y_pred = self.model.output
         y_true = Input(name='y_true', shape=(self.nb_actions,))
         mask = Input(name='mask', shape=(self.nb_actions,))
-        loss_out = Lambda(clipped_masked_mse, output_shape=(1,), name='loss')([y_pred, y_true, mask])
+        loss_out = Lambda(clipped_masked_error, output_shape=(1,), name='loss')([y_pred, y_true, mask])
         ins = [self.model.input] if type(self.model.input) is not list else self.model.input
         trainable_model = Model(input=ins + [y_true, mask], output=[loss_out, y_pred])
         assert len(trainable_model.output_names) == 2
@@ -154,7 +191,7 @@ class DQNAgent(AbstractDQNAgent):
         ]
         trainable_model.compile(optimizer=optimizer, loss=losses, metrics=combined_metrics)
         self.trainable_model = trainable_model
-        
+
         self.compiled = True
 
     def load_weights(self, filepath):
@@ -178,14 +215,17 @@ class DQNAgent(AbstractDQNAgent):
         # Select an action.
         state = self.memory.get_recent_state(observation)
         q_values = self.compute_q_values(state)
-        action = self.policy.select_action(q_values=q_values)
+        if self.training:
+            action = self.policy.select_action(q_values=q_values)
+        else:
+            action = self.test_policy.select_action(q_values=q_values)
         if self.processor is not None:
             action = self.processor.process_action(action)
 
         # Book-keeping.
         self.recent_observation = observation
         self.recent_action = action
-        
+
         return action
 
     def backward(self, reward, terminal):
@@ -204,7 +244,7 @@ class DQNAgent(AbstractDQNAgent):
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
             experiences = self.memory.sample(self.batch_size)
             assert len(experiences) == self.batch_size
-            
+
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             state0_batch = []
             reward_batch = []
@@ -254,7 +294,7 @@ class DQNAgent(AbstractDQNAgent):
             targets = np.zeros((self.batch_size, self.nb_actions))
             dummy_targets = np.zeros((self.batch_size,))
             masks = np.zeros((self.batch_size, self.nb_actions))
-            
+
             # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target targets accordingly,
             # but only for the affected output units (as given by action_batch).
             discounted_reward_batch = self.gamma * q_batch
@@ -285,6 +325,10 @@ class DQNAgent(AbstractDQNAgent):
         return metrics
 
     @property
+    def layers(self):
+        return self.model.layers[:]
+
+    @property
     def metrics_names(self):
         # Throw away individual losses and replace output name since this is hidden from the user.
         assert len(self.trainable_model.output_names) == 2
@@ -297,8 +341,28 @@ class DQNAgent(AbstractDQNAgent):
             names += self.processor.metrics_names[:]
         return names
 
+    @property
+    def policy(self):
+        return self.__policy
+
+    @policy.setter
+    def policy(self, policy):
+        self.__policy = policy
+        self.__policy._set_agent(self)
+
+    @property
+    def test_policy(self):
+        return self.__test_policy
+
+    @test_policy.setter
+    def test_policy(self, policy):
+        self.__test_policy = policy
+        self.__test_policy._set_agent(self)
+
 
 class NAFLayer(Layer):
+    """Write me
+    """
     def __init__(self, nb_actions, mode='full', **kwargs):
         if mode not in ('full', 'diag'):
             raise RuntimeError('Unknown mode "{}" in NAFLayer.'.format(self.mode))
@@ -310,35 +374,23 @@ class NAFLayer(Layer):
     def call(self, x, mask=None):
         # TODO: validate input shape
 
-        # The input of this layer is [L, mu, a] in concatenated form. We first split
-        # those up.
-        idx = 0
-        if self.mode == 'full':
-            L_flat = x[:, idx:idx + (self.nb_actions * self.nb_actions + self.nb_actions) // 2]
-            idx += (self.nb_actions * self.nb_actions + self.nb_actions) // 2
-        elif self.mode == 'diag':
-            L_flat = x[:, idx:idx + self.nb_actions]
-            idx += self.nb_actions
-        else:
-            L_flat = None
-        assert L_flat is not None
-        mu = x[:, idx:idx + self.nb_actions]
-        idx += self.nb_actions
-        a = x[:, idx:idx + self.nb_actions]
-        idx += self.nb_actions
+        assert (len(x) == 3)
+        L_flat = x[0]
+        mu = x[1]
+        a = x[2]
 
         if self.mode == 'full':
             # Create L and L^T matrix, which we use to construct the positive-definite matrix P.
             L = None
             LT = None
-            if K._BACKEND == 'theano':
+            if K.backend() == 'theano':
                 import theano.tensor as T
                 import theano
 
                 def fn(x, L_acc, LT_acc):
                     x_ = K.zeros((self.nb_actions, self.nb_actions))
                     x_ = T.set_subtensor(x_[np.tril_indices(self.nb_actions)], x)
-                    diag = K.exp(T.diag(x_))
+                    diag = K.exp(T.diag(x_)) + K.epsilon()
                     x_ = T.set_subtensor(x_[np.diag_indices(self.nb_actions)], diag)
                     return x_, x_.T
 
@@ -348,7 +400,7 @@ class NAFLayer(Layer):
                 ]
                 results, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
                 L, LT = results
-            elif K._BACKEND == 'tensorflow':
+            elif K.backend() == 'tensorflow':
                 import tensorflow as tf
 
                 # Number of elements in a triangular matrix.
@@ -367,23 +419,28 @@ class NAFLayer(Layer):
                 # element when gathering L_flat into a lower triangular matrix L.
                 nb_rows = tf.shape(L_flat)[0]
                 zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
-                L_flat = tf.concat(1, [zeros, L_flat])
-                
+                try:
+                    # Old TF behavior.
+                    L_flat = tf.concat(1, [zeros, L_flat])
+                except TypeError:
+                    # New TF behavior
+                    L_flat = tf.concat([zeros, L_flat], 1)
+
                 # Create mask that can be used to gather elements from L_flat and put them
                 # into a lower triangular matrix.
                 tril_mask = np.zeros((self.nb_actions, self.nb_actions), dtype='int32')
                 tril_mask[np.tril_indices(self.nb_actions)] = range(1, nb_elems + 1)
-                
+
                 # Finally, process each element of the batch.
                 init = [
                     K.zeros((self.nb_actions, self.nb_actions)),
                     K.zeros((self.nb_actions, self.nb_actions)),
                 ]
-                
+
                 def fn(a, x):
                     # Exponentiate everything. This is much easier than only exponentiating
                     # the diagonal elements, and, usually, the action space is relatively low.
-                    x_ = K.exp(x)
+                    x_ = K.exp(x) + K.epsilon()
                     # Only keep the diagonal elements.
                     x_ *= diag_mask
                     # Add the original, non-diagonal elements.
@@ -401,12 +458,12 @@ class NAFLayer(Layer):
                     L = tmp[:, 0, :, :]
                     LT = tmp[:, 1, :, :]
             else:
-                raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
+                raise RuntimeError('Unknown Keras backend "{}".'.format(K.backend()))
             assert L is not None
             assert LT is not None
             P = K.batch_dot(L, LT)
         elif self.mode == 'diag':
-            if K._BACKEND == 'theano':
+            if K.backend() == 'theano':
                 import theano.tensor as T
                 import theano
 
@@ -419,8 +476,7 @@ class NAFLayer(Layer):
                     K.zeros((self.nb_actions, self.nb_actions)),
                 ]
                 P, _ = theano.scan(fn=fn, sequences=L_flat, outputs_info=outputs_info)
-                print(P)
-            elif K._BACKEND == 'tensorflow':
+            elif K.backend() == 'tensorflow':
                 import tensorflow as tf
 
                 # Create mask that can be used to gather elements from L_flat and put them
@@ -432,7 +488,12 @@ class NAFLayer(Layer):
                 # element when gathering L_flat into a lower triangular matrix L.
                 nb_rows = tf.shape(L_flat)[0]
                 zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
-                L_flat = tf.concat(1, [zeros, L_flat])
+                try:
+                    # Old TF behavior.
+                    L_flat = tf.concat(1, [zeros, L_flat])
+                except TypeError:
+                    # New TF behavior
+                    L_flat = tf.concat([zeros, L_flat], 1)
 
                 # Finally, process each element of the batch.
                 def fn(a, x):
@@ -441,7 +502,7 @@ class NAFLayer(Layer):
 
                 P = tf.scan(fn, L_flat, initializer=K.zeros((self.nb_actions, self.nb_actions)))
             else:
-                raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
+                raise RuntimeError('Unknown Keras backend "{}".'.format(K.backend()))
         assert P is not None
         assert K.ndim(P) == 3
 
@@ -450,35 +511,46 @@ class NAFLayer(Layer):
         # TensorFlow handles vector * P slightly suboptimal, hence we convert the vectors to
         # 1xd/dx1 matrices and finally flatten the resulting 1x1 matrix into a scalar. All
         # operations happen over the batch size, which is dimension 0.
-        prod = K.batch_dot(K.expand_dims(a - mu, dim=1), P)
-        prod = K.batch_dot(prod, K.expand_dims(a - mu, dim=-1))
+        prod = K.batch_dot(K.expand_dims(a - mu, 1), P)
+        prod = K.batch_dot(prod, K.expand_dims(a - mu, -1))
         A = -.5 * K.batch_flatten(prod)
         assert K.ndim(A) == 2
         return A
 
     def get_output_shape_for(self, input_shape):
-        shape = list(input_shape)
-        if len(shape) != 2:
-            raise RuntimeError('Input tensor must be 2D, has shape {} instead.'.format(input_shape))
+        return self.compute_output_shape(input_shape)
+
+    def compute_output_shape(self, input_shape):
+        if len(input_shape) != 3:
+            raise RuntimeError("Expects 3 inputs: L, mu, a")
+        for i, shape in enumerate(input_shape):
+            if len(shape) != 2:
+                raise RuntimeError("Input {} has {} dimensions but should have 2".format(i, len(shape)))
+        assert self.mode in ('full','diag')
         if self.mode == 'full':
-            expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) // 2 + self.nb_actions + self.nb_actions
+            expected_elements = (self.nb_actions * self.nb_actions + self.nb_actions) // 2
         elif self.mode == 'diag':
-            expected_elements = self.nb_actions + self.nb_actions + self.nb_actions
+            expected_elements = self.nb_actions
         else:
             expected_elements = None
         assert expected_elements is not None
-        if shape[-1] != expected_elements:
-            raise RuntimeError(('Last dimension of input tensor must have exactly {} elements, ' +
-                                'has {} elements instead. This layer expects the input in the ' + 
-                                'following order: [L_flat, mu, action].').format(expected_elements, shape[-1]))
-        shape[-1] = 1
-        return tuple(shape)
+        if input_shape[0][1] != expected_elements:
+            raise RuntimeError("Input 0 (L) should have {} elements but has {}".format(input_shape[0][1]))
+        if input_shape[1][1] != self.nb_actions:
+            raise RuntimeError(
+                "Input 1 (mu) should have {} elements but has {}".format(self.nb_actions, input_shape[1][1]))
+        if input_shape[2][1] != self.nb_actions:
+            raise RuntimeError(
+                "Input 2 (action) should have {} elements but has {}".format(self.nb_actions, input_shape[1][1]))
+        return input_shape[0][0], 1
 
 
-class ContinuousDQNAgent(AbstractDQNAgent):
+class NAFAgent(AbstractDQNAgent):
+    """Write me
+    """
     def __init__(self, V_model, L_model, mu_model, random_process=None,
                  covariance_mode='full', *args, **kwargs):
-        super(ContinuousDQNAgent, self).__init__(*args, **kwargs)
+        super(NAFAgent, self).__init__(*args, **kwargs)
 
         # TODO: Validate (important) input.
 
@@ -521,27 +593,29 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         self.target_V_model.compile(optimizer='sgd', loss='mse')
 
         # Build combined model.
-        observation_shape = self.V_model.input._keras_shape[1:]
         a_in = Input(shape=(self.nb_actions,), name='action_input')
-        o_in = Input(shape=observation_shape, name='observation_input')
-        L_out = self.L_model([a_in, o_in])
-        V_out = self.V_model(o_in)
-        mu_out = self.mu_model(o_in)
-        A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)(merge([L_out, mu_out, a_in], mode='concat'))
-        combined_out = merge([A_out, V_out], mode='sum')
-        combined = Model(input=[a_in, o_in], output=combined_out)
+        if type(self.V_model.input) is list:
+            observation_shapes = [i._keras_shape[1:] for i in self.V_model.input]
+        else:
+            observation_shapes = [self.V_model.input._keras_shape[1:]]
+        os_in = [Input(shape=shape, name='observation_input_{}'.format(idx)) for idx, shape in enumerate(observation_shapes)]
+        L_out = self.L_model([a_in] + os_in)
+        V_out = self.V_model(os_in)
 
+        mu_out = self.mu_model(os_in)
+        A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)([L_out, mu_out, a_in])
+        combined_out = Lambda(lambda x: x[0]+x[1], output_shape=lambda x: x[0])([A_out, V_out])
+        combined = Model(input=[a_in] + os_in, output=[combined_out])
         # Compile combined model.
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             updates = get_soft_target_model_updates(self.target_V_model, self.V_model, self.target_model_update)
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
-        
-        def clipped_mse(y_true, y_pred):
-            delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
-            return K.mean(K.square(delta), axis=-1)
-        
-        combined.compile(loss=clipped_mse, optimizer=optimizer, metrics=metrics)
+
+        def clipped_error(y_true, y_pred):
+            return K.mean(huber_loss(y_true, y_pred, self.delta_clip), axis=-1)
+
+        combined.compile(loss=clipped_error, optimizer=optimizer, metrics=metrics)
         self.combined_model = combined
 
         self.compiled = True
@@ -569,7 +643,7 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         # Book-keeping.
         self.recent_observation = observation
         self.recent_action = action
-        
+
         return action
 
     def backward(self, reward, terminal):
@@ -583,12 +657,12 @@ class ContinuousDQNAgent(AbstractDQNAgent):
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
             return metrics
-        
+
         # Train the network on a single stochastic batch.
         if self.step > self.nb_steps_warmup and self.step % self.train_interval == 0:
             experiences = self.memory.sample(self.batch_size)
             assert len(experiences) == self.batch_size
-            
+
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             state0_batch = []
             reward_batch = []
@@ -625,7 +699,10 @@ class ContinuousDQNAgent(AbstractDQNAgent):
             assert Rs.shape == (self.batch_size,)
 
             # Finally, perform a single update on the entire batch.
-            metrics = self.combined_model.train_on_batch([action_batch, state0_batch], Rs)
+            if len(self.combined_model.input) == 2:
+                metrics = self.combined_model.train_on_batch([action_batch, state0_batch], Rs)
+            else:
+                metrics = self.combined_model.train_on_batch([action_batch] + state0_batch, Rs)
             if self.processor is not None:
                 metrics += self.processor.metrics
 
@@ -634,8 +711,12 @@ class ContinuousDQNAgent(AbstractDQNAgent):
 
         return metrics
 
+    @property
+    def layers(self):
+        return self.combined_model.layers[:]
+
     def get_config(self):
-        config = super(ContinuousDQNAgent, self).get_config()
+        config = super(NAFAgent, self).get_config()
         config['V_model'] = get_object_config(self.V_model)
         config['mu_model'] = get_object_config(self.mu_model)
         config['L_model'] = get_object_config(self.L_model)
@@ -649,3 +730,7 @@ class ContinuousDQNAgent(AbstractDQNAgent):
         if self.processor is not None:
             names += self.processor.metrics_names[:]
         return names
+
+
+# Aliases
+ContinuousDQNAgent = NAFAgent

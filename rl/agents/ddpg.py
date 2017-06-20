@@ -1,9 +1,11 @@
 from __future__ import division
 from collections import deque
 import os
+import warnings
 
 import numpy as np
 import keras.backend as K
+import keras.optimizers as optimizers
 
 from rl.core import Agent
 from rl.random import OrnsteinUhlenbeckProcess
@@ -18,23 +20,20 @@ def mean_q(y_true, y_pred):
 # http://arxiv.org/pdf/1509.02971v2.pdf
 # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.646.4324&rep=rep1&type=pdf
 class DDPGAgent(Agent):
+    """Write me
+    """
     def __init__(self, nb_actions, actor, critic, critic_action_input, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
-                 train_interval=1, memory_interval=1, delta_range=(-np.inf, np.inf),
-                 random_process=OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=0.3),
-                 custom_model_objects={}, target_model_update=.001, **kwargs):
+                 train_interval=1, memory_interval=1, delta_range=None, delta_clip=np.inf,
+                 random_process=None, custom_model_objects={}, target_model_update=.001, **kwargs):
         if hasattr(actor.output, '__len__') and len(actor.output) > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
-        if hasattr(actor.input, '__len__') and len(actor.input) != 1:
-            raise ValueError('Actor "{}" does have too many inputs. The actor must have at exactly one input for the observation.'.format(actor))
         if hasattr(critic.output, '__len__') and len(critic.output) > 1:
             raise ValueError('Critic "{}" has more than one output. DDPG expects a critic that has a single output.'.format(critic))
         if critic_action_input not in critic.input:
             raise ValueError('Critic "{}" does not have designated action input "{}".'.format(critic, critic_action_input))
-        if not hasattr(critic.input, '__len__') or len(critic.input) != 2:
+        if not hasattr(critic.input, '__len__') or len(critic.input) < 2:
             raise ValueError('Critic "{}" does not have enough inputs. The critic must have at exactly two inputs, one for the action and one for the observation.'.format(critic))
-        if critic_action_input._keras_shape != actor.output._keras_shape:
-            raise ValueError('Critic "{}" and actor "{}" do not have matching shapes')
 
         super(DDPGAgent, self).__init__(**kwargs)
 
@@ -48,12 +47,16 @@ class DDPGAgent(Agent):
             # Soft update with `(1 - target_model_update) * old + target_model_update * new`.
             target_model_update = float(target_model_update)
 
+        if delta_range is not None:
+            warnings.warn('`delta_range` is deprecated. Please use `delta_clip` instead, which takes a single scalar. For now we\'re falling back to `delta_range[1] = {}`'.format(delta_range[1]))
+            delta_clip = delta_range[1]
+
         # Parameters.
         self.nb_actions = nb_actions
         self.nb_steps_warmup_actor = nb_steps_warmup_actor
         self.nb_steps_warmup_critic = nb_steps_warmup_critic
         self.random_process = random_process
-        self.delta_range = delta_range
+        self.delta_clip = delta_clip
         self.gamma = gamma
         self.target_model_update = target_model_update
         self.batch_size = batch_size
@@ -79,13 +82,17 @@ class DDPGAgent(Agent):
     def compile(self, optimizer, metrics=[]):
         metrics += [mean_q]
 
-        if hasattr(optimizer, '__len__'):
+        if type(optimizer) in (list, tuple):
             if len(optimizer) != 2:
                 raise ValueError('More than two optimizers provided. Please only provide a maximum of two optimizers, the first one for the actor and the second one for the critic.')
             actor_optimizer, critic_optimizer = optimizer
         else:
             actor_optimizer = optimizer
             critic_optimizer = clone_optimizer(optimizer)
+        if type(actor_optimizer) is str:
+            actor_optimizer = optimizers.get(actor_optimizer)
+        if type(critic_optimizer) is str:
+            critic_optimizer = optimizers.get(critic_optimizer)
         assert actor_optimizer != critic_optimizer
 
         if len(metrics) == 2 and hasattr(metrics[0], '__len__') and hasattr(metrics[1], '__len__'):
@@ -93,9 +100,8 @@ class DDPGAgent(Agent):
         else:
             actor_metrics = critic_metrics = metrics
 
-        def clipped_mse(y_true, y_pred):
-            delta = K.clip(y_true - y_pred, self.delta_range[0], self.delta_range[1])
-            return K.mean(K.square(delta), axis=-1)
+        def clipped_error(y_true, y_pred):
+            return K.mean(huber_loss(y_true, y_pred, self.delta_clip), axis=-1)
 
         # Compile target networks. We only use them in feed-forward mode, hence we can pass any
         # optimizer and loss since we never use it anyway.
@@ -114,7 +120,7 @@ class DDPGAgent(Agent):
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
             critic_updates = get_soft_target_model_updates(self.target_critic, self.critic, self.target_model_update)
             critic_optimizer = AdditionalUpdatesOptimizer(critic_optimizer, critic_updates)
-        self.critic.compile(optimizer=critic_optimizer, loss=clipped_mse, metrics=critic_metrics)
+        self.critic.compile(optimizer=critic_optimizer, loss=clipped_error, metrics=critic_metrics)
 
         # Combine actor and critic so that we can get the policy gradient.
         combined_inputs = []
@@ -126,15 +132,15 @@ class DDPGAgent(Agent):
                 combined_inputs.append(i)
                 critic_inputs.append(i)
         combined_output = self.critic(combined_inputs)
-        if K._BACKEND == 'tensorflow':
+        if K.backend() == 'tensorflow':
             grads = K.gradients(combined_output, self.actor.trainable_weights)
             grads = [g / float(self.batch_size) for g in grads]  # since TF sums over the batch
-        elif K._BACKEND == 'theano':
+        elif K.backend() == 'theano':
             import theano.tensor as T
             grads = T.jacobian(combined_output.flatten(), self.actor.trainable_weights)
             grads = [K.mean(g, axis=0) for g in grads]
         else:
-            raise RuntimeError('Unknown Keras backend "{}".'.format(K._BACKEND))
+            raise RuntimeError('Unknown Keras backend "{}".'.format(K.backend()))
         
         # We now have the gradients (`grads`) of the combined model wrt to the actor's weights and
         # the output (`output`). Compute the necessary updates using a clone of the actor's optimizer.
@@ -161,12 +167,7 @@ class DDPGAgent(Agent):
         updates += self.actor.updates  # include other updates of the actor, e.g. for BN
 
         # Finally, combine it all into a callable function.
-        actor_inputs = None
-        if not hasattr(self.actor.input, '__len__'):
-            actor_inputs = [self.actor.input]
-        else:
-            actor_inputs = self.actor.input
-        inputs = actor_inputs + critic_inputs
+        inputs = self.actor.inputs[:] + critic_inputs
         if self.uses_learning_phase:
             inputs += [K.learning_phase()]
         self.actor_train_fn = K.function(inputs, [self.actor.output], updates=updates)
@@ -239,6 +240,10 @@ class DDPGAgent(Agent):
         return action
 
     @property
+    def layers(self):
+        return self.actor.layers[:] + self.critic.layers[:]
+
+    @property
     def metrics_names(self):
         names = self.critic.metrics_names[:]
         if self.processor is not None:
@@ -290,7 +295,10 @@ class DDPGAgent(Agent):
             if self.step > self.nb_steps_warmup_critic:
                 target_actions = self.target_actor.predict_on_batch(state1_batch)
                 assert target_actions.shape == (self.batch_size, self.nb_actions)
-                state1_batch_with_action = [state1_batch]
+                if len(self.critic.inputs) >= 3:
+                    state1_batch_with_action = state1_batch[:]
+                else:
+                    state1_batch_with_action = [state1_batch]
                 state1_batch_with_action.insert(self.critic_action_input_idx, target_actions)
                 target_q_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
                 assert target_q_values.shape == (self.batch_size,)
@@ -303,7 +311,10 @@ class DDPGAgent(Agent):
                 targets = (reward_batch + discounted_reward_batch).reshape(self.batch_size, 1)
                 
                 # Perform a single batch update on the critic network.
-                state0_batch_with_action = [state0_batch]
+                if len(self.critic.inputs) >= 3:
+                    state0_batch_with_action = state0_batch[:]
+                else:
+                    state0_batch_with_action = [state0_batch]
                 state0_batch_with_action.insert(self.critic_action_input_idx, action_batch)
                 metrics = self.critic.train_on_batch(state0_batch_with_action, targets)
                 if self.processor is not None:
@@ -312,7 +323,10 @@ class DDPGAgent(Agent):
             # Update actor, if warm up is over.
             if self.step > self.nb_steps_warmup_actor:
                 # TODO: implement metrics for actor
-                inputs = [state0_batch, state0_batch]
+                if len(self.actor.inputs) >= 2:
+                    inputs = state0_batch[:] + state0_batch[:]
+                else:
+                    inputs = [state0_batch, + state0_batch]
                 if self.uses_learning_phase:
                     inputs += [self.training]
                 action_values = self.actor_train_fn(inputs)[0]

@@ -10,6 +10,8 @@ from rl.core import Agent
 from rl.util import *
 
 class CEMAgent(Agent):
+    """Write me
+    """
     def __init__(self, model, nb_actions, memory, batch_size=50, nb_steps_warmup=1000,
                  train_interval=50, elite_frac=0.05, memory_interval=1, theta_init=None,
                  noise_decay_const=0.0, noise_ampl=0.0, **kwargs):
@@ -123,6 +125,10 @@ class CEMAgent(Agent):
         self.recent_action = action
 
         return action
+
+    @property
+    def layers(self):
+        return self.model.layers[:]
          
     def backward(self, reward, terminal):
         # Store most recent experience in memory.

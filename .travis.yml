@@ -3,23 +3,25 @@ dist: trusty
 language: python
 matrix:
     include:
-        - python: 3.4
+        - python: 3.5
           env: KERAS_BACKEND=theano
-        - python: 3.4
+        - python: 3.5
           env: KERAS_BACKEND=tensorflow
         - python: 2.7
           env: KERAS_BACKEND=theano
         - python: 2.7
           env: KERAS_BACKEND=tensorflow
+        - python: 2.7
+          env: KERAS_BACKEND=tensorflow LEGACY_KERAS=1
         - python: 2.7
           env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8
         - python: 2.7
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
-        - python: 3.4
+        - python: 3.5
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
         - python: 2.7
           env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
-        - python: 3.4
+        - python: 3.5
           env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
 install:
   # Adopted from https://github.com/fchollet/keras/blob/master/.travis.yml.
@@ -42,14 +44,15 @@ install:
   # See https://github.com/pytest-dev/pytest-cov/issues/124 for details
   - pip install pytest-cov==2.2.1 python-coveralls coverage==3.7.1
   - pip install pep8 pytest-pep8
-  - pip install git+git://github.com/Theano/Theano.git
+  - pip install tensorflow
+  # Bleeding-edge: pip install git+https://github.com/Theano/Theano.git
+  - pip install theano>=0.9.0rc1
   - pip install gym
-
-  # Install TensorFlow.
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.9.0-cp27-none-linux_x86_64.whl;
-    elif [[ "$TRAVIS_PYTHON_VERSION" == "3.4" ]]; then
-      pip install https://storage.googleapis.com/tensorflow/linux/cpu/tensorflow-0.9.0-cp34-cp34m-linux_x86_64.whl;
+  # Bleeding-edge: pip install git+https://github.com/fchollet/keras.git;
+  - if [[ "$LEGACY_KERAS" == "1" ]]; then
+      pip install keras==1.2.2;
+    else
+      pip install keras;
     fi
 
   - python setup.py install
@@ -62,11 +65,11 @@ script:
   - sed -i -e 's/"backend":[[:space:]]*"[^"]*/"backend":\ "'$KERAS_BACKEND'/g' ~/.keras/keras.json;
   - echo -e "Running tests with the following config:\n$(cat ~/.keras/keras.json)"
   - if [[ "$TEST_MODE" == "INTEGRATION" ]]; then
-       PYTHONPATH=$PWD:$PYTHONPATH py.test tests/integration;
+      PYTHONPATH=$PWD:$PYTHONPATH py.test tests/integration;
     elif [[ "$TEST_MODE" == "PEP8" ]]; then
-       PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8 -m pep8 -n0;
+      PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8 -m pep8 -n0;
     else
-       PYTHONPATH=$PWD:$PYTHONPATH py.test tests/;
+      PYTHONPATH=$PWD:$PYTHONPATH py.test tests/;
     fi
 after_success:
   - coveralls

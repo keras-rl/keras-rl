@@ -1,0 +1,20 @@
+site_name: Keras-RL Documentation
+theme: readthedocs
+docs_dir: docs/sources
+repo_url: https://github.com/matthiasplappert/keras-rl
+site_description: 'Documentation for Keras-RL, a library for Deep Reinforcement Learning with Keras.'
+#markdown_extensions: [mdx_math]
+#extra_javascript: ['https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS_HTML']
+
+dev_addr: '0.0.0.0:8000'
+
+pages:
+- Home: index.md
+- Core: core.md
+- Agents:
+  - Overview: agents/overview.md
+  - DQNAgent: agents/dqn.md
+  - NAFAgent: agents/naf.md
+  - DDPGAgent: agents/ddpg.md
+  - SARSAAgent: agents/sarsa.md
+  - CEMAgent: agents/cem.md

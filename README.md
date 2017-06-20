@@ -1,6 +1,9 @@
 # Deep Reinforcement Learning for Keras
 [![Build Status](https://api.travis-ci.org/matthiasplappert/keras-rl.svg?branch=master)](https://travis-ci.org/matthiasplappert/keras-rl)
+[![Documentation](https://readthedocs.org/projects/keras-rl/badge/)](http://keras-rl.readthedocs.io/)
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/matthiasplappert/keras-rl/blob/master/LICENSE)
+[![Join the chat at https://gitter.im/keras-rl/Lobby](https://badges.gitter.im/keras-rl/Lobby.svg)](https://gitter.im/keras-rl/Lobby)
+
 
 <table>
   <tr>
@@ -16,7 +19,7 @@ Furthermore, `keras-rl` works with [OpenAI Gym](https://gym.openai.com/) out of 
 Of course you can extend `keras-rl` according to your own needs. You can use built-in Keras callbacks and metrics or define your own.
 Even more so, it is easy to implement your own environments and even algorithms by simply extending some simple abstract classes.
 
-In a nutshell: `keras-rl` makes it really easy to run state-of-the-art deep reinforcement learning algorithms, uses Keras and thus Theano and TensorFlow and was built with OpenAI Gym in mind.
+In a nutshell: `keras-rl` makes it really easy to run state-of-the-art deep reinforcement learning algorithms, uses Keras and thus Theano or TensorFlow and was built with OpenAI Gym in mind.
 
 ## What is included?
 As of today, the following algorithms have been implemented:
@@ -26,6 +29,8 @@ As of today, the following algorithms have been implemented:
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
 - Continuous DQN (CDQN or NAF) [[6]](http://arxiv.org/abs/1603.00748)
 - Cross-Entropy Method (CEM) [[7]](http://learning.mpi-sws.org/mlss2016/slides/2016-MLSS-RL.pdf), [[8]](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.81.6579&rep=rep1&type=pdf)
+- Dueling network DQN (Dueling DQN) [[9]](https://arxiv.org/abs/1511.06581)
+- Deep SARSA [[10]](http://people.inf.elte.hu/lorincz/Files/RL_2006/SuttonBook.pdf)
 
 You can find more information on each agent in the [wiki](https://github.com/matthiasplappert/keras-rl/wiki/Agent-Overview).
 
@@ -38,9 +43,7 @@ Notice that these are **only experimental** and might currently not even run.
 ## How do I install it and how do I get started?
 Installing `keras-rl` is easy. Just run the following commands and you should be good to go:
 ```bash
-git clone https://github.com/matthiasplappert/keras-rl.git
-cd keras-rl
-python setup.py install
+pip install keras-rl
 ```
 This will install `keras-rl` and all necessary dependencies.
 
@@ -82,6 +85,19 @@ That's it. However, if you want to run the examples, you'll also need the follow
 
 `keras-rl` also works with [TensorFlow](https://www.tensorflow.org/). To find out how to use TensorFlow instead of [Theano](http://deeplearning.net/software/theano/), please refer to the [Keras documentation](http://keras.io/#switching-from-theano-to-tensorflow).
 
+## Documentation
+We are currently in the process of getting a proper documentation going. [The latest version of the
+documentation is available online](http://keras-rl.readthedocs.org). All contributions to the
+documentation are greatly appreciated!
+
+## Support
+You can ask questions and join the development discussion:
+
+- On the [Keras-RL Google group](https://groups.google.com/forum/#!forum/keras-rl-users).
+- On the [Keras-RL Gitter channel](https://gitter.im/keras-rl/Lobby).
+
+You can also post **bug reports and feature requests** (only!) in [Github issues](https://github.com/matthiasplappert/keras-rl/issues).
+
 ## Running the Tests
 To run the tests locally, you'll first have to install the following dependencies:
 ```bash
@@ -109,8 +125,9 @@ If you use `keras-rl` in your research, you can cite it as follows:
 }
 ```
 
+
 ## Acknowledgments
-The foundation for this library was developed during my work at the [High Performance Humanoid Technologies (H²T)](https://h2t.anthropomatik.kit.edu/) lab at the [Karlsruhe Institute of Technologie (KIT)](https://kit.edu).
+The foundation for this library was developed during my work at the [High Performance Humanoid Technologies (H²T)](https://h2t.anthropomatik.kit.edu/) lab at the [Karlsruhe Institute of Technology (KIT)](https://kit.edu).
 It has since been adapted to become a general-purpose library.
 
 ## References
@@ -121,9 +138,10 @@ It has since been adapted to become a general-purpose library.
 5. *Asynchronous Methods for Deep Reinforcement Learning*, Mnih et al., 2016
 6. *Continuous Deep Q-Learning with Model-based Acceleration*, Gu et al., 2016
 7. *Learning Tetris Using the Noisy Cross-Entropy Method*, Szita et al., 2006
-8. *Deep Reinforcement Learning (MLSS lecture notes)*, John Schulman, 2016.
+8. *Deep Reinforcement Learning (MLSS lecture notes)*, Schulman, 2016
+9. *Dueling Network Architectures for Deep Reinforcement Learning*, Wang et al., 2016
+10. *Reinforcement learning: An introduction*, Sutton and Barto, 2011
 
 ## Todos
-- Tests: I haven't yet had time to get started, but this is important.
-- Documentation: Currently, the documentation is pretty much non-existent.
-- TRPO, priority-based memory, dueling DQN, A3C, async DQN, ...
+- Documentation: Work on the documentation has begun but not everything is documented in code yet. Additionally, it would be super nice to have guides for each agents that describe the basic ideas behind it.
+- TRPO, priority-based memory, A3C, async DQN, ...

@@ -88,6 +88,9 @@ class CallbackList(KerasCallbackList):
 
 
 class TestLogger(Callback):
+    def on_train_begin(self, logs):
+        print('Testing for {} episodes ...'.format(self.params['nb_episodes']))
+
     def on_episode_end(self, episode, logs):
         template = 'Epoch {0}: episode {1}: reward: {2:.3f}, steps: {3}'
         variables = [

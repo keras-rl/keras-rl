@@ -262,7 +262,6 @@ class Agent(object):
         params = {
             'nb_episodes': nb_episodes,
             'epoch': self.epoch
-        })
         }
         if hasattr(callbacks, 'set_params'):
             callbacks.set_params(params)

@@ -37,9 +37,11 @@ class Agent(object):
         history = History()
         callbacks += [history]
         callbacks = CallbackList(callbacks)
-        callbacks._set_model(self)
+        callbacks.set_model(self)
+        # callbacks._set_model(self)
         callbacks._set_env(env)
-        callbacks._set_params({
+        callbacks.set_params({
+        # callbacks._set_params({
             'nb_steps': nb_steps,
         })
         self._on_train_begin()
@@ -189,9 +191,11 @@ class Agent(object):
         history = History()
         callbacks += [history]
         callbacks = CallbackList(callbacks)
-        callbacks._set_model(self)
+        callbacks.set_model(self)
+        # callbacks._set_model(self)
         callbacks._set_env(env)
-        callbacks._set_params({
+        callbacks.set_params({
+        # callbacks._set_params({
             'nb_episodes': nb_episodes,
         })
 

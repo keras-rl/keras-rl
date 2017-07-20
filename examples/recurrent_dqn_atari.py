@@ -6,7 +6,7 @@ import numpy as np
 import gym
 
 from keras.models import Sequential
-from keras.layers import Dense, Activation, Flatten, Convolution2D, Permute, LSTM, TimeDistributed
+from keras.layers import Dense, Activation, Flatten, Convolution2D, Permute, LSTM, TimeDistributed, Conv2D
 from keras.optimizers import Adam
 import keras.backend as K
 
@@ -16,7 +16,7 @@ from rl.memory import EpisodicMemory
 from rl.core import Processor
 from rl.callbacks import FileLogger, ModelIntervalCheckpoint
 
-
+TRAIN_STEPS = 1000
 INPUT_SHAPE = (84, 84)
 
 
@@ -52,17 +52,21 @@ np.random.seed(123)
 env.seed(123)
 nb_actions = env.action_space.n
 
+
 # We patch the environment to be closer to what Mnih et al. actually do: The environment
-# repeats the action 4 times and a game is considered to be over during training as soon as a live
-# is lost.
+# repeats the action 4 times and a game is considered to be over during training as soon as a live is lost.
 def _step(a):
     reward = 0.0
-    action = env._action_set[a]
-    lives_before = env.ale.lives()
+    action = env.env._action_set[a]
+    # action = env._action_set[a]
+    lives_before = env.env.ale.lives()
+    # lives_before = env.ale.lives()
     for _ in range(4):
-        reward += env.ale.act(action)
-    ob = env._get_obs()
-    done = env.ale.game_over() or (args.mode == 'train' and lives_before != env.ale.lives())
+        reward += env.env.ale.act(action)
+    ob = env.env._get_obs()
+    # ob = env._get_obs()
+    done = env.env.ale.game_over() or (args.mode == 'train' and lives_before != env.env.ale.lives())
+    # done = env.ale.game_over() or (args.mode == 'train' and lives_before != env.ale.lives())
     return ob, reward, done, {}
 env._step = _step
 
@@ -78,7 +82,8 @@ def build_model(stateful, batch_size=None):
     if K.image_dim_ordering() == 'tf':
         # (width, height, channels)
         if stateful:
-            model.add(Permute((2, 3, 4, 5), batch_input_shape=input_shape))
+            model.add(Permute((1, 3, 4, 2), batch_input_shape=input_shape))     # TODO confirm change with Matthias
+            # model.add(Permute((2, 3, 4, 5), batch_input_shape=input_shape))
         else:
             model.add(Permute((1, 3, 4, 2), input_shape=input_shape))
     elif K.image_dim_ordering() == 'th':
@@ -89,11 +94,14 @@ def build_model(stateful, batch_size=None):
             model.add(Permute((1, 2, 3, 4), input_shape=input_shape))
     else:
         raise RuntimeError('Unknown image_dim_ordering.')
-    model.add(TimeDistributed(Convolution2D(32, 8, 8, subsample=(4, 4))))
+    model.add(TimeDistributed(Conv2D(32, (8, 8), strides=(4, 4))))
+    # model.add(TimeDistributed(Convolution2D(32, 8, 8, subsample=(4, 4))))
     model.add(Activation('relu'))
-    model.add(TimeDistributed(Convolution2D(64, 4, 4, subsample=(2, 2))))
+    model.add(TimeDistributed(Conv2D(64, (4, 4), strides=(2, 2))))
+    # model.add(TimeDistributed(Convolution2D(64, 4, 4, subsample=(2, 2))))
     model.add(Activation('relu'))
-    model.add(TimeDistributed(Convolution2D(64, 3, 3, subsample=(1, 1))))
+    model.add(TimeDistributed(Conv2D(64, (3, 3), strides=(1, 1))))
+    # model.add(TimeDistributed(Convolution2D(64, 3, 3, subsample=(1, 1))))
     model.add(Activation('relu'))
     model.add(TimeDistributed(Flatten()))
     model.add(LSTM(128, return_sequences=True, stateful=stateful))
@@ -139,7 +147,7 @@ if args.mode == 'train':
     log_filename = 'dqn_{}_log.json'.format(args.env_name)
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=250000)]
     callbacks += [FileLogger(log_filename, interval=100)]
-    dqn.fit(env, callbacks=callbacks, nb_steps=1750000, log_interval=10000)
+    dqn.fit(env, callbacks=callbacks, nb_steps=TRAIN_STEPS, log_interval=10000)
 
     # After training is done, we save the final weights one more time.
     dqn.save_weights(weights_filename, overwrite=True)

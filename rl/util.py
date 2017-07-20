@@ -1,6 +1,6 @@
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
-from keras.optimizers import optimizer_from_config, get
+# from keras.optimizers import optimizer_from_config, get
 from keras.layers import Recurrent
 
 
@@ -15,17 +15,17 @@ def clone_model(model, custom_objects={}):
     return clone
 
 
-def clone_optimizer(optimizer):
-    if type(optimizer) is str:
-        return get(optimizer)
-    # Requires Keras 1.0.7 since get_config has breaking changes.
-    params = dict([(k, v) for k, v in optimizer.get_config().items()])
-    config = {
-        'class_name': optimizer.__class__.__name__,
-        'config': params,
-    }
-    clone = optimizer_from_config(config)
-    return clone
+# def clone_optimizer(optimizer):
+#     if type(optimizer) is str:
+#         return get(optimizer)
+#     # Requires Keras 1.0.7 since get_config has breaking changes.
+#     params = dict([(k, v) for k, v in optimizer.get_config().items()])
+#     config = {
+#         'class_name': optimizer.__class__.__name__,
+#         'config': params,
+#     }
+#     clone = optimizer_from_config(config)
+#     return clone
 
 
 def get_soft_target_model_updates(target, source, tau):

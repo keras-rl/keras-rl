@@ -160,7 +160,8 @@ class DQNAgent(AbstractDQNAgent):
         mask = Input(name='mask', shape=input_shape)
         loss_out = Lambda(clipped_masked_mse, output_shape=output_shape, name='loss')([y_pred, y_true, mask])
         ins = [self.model.input] if type(self.model.input) is not list else self.model.input
-        trainable_model = Model(input=ins + [y_true, mask], output=[loss_out, y_pred])
+        trainable_model = Model(inputs=ins + [y_true, mask], outputs=[loss_out, y_pred])
+        # trainable_model = Model(input=ins + [y_true, mask], output=[loss_out, y_pred])
         assert len(trainable_model.output_names) == 2
         combined_metrics = {trainable_model.output_names[1]: metrics}
         losses = [

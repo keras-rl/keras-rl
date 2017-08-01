@@ -2,6 +2,7 @@ from __future__ import division
 from __future__ import print_function
 import warnings
 import timeit
+import datetime as dt
 import json
 from tempfile import mkdtemp
 
@@ -191,8 +192,9 @@ class TrainEpisodeLogger(Callback):
 
 
 class TrainIntervalLogger(Callback):
-    def __init__(self, interval=10000):
+    def __init__(self, interval=10000, progbar_show=False):
         self.interval = interval
+        self.progbar_show = progbar_show
         self.step = 0
         self.reset()
 
@@ -233,16 +235,20 @@ class TrainIntervalLogger(Callback):
                         assert means.shape == (len(self.info_names),)
                         for name, mean in zip(self.info_names, means):
                             formatted_infos += ' - {}: {:.3f}'.format(name, mean)
-                print('{} episodes - episode_reward: {:.3f} [{:.3f}, {:.3f}]{}{}'.format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards), formatted_metrics, formatted_infos))
+                print('{} episodes - episode_reward: {:.3f} [{:.3f}, {:.3f}]{}{}'
+                      .format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards), formatted_metrics, formatted_infos))
                 print('')
             self.reset()
-            print('Interval {} ({} steps performed)'.format(self.step // self.interval + 1, self.step))
+            print('{:%H:%M:%S}  Interval {} ({} steps performed)'
+                  .format(dt.datetime.now(), self.step // self.interval + 1, self.step))
 
     def on_step_end(self, step, logs):
         if self.info_names is None:
             self.info_names = logs['info'].keys()
-        values = [('reward', logs['reward'])]
-        self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
+        # TODO review: timestamps (above) vs. logging every step (below)
+        if self.progbar_show is True:
+            values = [('reward', logs['reward'])]
+            self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
         self.step += 1
         self.metrics.append(logs['metrics'])
         if len(self.info_names) > 0:

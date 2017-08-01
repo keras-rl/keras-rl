@@ -52,7 +52,7 @@ cem.compile()
 # Okay, now it's time to learn something! We visualize the training here for show, but this
 # slows down training quite a lot. You can always safely abort the training prematurely using
 # Ctrl + C.
-cem.fit(env, nb_steps=100000, visualize=False, verbose=2)
+cem.fit(env, nb_steps=100000, verbose=2, visualize=False)
 
 # After training is done, we save the best weights.
 cem.save_weights('cem_{}_params.h5f'.format(ENV_NAME), overwrite=True)

@@ -51,7 +51,7 @@ def test_cdqn():
                                gamma=.99, target_model_update=1e-3)
     agent.compile(Adam(lr=1e-3))
 
-    agent.fit(env, nb_steps=400, visualize=False, verbose=0, nb_max_episode_steps=100)
+    agent.fit(env, nb_steps=400, verbose=0, visualize=False, nb_max_episode_steps=100)
     h = agent.test(env, nb_episodes=2, visualize=False, nb_max_episode_steps=100)
     # TODO: evaluate history
 
@@ -88,6 +88,6 @@ def test_ddpg():
                       random_process=random_process, gamma=.99, target_model_update=1e-3)
     agent.compile([Adam(lr=1e-3), Adam(lr=1e-3)])
 
-    agent.fit(env, nb_steps=400, visualize=False, verbose=0, nb_max_episode_steps=100)
+    agent.fit(env, nb_steps=400, verbose=0, visualize=False, nb_max_episode_steps=100)
     h = agent.test(env, nb_episodes=2, visualize=False, nb_max_episode_steps=100)
     # TODO: evaluate history

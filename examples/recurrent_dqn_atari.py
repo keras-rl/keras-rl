@@ -104,7 +104,7 @@ def experiment(env_name='Breakout-v0', mode='train', weights=None):
 
     train_steps = 1750000  # 250001 up to 1750000
     checkpoint_interval = 250000  # default 250000
-    train_interval = 10  # default 10
+    train_interval = 100  # default 10
     output_directory = 'output'
     batch_size = 32
 

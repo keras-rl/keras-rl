@@ -33,7 +33,7 @@ def test_dqn():
                    target_model_update=1e-1, policy=policy, enable_double_dqn=False)
     dqn.compile(Adam(lr=1e-3))
 
-    dqn.fit(env, nb_steps=2000, visualize=False, verbose=0)
+    dqn.fit(env, nb_steps=2000, verbose=0, visualize=False)
     policy.eps = 0.
     h = dqn.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
@@ -59,7 +59,7 @@ def test_double_dqn():
                    target_model_update=1e-1, policy=policy, enable_double_dqn=True)
     dqn.compile(Adam(lr=1e-3))
 
-    dqn.fit(env, nb_steps=2000, visualize=False, verbose=0)
+    dqn.fit(env, nb_steps=2000, verbose=0, visualize=False)
     policy.eps = 0.
     h = dqn.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
@@ -91,7 +91,7 @@ def test_recurrent_dqn():
                    batch_size=batch_size)
     dqn.compile(Adam(lr=1e-3))
 
-    dqn.fit(env, nb_steps=2000, visualize=False, verbose=0)
+    dqn.fit(env, nb_steps=2000, verbose=0, visualize=False)
     policy.eps = 0.
     h = dqn.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
@@ -115,6 +115,6 @@ def test_cem():
     dqn = CEMAgent(model=model, nb_actions=nb_actions, memory=memory)
     dqn.compile()
 
-    dqn.fit(env, nb_steps=2000, visualize=False, verbose=1)
+    dqn.fit(env, nb_steps=2000, verbose=1, visualize=False)
     h = dqn.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)

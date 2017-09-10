@@ -83,6 +83,19 @@ def huber_loss(y_true, y_pred, clip_value):
     else:
         raise RuntimeError('Unknown backend "{}".'.format(K.backend()))
 
+def GeneralizedAdvantageEstimator(critic, state, reward, gamma, lamb):
+    # TODO: irresponsible draft, all details likely wrong
+    # See https://danieltakeshi.github.io/2017/04/02/notes-on-the-generalized-advantage-estimation-paper/
+    assert len(state) == len(reward)
+    n = len(state)
+    value = critic.predict_on_batch(np.array(state)).flatten()
+    delta = reward + gamma * np.roll(value, 1) - value
+    # No premature optimization for now...
+    result = [0]
+    r = gamma * lamb
+    for i in range(0, n):
+        result.append(result[-1] * r + delta[n-i])
+    return result[:0:-1]
 
 class AdditionalUpdatesOptimizer(optimizers.Optimizer):
     def __init__(self, optimizer, additional_updates):

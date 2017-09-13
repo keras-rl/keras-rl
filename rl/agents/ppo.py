@@ -1,10 +1,14 @@
 import os
 
 import numpy
-from keras import optimizers
+from keras import optimizers, Input
+from keras.engine import Model
+from keras.layers import Lambda
 
 from rl.core import Agent
 from rl.util import clone_optimizer, clone_model
+
+import keras.backend as K
 
 
 class PPOAgent(Agent):
@@ -13,10 +17,11 @@ class PPOAgent(Agent):
     # representing the probability of taking that action.
     # critic's only input is the current state, and should output a scalar representing estimated
     # value of this state
-    def __init__(self, actor, critic, memory, nb_actor=3, nb_steps=1000, epoch=5, **kwargs):
+    def __init__(self, actor, critic, memory, epsilon=0.2, nb_actor=3, nb_steps=1000, epoch=5, **kwargs):
         super(Agent, self).__init__(**kwargs)
 
         # Parameters.
+        self.epsilon = epsilon
         self.nb_actor = nb_actor
         self.nb_steps = nb_steps
         self.epoch = epoch
@@ -55,6 +60,21 @@ class PPOAgent(Agent):
         self.critic.compile(optimizer=critic_optimizer)
 
         # TODO: Model for the overall objective
+        action = Input(name='action')
+        state = Input(name='state')
+        advantage = Input(name='advantage')
+        prob_theta = self.actor(action, state)
+        prob_thetaold = self.target_actor(action, state)
+        def clipped_loss(args):
+            prob_theta, prob_thetaold, advantage = args
+            prob_ratio = prob_theta / prob_thetaold
+            return K.minimum(prob_ratio * advantage, K.clip(prob_ratio, 1-self.epsilon, 1+self.epsilon) * advantage)
+        loss_out = Lambda(clipped_loss, name='loss')([prob_theta, prob_thetaold, advantage])
+        trainable_model = Model(inputs=[action, state, advantage], outputs=loss_out)
+        losses = [ lambda sample_out, network_out: network_out ]
+        trainable_model.compile(optimizer=optimizer, loss=losses)
+        self.trainable_model = trainable_model
+
 
     def load_weights(self, filepath):
         filename, extension = os.path.splitext(filepath)

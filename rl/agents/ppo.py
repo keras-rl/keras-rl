@@ -1,9 +1,18 @@
 import os
 
+import numpy
+from keras import optimizers
+
 from rl.core import Agent
+from rl.util import clone_optimizer, clone_model
 
 
 class PPOAgent(Agent):
+    # Note on network architecture:
+    # actor should take as input the current state and candidate action, and should output a scalar
+    # representing the probability of taking that action.
+    # critic's only input is the current state, and should output a scalar representing estimated
+    # value of this state
     def __init__(self, actor, critic, memory, nb_actor=3, nb_steps=1000, epoch=5, **kwargs):
         super(Agent, self).__init__(**kwargs)
 
@@ -19,7 +28,33 @@ class PPOAgent(Agent):
 
     def compile(self, optimizer, metrics=[]):
         # TODO
-        pass
+        if type(optimizer) in (list, tuple):
+            if len(optimizer) != 2:
+                raise ValueError('More than two optimizers provided. Please only provide a maximum of two optimizers, the first one for the actor and the second one for the critic.')
+            actor_optimizer, critic_optimizer = optimizer
+        else:
+            actor_optimizer = optimizer
+            critic_optimizer = clone_optimizer(optimizer)
+        if type(actor_optimizer) is str:
+            actor_optimizer = optimizers.get(actor_optimizer)
+        if type(critic_optimizer) is str:
+            critic_optimizer = optimizers.get(critic_optimizer)
+        assert actor_optimizer != critic_optimizer
+
+        # Compile networks:
+        # Critic is used in a standard way, so nothing special.
+        # Actor is the ephemeral network that is directly trained,
+        # While target_network is the actual actor network and is updated with the weight of actor
+        # after each round of training
+        self.target_actor = clone_model(self.actor, self.custom_model_objects)
+        self.target_actor.set_weights(self.actor.get_weights())
+        self.target_actor.name += '_copy'
+        for layer in self.target_actor.layers:
+            layer.trainable = False
+        #self.actor.compile(optimizer='sgd', loss='mse')
+        self.critic.compile(optimizer=critic_optimizer)
+
+        # TODO: Model for the overall objective
 
     def load_weights(self, filepath):
         filename, extension = os.path.splitext(filepath)
@@ -37,7 +72,9 @@ class PPOAgent(Agent):
 
     def forward(self, observation):
         # TODO
-        pass
+        prob_dist = self.target_actor.predict_on_batch({ 'state': numpy.repeat(observation, self.nb_action),
+                                                         'action': numpy.arange(self.nb_action) })
+        return self.policy.select_action(prob_dist)
 
     @property
     def layers(self):

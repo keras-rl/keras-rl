@@ -97,6 +97,12 @@ class GreedyQPolicy(Policy):
         action = np.argmax(q_values)
         return action
 
+class SimpleProbabilisticPolicy(Policy):
+    def select_action(self, p_values):
+        assert p_values.ndim == 1
+        nb_actions = p_values.shape[0]
+        return np.random.choice(nb_actions, p=p_values)
+
 
 class BoltzmannQPolicy(Policy):
     def __init__(self, tau=1., clip=(-500., 500.)):

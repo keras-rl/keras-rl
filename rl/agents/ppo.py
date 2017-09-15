@@ -6,7 +6,7 @@ from keras.engine import Model
 from keras.layers import Lambda
 
 from rl.core import Agent
-from rl.util import clone_optimizer, clone_model
+from rl.util import clone_optimizer, clone_model, GeneralizedAdvantageEstimator
 
 import keras.backend as K
 
@@ -75,6 +75,8 @@ class PPOAgent(Agent):
         trainable_model.compile(optimizer=optimizer, loss=losses)
         self.trainable_model = trainable_model
 
+        # Other init
+        self.round = 0
 
     def load_weights(self, filepath):
         filename, extension = os.path.splitext(filepath)
@@ -101,8 +103,51 @@ class PPOAgent(Agent):
         return self.actor.layers[:] + self.critic.layers[:]
 
     def backward(self, reward, terminal=False):
+        # TODO: Just a sketch
         # Store most recent experience in memory.
-        if self.step % self.memory_interval == 0:
+        #if self.step % self.memory_interval == 0:
+        if self.step == 0:
+            self.done_this_round = False
+        if not self.done_this_round:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
-                               training=self.training)
-        # TODO
+                        training=self.training)
+            if terminal or self.step == self.nb_steps:
+                # Compute and store GAE
+                state_history, _, reward_history, _ = self.memory.take_recent(self.step)
+                gae = GeneralizedAdvantageEstimator(self.critic, state_history, reward_history, self.gamma, self.lamb)
+                self.memory.add_info(self.step, gae)
+                self.round += 1
+                self.done_this_round = True
+
+        # Train network every nb_actor rounds of simulation
+        if self.round % self.nb_actor == 0:
+            experiences, info = self.memory.sample(self.batch_size)
+            assert len(experiences) == self.batch_size
+            assert len(info) == self.batch_size
+
+            # Start by extracting the necessary parameters (we use a vectorized implementation).
+            state0_batch = []
+            reward_batch = []
+            action_batch = []
+            terminal1_batch = []
+            state1_batch = []
+            gae_batch = []
+            for e, gae in zip(experiences, info): #TODO: Okay to use zip?
+                state0_batch.append(e.state0)
+                state1_batch.append(e.state1)
+                reward_batch.append(e.reward)
+                action_batch.append(e.action)
+                terminal1_batch.append(0. if e.terminal1 else 1.)
+                gae_batch.append(gae)
+
+            # Prepare and validate parameters.
+            state0_batch = self.process_state_batch(state0_batch)
+            state1_batch = self.process_state_batch(state1_batch)
+            terminal1_batch = np.array(terminal1_batch)
+            reward_batch = np.array(reward_batch)
+            action_batch = np.array(action_batch)
+            assert reward_batch.shape == (self.batch_size,)
+            assert terminal1_batch.shape == reward_batch.shape
+            assert action_batch.shape == (self.batch_size, self.nb_actions)
+
+            # TODO: rest

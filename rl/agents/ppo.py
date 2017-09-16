@@ -1,6 +1,7 @@
 import os
+import itertools
 
-import numpy
+import numpy as np
 from keras import optimizers, Input
 from keras.engine import Model
 from keras.layers import Lambda
@@ -94,13 +95,45 @@ class PPOAgent(Agent):
 
     def forward(self, observation):
         # TODO
-        prob_dist = self.target_actor.predict_on_batch({ 'state': numpy.repeat(observation, self.nb_action),
-                                                         'action': numpy.arange(self.nb_action) })
+        prob_dist = self.target_actor.predict_on_batch({ 'state': np.repeat(observation, self.nb_action),
+                                                         'action': np.arange(self.nb_action) })
         return self.policy.select_action(prob_dist)
 
     @property
     def layers(self):
         return self.actor.layers[:] + self.critic.layers[:]
+
+    def _get_sample_batch(self):
+        experiences, info = self.memory.sample(self.batch_size)
+        assert len(experiences) == self.batch_size
+        assert len(info) == self.batch_size
+
+        # Start by extracting the necessary parameters (we use a vectorized implementation).
+        state0_batch = []
+        reward_batch = []
+        action_batch = []
+        terminal1_batch = []
+        state1_batch = []
+        gae_batch = []
+        for e, gae in zip(experiences, info):  # TODO: Okay to use zip?
+            state0_batch.append(e.state0)
+            state1_batch.append(e.state1)
+            reward_batch.append(e.reward)
+            action_batch.append(e.action)
+            terminal1_batch.append(0. if e.terminal1 else 1.)
+            gae_batch.append(gae)
+
+        # Prepare and validate parameters.
+        state0_batch = self.process_state_batch(state0_batch)
+        state1_batch = self.process_state_batch(state1_batch)
+        terminal1_batch = np.array(terminal1_batch)
+        reward_batch = np.array(reward_batch)
+        action_batch = np.array(action_batch)
+        assert reward_batch.shape == (self.batch_size,)
+        assert terminal1_batch.shape == reward_batch.shape
+        assert action_batch.shape == (self.batch_size, self.nb_actions)
+
+        return state0_batch, reward_batch, action_batch, terminal1_batch, state1_batch, gae_batch
 
     def backward(self, reward, terminal=False):
         # TODO: Just a sketch
@@ -121,33 +154,46 @@ class PPOAgent(Agent):
 
         # Train network every nb_actor rounds of simulation
         if self.round % self.nb_actor == 0:
-            experiences, info = self.memory.sample(self.batch_size)
-            assert len(experiences) == self.batch_size
-            assert len(info) == self.batch_size
+            for _ in itertools.repeat(None, self.epoch):
+                state0_batch, reward_batch, action_batch, terminal1_batch, state1_batch, gae_batch\
+                    = self._get_sample_batch()
 
-            # Start by extracting the necessary parameters (we use a vectorized implementation).
-            state0_batch = []
-            reward_batch = []
-            action_batch = []
-            terminal1_batch = []
-            state1_batch = []
-            gae_batch = []
-            for e, gae in zip(experiences, info): #TODO: Okay to use zip?
-                state0_batch.append(e.state0)
-                state1_batch.append(e.state1)
-                reward_batch.append(e.reward)
-                action_batch.append(e.action)
-                terminal1_batch.append(0. if e.terminal1 else 1.)
-                gae_batch.append(gae)
+                # Train actor with one batch
+                dummy_targets = np.zeros((self.batch_size,))
+                self.trainable_model.train_on_batch([action_batch, state0_batch, gae_batch], [dummy_targets])
 
-            # Prepare and validate parameters.
-            state0_batch = self.process_state_batch(state0_batch)
-            state1_batch = self.process_state_batch(state1_batch)
-            terminal1_batch = np.array(terminal1_batch)
-            reward_batch = np.array(reward_batch)
-            action_batch = np.array(action_batch)
-            assert reward_batch.shape == (self.batch_size,)
-            assert terminal1_batch.shape == reward_batch.shape
-            assert action_batch.shape == (self.batch_size, self.nb_actions)
+            # Update actor
+            self.target_actor.set_weights(self.actor.get_weights())
 
-            # TODO: rest
+            for _ in itertools.repeat(None, self.epoch):
+                state0_batch, reward_batch, action_batch, terminal1_batch, state1_batch, gae_batch \
+                    = self._get_sample_batch()
+
+                # Update critic
+                target_actions = self.target_actor.predict_on_batch(state1_batch)
+                assert target_actions.shape == (self.batch_size, self.nb_actions)
+                if len(self.critic.inputs) >= 3:
+                    state1_batch_with_action = state1_batch[:]
+                else:
+                    state1_batch_with_action = [state1_batch]
+                state1_batch_with_action.insert(self.critic_action_input_idx, target_actions)
+                target_q_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
+                assert target_q_values.shape == (self.batch_size,)
+
+                # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target ys accordingly,
+                # but only for the affected output units (as given by action_batch).
+                discounted_reward_batch = self.gamma * target_q_values
+                discounted_reward_batch *= terminal1_batch
+                assert discounted_reward_batch.shape == reward_batch.shape
+                targets = (reward_batch + discounted_reward_batch).reshape(self.batch_size, 1)
+
+                # Perform a single batch update on the critic network.
+                if len(self.critic.inputs) >= 3:
+                    state0_batch_with_action = state0_batch[:]
+                else:
+                    state0_batch_with_action = [state0_batch]
+                state0_batch_with_action.insert(self.critic_action_input_idx, action_batch)
+                metrics = self.critic.train_on_batch(state0_batch_with_action, targets)
+                if self.processor is not None:
+                    metrics += self.processor.metrics
+

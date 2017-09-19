@@ -163,21 +163,21 @@ class Agent(object):
                 reward = 0.
                 accumulated_info = {}
                 done = False
-                for _ in range(action_repetition):
+                episode_info = {}
+                for i in range(action_repetition):
                     callbacks.on_action_begin(action)
                     observation, r, done, info = env.step(action)
                     observation = deepcopy(observation)
                     if self.processor is not None:
                         observation, r, done, info = self.processor.process_step(observation, r, done, info)
                     for key, value in info.items():
-                        if not np.isreal(value):
-                            continue
                         if key not in accumulated_info:
-                            accumulated_info[key] = np.zeros_like(value)
-                        accumulated_info[key] += value
+                            accumulated_info[key] = np.zeros(action_repetition, dtype=np.array(value).dtype)
+                        accumulated_info[key][i] = value
                     callbacks.on_action_end(action)
                     reward += r
                     if done:
+                        episode_info = info
                         break
                 if nb_max_episode_steps and episode_step >= nb_max_episode_steps - 1:
                     # Force a terminal state.
@@ -209,6 +209,7 @@ class Agent(object):
                     # This episode is finished, report and reset.
                     episode_logs = {
                         'episode_reward': episode_reward,
+                        'episode_info': episode_info,
                         'nb_episode_steps': episode_step,
                         'nb_steps': self.step,
                     }
@@ -301,6 +302,7 @@ class Agent(object):
 
             # Run the episode until we're done.
             done = False
+            episode_info = {}
             while not done:
                 callbacks.on_step_begin(episode_step)
 
@@ -309,7 +311,7 @@ class Agent(object):
                     action = self.processor.process_action(action)
                 reward = 0.
                 accumulated_info = {}
-                for _ in range(action_repetition):
+                for i in range(action_repetition):
                     callbacks.on_action_begin(action)
                     observation, r, d, info = env.step(action)
                     observation = deepcopy(observation)
@@ -318,13 +320,12 @@ class Agent(object):
                     callbacks.on_action_end(action)
                     reward += r
                     for key, value in info.items():
-                        if not np.isreal(value):
-                            continue
                         if key not in accumulated_info:
-                            accumulated_info[key] = np.zeros_like(value)
-                        accumulated_info[key] += value
+                            accumulated_info[key] = np.zeros(action_repetition, dtype=np.array(value).dtype)
+                        accumulated_info[key][i] = value
                     if d:
                         done = True
+                        episode_info = info
                         break
                 if nb_max_episode_steps and episode_step >= nb_max_episode_steps - 1:
                     done = True
@@ -353,6 +354,7 @@ class Agent(object):
             # Report end of episode.
             episode_logs = {
                 'episode_reward': episode_reward,
+                'episode_info': episode_info,
                 'nb_steps': episode_step,
             }
             callbacks.on_episode_end(episode, episode_logs)

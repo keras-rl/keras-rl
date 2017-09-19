@@ -5,6 +5,8 @@ import timeit
 import json
 from tempfile import mkdtemp
 
+from time import time, sleep
+
 import numpy as np
 
 from keras.callbacks import Callback as KerasCallback, CallbackList as KerasCallbackList
@@ -324,7 +326,17 @@ class FileLogger(Callback):
 
 
 class Visualizer(Callback):
+    def __init__(self, fps = 24):
+        super(Visualizer, self).__init__()
+        self.frame_time = 1.0 / fps
+        self.last_render_time = 0
+
     def on_action_end(self, action, logs):
+        now = time()
+        if now - self.last_render_time < self.frame_time:
+            sleep(self.frame_time - now + self.last_render_time)
+        self.last_render_time = now
+
         self.env.render(mode='human')
 
 

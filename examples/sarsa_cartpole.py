@@ -44,4 +44,4 @@ sarsa.fit(env, nb_steps=5000, visualize=False, verbose=2)
 sarsa.save_weights('sarsa_{}_weights.h5f'.format(ENV_NAME), overwrite=True)
 
 # Finally, evaluate our algorithm for 5 episodes.
-sarsa.test(env, nb_episodes=5, visualize=False)
+sarsa.test(env, nb_episodes=5, visualize=True)

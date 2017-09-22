@@ -38,6 +38,14 @@ class MultiInputProcessor(Processor):
 
 
 class WhiteningNormalizerProcessor(Processor):
+    """Normalizes the observations to have zero mean and standard deviation of one,
+    i.e. it applies whitening to the inputs.
+
+    This typically helps significantly with learning, especially if different dimensions are
+    on different scales. However, it complicates training in the sense that you will have to store
+    these weights alongside the policy if you intend to load it later. It is the responsibility of
+    the user to do so.
+    """
     def __init__(self):
         self.normalizer = None
 

@@ -620,3 +620,8 @@ class Space(object):
         """Return boolean specifying if x is a valid member of this space
         """
         raise NotImplementedError()
+
+
+# Backwards compatibility
+import rl.processors
+MultiInputProcessor = rl.processors.MultiInputProcessor

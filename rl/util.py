@@ -98,3 +98,36 @@ class AdditionalUpdatesOptimizer(optimizers.Optimizer):
 
     def get_config(self):
         return self.optimizer.get_config()
+
+
+# Based on https://github.com/openai/baselines/blob/master/baselines/common/mpi_running_mean_std.py
+class WhiteningNormalizer(object):
+    def __init__(self, shape, eps=1e-2, dtype=np.float64):
+        self.eps = eps
+        self.shape = shape
+        self.dtype = dtype
+
+        self._sum = np.zeros(shape, dtype=dtype)
+        self._sumsq = np.zeros(shape, dtype=dtype)
+        self._count = 0
+
+        self.mean = np.zeros(shape, dtype=dtype)
+        self.std = np.ones(shape, dtype=dtype)
+
+    def normalize(self, x):
+        return (x - self.mean) / self.std
+
+    def denormalize(self, x):
+        return self.std * x + self.mean
+
+    def update(self, x):
+        if x.ndim == len(self.shape):
+            x = x.reshape(-1, *self.shape)
+        assert x.shape[1:] == self.shape
+
+        self._count += x.shape[0]
+        self._sum += np.sum(x, axis=0)
+        self._sumsq += np.sum(np.square(x), axis=0)
+
+        self.mean = self._sum / float(self._count)
+        self.std = np.sqrt(np.maximum(np.square(self.eps), self._sumsq / float(self._count) - np.square(self.mean)))

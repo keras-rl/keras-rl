@@ -10,7 +10,7 @@ from keras.layers import Input, merge, Dense, Flatten
 
 from rl.agents.cem import CEMAgent
 from rl.memory import EpisodeParameterMemory
-from rl.core import MultiInputProcessor
+from rl.processors import MultiInputProcessor
 
 from ..util import MultiInputTestEnv
 

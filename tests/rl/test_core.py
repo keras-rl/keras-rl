@@ -56,54 +56,42 @@ def test_fit_observations():
     agent.fit(env, 20, verbose=0)
 
     # Inspect memory to see if observations are correct.
-    experiencies = memory.sample(batch_size=8, batch_idxs=range(8))
-    
-    assert experiencies[0].reward == .2
-    assert experiencies[0].action == 1
-    assert_allclose(experiencies[0].state0, np.array([0, 1]))
-    assert_allclose(experiencies[0].state1, np.array([1, 2]))
+    experiencies = memory.sample(batch_size=6, batch_idxs=range(2, 8))
+
+    assert experiencies[0].reward == .4
+    assert experiencies[0].action == 3
+    assert_allclose(experiencies[0].state0, np.array([2, 3]))
+    assert_allclose(experiencies[0].state1, np.array([3, 4]))
     assert experiencies[0].terminal1 is False
-    
-    assert experiencies[1].reward == .3
-    assert experiencies[1].action == 2
-    assert_allclose(experiencies[1].state0, np.array([1, 2]))
-    assert_allclose(experiencies[1].state1, np.array([2, 3]))
+
+    assert experiencies[1].reward == .5
+    assert experiencies[1].action == 4
+    assert_allclose(experiencies[1].state0, np.array([3, 4]))
+    assert_allclose(experiencies[1].state1, np.array([4, 5]))
     assert experiencies[1].terminal1 is False
 
-    assert experiencies[2].reward == .4
-    assert experiencies[2].action == 3
-    assert_allclose(experiencies[2].state0, np.array([2, 3]))
-    assert_allclose(experiencies[2].state1, np.array([3, 4]))
-    assert experiencies[2].terminal1 is False
+    assert experiencies[2].reward == .6
+    assert experiencies[2].action == 5
+    assert_allclose(experiencies[2].state0, np.array([4, 5]))
+    assert_allclose(experiencies[2].state1, np.array([5, 6]))
+    assert experiencies[2].terminal1 is True
 
-    assert experiencies[3].reward == .5
-    assert experiencies[3].action == 4
-    assert_allclose(experiencies[3].state0, np.array([3, 4]))
-    assert_allclose(experiencies[3].state1, np.array([4, 5]))
-    assert experiencies[3].terminal1 is False
-
-    assert experiencies[4].reward == .6
-    assert experiencies[4].action == 5
-    assert_allclose(experiencies[4].state0, np.array([4, 5]))
-    assert_allclose(experiencies[4].state1, np.array([5, 6]))
-    assert experiencies[4].terminal1 is True
-
-    # Experience 5 has been re-sampled since since state0 would be terminal in which case we
+    # Experience 3 has been re-sampled since since state0 would be terminal in which case we
     # cannot really have a meaningful transition because the environment gets reset. We thus
     # just ensure that state0 is not terminal.
-    assert not np.all(experiencies[5].state0 == np.array([5, 6]))
+    assert not np.all(experiencies[3].state0 == np.array([5, 6]))
 
-    assert experiencies[6].reward == .2
-    assert experiencies[6].action == 1
-    assert_allclose(experiencies[6].state0, np.array([0, 1]))
-    assert_allclose(experiencies[6].state1, np.array([1, 2]))
-    assert experiencies[6].terminal1 is False
+    assert experiencies[4].reward == .2
+    assert experiencies[4].action == 1
+    assert_allclose(experiencies[4].state0, np.array([0, 1]))
+    assert_allclose(experiencies[4].state1, np.array([1, 2]))
+    assert experiencies[4].terminal1 is False
 
-    assert experiencies[7].reward == .3
-    assert experiencies[7].action == 2
-    assert_allclose(experiencies[7].state0, np.array([1, 2]))
-    assert_allclose(experiencies[7].state1, np.array([2, 3]))
-    assert experiencies[7].terminal1 is False
+    assert experiencies[5].reward == .3
+    assert experiencies[5].action == 2
+    assert_allclose(experiencies[5].state0, np.array([1, 2]))
+    assert_allclose(experiencies[5].state1, np.array([2, 3]))
+    assert experiencies[5].terminal1 is False
 
 
 def test_copy_observations():
@@ -114,7 +102,7 @@ def test_copy_observations():
 
     for method in methods:
         original_observations = []
-        
+
         class LocalEnv(Env):
             def __init__(self):
                 super(LocalEnv, self).__init__()
@@ -155,7 +143,7 @@ def test_copy_observations():
         assert len(observations) == len(original_observations)
         assert_allclose(np.array(observations), np.array(original_observations))
         assert np.all([o is not o_ for o, o_ in zip(original_observations, observations)])
-    
+
 
 if __name__ == '__main__':
     pytest.main([__file__])

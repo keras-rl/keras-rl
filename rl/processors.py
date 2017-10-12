@@ -54,4 +54,3 @@ class WhiteningNormalizerProcessor(Processor):
             self.normalizer = WhiteningNormalizer(shape=batch.shape[1:], dtype=batch.dtype)
         self.normalizer.update(batch)
         return self.normalizer.normalize(batch)
-

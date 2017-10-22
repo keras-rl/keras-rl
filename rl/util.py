@@ -90,8 +90,8 @@ class AdditionalUpdatesOptimizer(optimizers.Optimizer):
         self.optimizer = optimizer
         self.additional_updates = additional_updates
 
-    def get_updates(self, params, constraints, loss):
-        updates = self.optimizer.get_updates(params, constraints, loss)
+    def get_updates(self, params, loss):
+        updates = self.optimizer.get_updates(loss, params)
         updates += self.additional_updates
         self.updates = updates
         return self.updates

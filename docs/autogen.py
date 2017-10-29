@@ -16,6 +16,7 @@ if sys.version[0] == '2':
 
 import rl
 import rl.core
+import rl.processors
 import rl.agents
 
 
@@ -27,6 +28,10 @@ PAGES = [
     {
         'page': 'core.md',
         'all_module_classes': [rl.core],
+    },
+    {
+        'page': 'processors.md',
+        'all_module_classes': [rl.processors],
     },
     {
         'page': 'agents/overview.md',

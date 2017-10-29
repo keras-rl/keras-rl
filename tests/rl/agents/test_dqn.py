@@ -10,7 +10,7 @@ from keras.layers import Input, merge, Dense, Flatten
 
 from rl.agents.dqn import NAFLayer, DQNAgent, NAFAgent
 from rl.memory import SequentialMemory
-from rl.core import MultiInputProcessor
+from rl.processors import MultiInputProcessor
 from rl.keras_future import concatenate, Model
 
 from ..util import MultiInputTestEnv

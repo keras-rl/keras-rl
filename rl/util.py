@@ -3,7 +3,7 @@ import numpy as np
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
 import keras.backend as K
-
+from keras import __version__ as keras_version
 
 def clone_model(model, custom_objects={}):
     # Requires Keras 1.0.7 since get_config has breaking changes.
@@ -48,7 +48,7 @@ def get_soft_target_model_updates(target, source, tau):
 def get_object_config(o):
     if o is None:
         return None
-        
+
     config = {
         'class_name': o.__class__.__name__,
         'config': o.get_config()
@@ -84,20 +84,33 @@ def huber_loss(y_true, y_pred, clip_value):
         raise RuntimeError('Unknown backend "{}".'.format(K.backend()))
 
 
-class AdditionalUpdatesOptimizer(optimizers.Optimizer):
+class AbstractAdditionalUpdatesOptimizer(optimizers.Optimizer):
+
     def __init__(self, optimizer, additional_updates):
         super(AdditionalUpdatesOptimizer, self).__init__()
         self.optimizer = optimizer
         self.additional_updates = additional_updates
 
-    def get_updates(self, params, constraints, loss):
-        updates = self.optimizer.get_updates(params, constraints, loss)
+    def get_config(self):
+        return self.optimizer.get_config()
+
+    def _update_updates(updates):
         updates += self.additional_updates
         self.updates = updates
         return self.updates
 
-    def get_config(self):
-        return self.optimizer.get_config()
+class AdditionalUpdatesOptimizerK1(AbstractAdditionalUpdatesOptimizer):
+    def get_updates(self, params, constraints, loss):
+        return self._update_updates(self.optimizer.get_updates(params, constraints, loss))
+
+class AdditionalUpdatesOptimizerK2(AbstractAdditionalUpdatesOptimizer):
+    def get_updates(self, params, constraints, loss):
+        return self._update_updates(self.optimizer.get_updates(params, loss))
+
+if int(keras_version.split('.')[0]) == 1:
+    AdditionalUpdatesOptimizer = AdditionalUpdatesOptimizerK1
+else:
+    AdditionalUpdatesOptimizer = AdditionalUpdatesOptimizerK2
 
 
 # Based on https://github.com/openai/baselines/blob/master/baselines/common/mpi_running_mean_std.py

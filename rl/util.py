@@ -87,7 +87,7 @@ def huber_loss(y_true, y_pred, clip_value):
 class AbstractAdditionalUpdatesOptimizer(optimizers.Optimizer):
 
     def __init__(self, optimizer, additional_updates):
-        super(AdditionalUpdatesOptimizer, self).__init__()
+        super(AbstractAdditionalUpdatesOptimizer, self).__init__()
         self.optimizer = optimizer
         self.additional_updates = additional_updates
 

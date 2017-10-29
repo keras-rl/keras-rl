@@ -121,6 +121,14 @@ class BoltzmannQPolicy(Policy):
         return config
 
 class MaxBoltzmannQPolicy(Policy):
+    """
+    A combination of the eps-greedy and Boltzman q-policy.
+
+    Wiering, M.: Explorations in Efficient Reinforcement Learning.
+    PhD thesis, University of Amserdam, Amsterdam (1999)
+
+    https://pure.uva.nl/ws/files/3153478/8461_UBA003000033.pdf
+    """
     def __init__(self, eps=.1, tau=1., clip=(-500., 500.)):
         super(MaxBoltzmannQPolicy, self).__init__()
         self.eps = eps

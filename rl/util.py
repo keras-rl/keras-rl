@@ -99,18 +99,14 @@ class AbstractAdditionalUpdatesOptimizer(optimizers.Optimizer):
         self.updates = updates
         return self.updates
 
-class AdditionalUpdatesOptimizerK1(AbstractAdditionalUpdatesOptimizer):
-    def get_updates(self, params, constraints, loss):
-        return self._update_updates(self.optimizer.get_updates(params, constraints, loss))
-
-class AdditionalUpdatesOptimizerK2(AbstractAdditionalUpdatesOptimizer):
-    def get_updates(self, params, constraints, loss):
-        return self._update_updates(self.optimizer.get_updates(params, loss))
-
 if int(keras_version.split('.')[0]) == 1:
-    AdditionalUpdatesOptimizer = AdditionalUpdatesOptimizerK1
+    class AdditionalUpdatesOptimizer(AbstractAdditionalUpdatesOptimizer):
+        def get_updates(self, params, constraints, loss):
+            return self._update_updates(self.optimizer.get_updates(params, constraints, loss))
 else:
-    AdditionalUpdatesOptimizer = AdditionalUpdatesOptimizerK2
+    class AdditionalUpdatesOptimizer(AbstractAdditionalUpdatesOptimizer):
+        def get_updates(self, params, constraints, loss):
+            return self._update_updates(self.optimizer.get_updates(params, loss))
 
 
 # Based on https://github.com/openai/baselines/blob/master/baselines/common/mpi_running_mean_std.py

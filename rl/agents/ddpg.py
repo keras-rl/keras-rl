@@ -145,8 +145,8 @@ class DDPGAgent(Agent):
 
         # Finally, combine it all into a callable function.
         # if self.uses_learning_phase:
-        #     critic_inputs += [K.learning_phase()]
-        self.actor_train_fn = K.function([critic_inputs, K.learning_phase()],
+        # critic_inputs = [critic_inputs[0], K.learning_phase()]
+        self.actor_train_fn = K.function(critic_inputs + [K.learning_phase()],
                                          [self.actor(critic_inputs)], updates=updates)
         self.actor_optimizer = actor_optimizer
 

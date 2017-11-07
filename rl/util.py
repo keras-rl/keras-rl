@@ -146,7 +146,7 @@ def _freeze_unfreeze_layers_of_model(model, freeze=True):
 def freeze_unfreeze_n_layers(model, n, freeze=True):
     """Freezes either first n layers or last n layers of a network depending upon if
     n is +ve or -ve"""
-    if not self.compiled:
+    if not model.optimizer:
         raise RuntimeError(
             'Your tried to fit your model but it hasn\'t been compiled yet. '
             'Please call `compile()`. Otherwise this is error prone.')
@@ -170,7 +170,7 @@ def freeze_unfreeze_n_layers(model, n, freeze=True):
 def freeze_by_binary_flag(model, flag_list):
     """Takes a flag_list of binary values which is as long as number of layers in the model.
     Any layer with a True flag gets frozen"""
-    if not self.compiled:
+    if not model.optimizer:
         raise RuntimeError(
             'Your tried to fit your model but it hasn\'t been compiled yet. '
             'Please call `compile()`. Otherwise this is error prone.')

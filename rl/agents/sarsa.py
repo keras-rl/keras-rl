@@ -101,8 +101,8 @@ class SARSAAgent(Agent):
 
         self.compiled = True
 
-    def load_weights(self, filepath):
-        self.model.load_weights(filepath)
+    def load_weights(self, filepath, by_name=False):
+        self.model.load_weights(filepath, by_name)
         
     def freeze_unfreeze_n_layers(self, n, freeze=True):
         freeze_unfreeze_n_layers(self.model, n, freeze)

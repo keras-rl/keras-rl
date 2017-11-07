@@ -194,8 +194,8 @@ class DQNAgent(AbstractDQNAgent):
 
         self.compiled = True
 
-    def load_weights(self, filepath):
-        self.model.load_weights(filepath)
+    def load_weights(self, filepath, by_name=False):
+        self.model.load_weights(filepath, by_name)
         self.update_target_model_hard()
 
     def save_weights(self, filepath, overwrite=False):

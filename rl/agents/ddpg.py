@@ -150,17 +150,18 @@ class DDPGAgent(Agent):
         else:
             if self.uses_learning_phase:
                 critic_inputs += [K.learning_phase()]
-            self.actor_train_fn = K.function(critic_inputs, [self.actor(critic_inputs)], updates=updates)
+            self.actor_train_fn = K.function(critic_inputs, [self.actor(critic_inputs)],
+                                             updates=updates)
         self.actor_optimizer = actor_optimizer
 
         self.compiled = True
 
-    def load_weights(self, filepath):
+    def load_weights(self, filepath, by_name=False):
         filename, extension = os.path.splitext(filepath)
         actor_filepath = filename + '_actor' + extension
         critic_filepath = filename + '_critic' + extension
-        self.actor.load_weights(actor_filepath)
-        self.critic.load_weights(critic_filepath)
+        self.actor.load_weights(actor_filepath, by_name)
+        self.critic.load_weights(critic_filepath, by_name)
         self.update_target_models_hard()
 
     def save_weights(self, filepath, overwrite=False):

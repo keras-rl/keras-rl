@@ -103,6 +103,12 @@ class SARSAAgent(Agent):
 
     def load_weights(self, filepath):
         self.model.load_weights(filepath)
+        
+    def freeze_unfreeze_n_layers(self, n, freeze=True):
+        freeze_unfreeze_n_layers(self.model, n, freeze)
+
+    def freeze_by_binary_flag(self, flag_list):
+        freeze_by_binary_flag(self.model, flag_list)
 
     def save_weights(self, filepath, overwrite=False):
         self.model.save_weights(filepath, overwrite=overwrite)

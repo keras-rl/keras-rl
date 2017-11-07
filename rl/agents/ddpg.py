@@ -172,6 +172,21 @@ class DDPGAgent(Agent):
 
     # TODO: implement pickle
 
+    def freeze_unfreeze_n_layers(self, n, freeze=True, operate_on_actor=True,
+                                 operate_on_critic=True):
+        if operate_on_actor:
+            freeze_unfreeze_n_layers(self.actor, n, freeze)
+
+        if operate_on_critic:
+            freeze_unfreeze_n_layers(self.critic, n, freeze)
+
+    def freeze_by_binary_flag(self, list_actor, list_critic):
+        if list_actor:
+            freeze_by_binary_flag(self.actor, list_actor)
+
+        if list_critic:
+            freeze_by_binary_flag(self.critic, list_critic)
+
     def reset_states(self):
         if self.random_process is not None:
             self.random_process.reset_states()

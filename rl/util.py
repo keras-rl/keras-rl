@@ -176,12 +176,12 @@ def freeze_by_binary_flag(model, flag_list):
             'Please call `compile()`. Otherwise this is error prone.')
 
     if len(flag_list) != len(model.layers):
-        logging.critical('The number of flags provided doesn\'t match number of layers in the model  = '
-                         + str(len(flag_list)) + 'number of ids = ' + str(len(model.layers)))
+        raise RuntimeError('The number of flags provided doesn\'t match number of layers in the model  = '
+                           + str(len(flag_list)) + 'number of ids = ' + str(len(model.layers)))
     for i in range(len(flag_list)):
         if flag_list[i] == 1:
             if len(model.layers[i].get_weights()) <= 0:
-                logging.critical("Fatal Error: Trying to freeze layer with no weights")
+                raise RuntimeError("Trying to freeze layer with no weights")
             else:
                 logging.info("Freezing " + model.layers[i].name)
 

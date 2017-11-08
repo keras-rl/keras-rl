@@ -152,7 +152,10 @@ def freeze_unfreeze_n_layers(model, n, freeze=True):
             'Please call `compile()`. Otherwise this is error prone.')
     if n < 0:
         n += len(model.layers)
-    for i in range(n):
+        idx_range = range(n, len(model.layers), 1)
+    else:
+        idx_range = range(n)
+    for i in idx_range:
         if len(model.layers[i].get_weights()) > 0:
             if freeze:
                 logging.info("Freezing " + model.layers[i].name)

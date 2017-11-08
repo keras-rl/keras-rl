@@ -1,6 +1,8 @@
 import logging
 import numpy as np
 
+from multiprocessing import Process, Queue
+
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
 import keras.backend as K
@@ -163,7 +165,7 @@ def freeze_unfreeze_n_layers(model, n, freeze=True):
                 logging.info("Unfreezing " + model.layers[i].name)
             if hasattr(model.layers[i], 'layers'):
                 # If a model layer is itself a model then it freezes recursively
-                NnBase._freeze_unfreeze_layers_of_model(model.layers[i], freeze)
+                _freeze_unfreeze_layers_of_model(model.layers[i], freeze)
             else:
                 model.layers[i].trainable = not freeze
 
@@ -190,8 +192,55 @@ def freeze_by_binary_flag(model, flag_list):
 
                 if hasattr(model.layers[i], 'layers'):
                     # If a model layer is itself a model then it freezes recursively
-                    NnBase._freeze_unfreeze_layers_of_model(model.layers[i])
+                    _freeze_unfreeze_layers_of_model(model.layers[i])
                 else:
                     model.layers[i].trainable = False
 
     model.compile(loss=model.loss, optimizer=model.optimizer, metrics=model.metrics)
+
+
+class EnvironmentInstance:
+    def __init__(self, get_env, environment_arguments):
+        self.result_q = Queue(1)
+        self.command_q = Queue(1)
+        self.environment_arguments = environment_arguments
+        self.get_env = get_env
+
+        self.p = Process(target=self.execute_current_command)
+        self.p.daemon = True
+        self.p.start()
+
+    def execute_current_command(self):
+        e = self.get_env(*self.environment_arguments)
+        self.action_space = e.action_space
+        while True:
+            command = self.command_q.get()
+            if command[0] == 'reset':
+                if len(command) > 1:
+                    keyword, sep, value = command[1].partition('=')
+                    kwargs = {keyword: value.strip('"')}
+                    observation = e.reset(**kwargs)
+                else:
+                    observation = e.reset()
+                self.result_q.put(observation)
+
+            elif command[0] == 'step':
+                self.result_q.put(e.step(command[1]))
+            else:
+                self.result_q.close()
+                self.command_q.close()
+                del e
+
+    def set_command(self, command):
+        self.command_q.put(command)
+
+    def get_results(self):
+        return self.result_q.get()
+
+    def reset(self):
+        self.set_command(['reset',])
+        return self.result_q.get()
+
+    def step(self, action):
+        self.set_command(['step', action])
+        return self.result_q.get()

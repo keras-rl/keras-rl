@@ -73,7 +73,7 @@ def zeroed_observation(observation):
 
 
 class Memory(object):
-    def __init__(self, window_length, num_parallel_envs, ignore_episode_boundaries=False):
+    def __init__(self, window_length, num_parallel_envs=1, ignore_episode_boundaries=False):
         self.window_length = window_length
         self.ignore_episode_boundaries = ignore_episode_boundaries
 

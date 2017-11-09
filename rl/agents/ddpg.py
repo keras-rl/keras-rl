@@ -211,7 +211,6 @@ class DDPGAgent(Agent):
 
     def select_action(self, state):
         batch = self.process_state_batch([state])
-        print(batch)
         action = self.actor.predict_on_batch(batch).flatten()
         assert action.shape == (self.nb_actions,)
 

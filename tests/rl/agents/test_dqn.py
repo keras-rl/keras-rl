@@ -28,10 +28,8 @@ def test_single_dqn_input():
         agent.compile('sgd')
         agent.fit(MultiInputTestEnv((3,)), nb_steps=10)
 
-    # Running parallely crashes the test cases! Te recreate un comment the following line.
-    # Plese discuss this in an issue thread if any one can
-    # figure out why
-# def test_multi_dqn_input():
+
+def test_multi_dqn_input():
     input1 = Input(shape=(2, 3))
     input2 = Input(shape=(2, 4))
     x = merge([input1, input2], mode='concat')
@@ -47,10 +45,8 @@ def test_single_dqn_input():
         agent.compile('sgd')
         agent.fit(MultiInputTestEnv([(3,), (4,)]), nb_steps=10)
 
-        # Running parallely crashes the test cases! Te recreate un comment the following line.
-        # Plese discuss this in an issue thread if any one can
-        # figure out why
-# def test_single_continuous_dqn_input():
+
+def test_single_continuous_dqn_input():
     nb_actions = 2
 
     V_model = Sequential()
@@ -73,10 +69,8 @@ def test_single_dqn_input():
     agent.compile('sgd')
     agent.fit(MultiInputTestEnv((3,)), nb_steps=10)
 
-    # Running parallely crashes the test cases! Te recreate un comment the following line.
-    # Plese discuss this in an issue thread if any one can
-    # figure out why
-# def test_multi_continuous_dqn_input():
+
+def test_multi_continuous_dqn_input():
     nb_actions = 2
 
     V_input1 = Input(shape=(2, 3))
@@ -108,10 +102,8 @@ def test_single_dqn_input():
     agent.compile('sgd')
     agent.fit(MultiInputTestEnv([(3,), (4,)]), nb_steps=10)
 
-    # Running parallely crashes the test cases! Te recreate un comment the following line.
-    # Plese discuss this in an issue thread if any one can
-    # figure out why
-# def test_naf_layer_full():
+
+def test_naf_layer_full():
     batch_size = 2
     for nb_actions in (1, 3):
         # Construct single model with NAF as the only layer, hence it is fully deterministic
@@ -144,10 +136,8 @@ def test_single_dqn_input():
         A_net = model.predict([L_flat, mu, action]).flatten()
         assert_allclose(A_net, A_ref, rtol=1e-5)
 
-        # Running parallely crashes the test cases! Te recreate un comment the following line.
-        # Plese discuss this in an issue thread if any one can
-        # figure out why
-# def test_naf_layer_diag():
+
+def test_naf_layer_diag():
     batch_size = 2
     for nb_actions in (1, 3):
         # Construct single model with NAF as the only layer, hence it is fully deterministic

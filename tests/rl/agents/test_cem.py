@@ -25,10 +25,7 @@ def test_single_cem_input():
     agent.compile()
     agent.fit(MultiInputTestEnv((3,)), nb_steps=100)
 
-    # Running parallely crashes the test cases! Te recreate un comment the following line.
-    # Plese discuss this in an issue thread if any one can
-    # figure out why
-# def test_multi_cem_input():
+def test_multi_cem_input():
     input1 = Input(shape=(2, 3))
     input2 = Input(shape=(2, 4))
     x = merge([input1, input2], mode='concat')

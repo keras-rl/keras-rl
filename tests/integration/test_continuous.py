@@ -52,10 +52,8 @@ def test_cdqn():
     h = agent.test(env, nb_episodes=2, visualize=False, nb_max_episode_steps=10)
     # TODO: evaluate history
 
-    # Running parallely crashes the test cases! Te recreate un comment the following line.
-    # Plese discuss this in an issue thread if any one can
-    # figure out why
-# def test_ddpg():
+
+def test_ddpg():
     # TODO: replace this with a simpler environment where we can actually test if it finds a solution
     env = gym.make('Pendulum-v0')
     np.random.seed(123)

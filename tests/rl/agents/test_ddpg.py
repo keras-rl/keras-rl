@@ -31,10 +31,8 @@ def test_single_ddpg_input():
     env = util.MultiInputTestEnv((3,))
     agent.fit(env, nb_steps=10)
 
-    # ============================ test_multi_ddpg_input ============================
-    # Running parallely crashes them both. Te recreate un comment the following line
-    # def test_multi_ddpg_input(). Plese discuss this in an issue thread if any one can
-    # figure out why
+
+def test_multi_ddpg_input():
     nb_actions = 2
 
     actor_observation_input1 = Input(shape=(2, 3), name='actor_observation_input1')

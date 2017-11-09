@@ -37,10 +37,8 @@ def test_dqn():
     h = dqn.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
 
-    # Running parallely crashes the test cases! Te recreate un comment the following line.
-    # Plese discuss this in an issue thread if any one can
-    # figure out why
-# def test_double_dqn():
+
+def test_double_dqn():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
     env.seed(123)
@@ -65,10 +63,8 @@ def test_dqn():
     h = dqn.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
 
-    # Running parallely crashes the test cases! Te recreate un comment the following line.
-    # Plese discuss this in an issue thread if any one can
-    # figure out why
-# def test_cem():
+
+def test_cem():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
     env.seed(123)
@@ -90,10 +86,8 @@ def test_dqn():
     h = dqn.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
 
-    # Running parallely crashes the test cases! Te recreate un comment the following line.
-    # Plese discuss this in an issue thread if any one can
-    # figure out why
-# def test_duel_dqn():
+
+def test_duel_dqn():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
     env.seed(123)
@@ -117,10 +111,8 @@ def test_dqn():
     h = dqn.test(env, nb_episodes=20, visualize=False)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
 
-    # Running parallely crashes the test cases! Te recreate un comment the following line.
-    # Plese discuss this in an issue thread if any one can
-    # figure out why
-# def test_sarsa():
+
+def test_sarsa():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
     env.seed(123)

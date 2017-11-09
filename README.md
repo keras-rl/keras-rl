@@ -105,7 +105,7 @@ pip install pytest pytest-xdist pep8 pytest-pep8 pytest-cov python-coveralls
 ```
 You can then run all tests using this command:
 ```bash
-py.test tests/.
+py.test tests/. -n=1
 ```
 If you want to check if the files conform to the PEP8 style guidelines, run the following command:
 ```bash

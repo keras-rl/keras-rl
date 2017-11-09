@@ -119,9 +119,9 @@ class CEMAgent(Agent):
         sampled_weights = self.get_weights_list(weights_flat)
         self.model.set_weights(sampled_weights)
 
-    def forward(self, observation):
+    def forward(self, observation, env_id):
         # Select an action.
-        state = self.memory.get_recent_state(observation)
+        state = self.memory.get_recent_state(observation, env_id)
         action = self.select_action(state)
         if self.processor is not None:
             action = self.processor.process_action(action)
@@ -136,11 +136,11 @@ class CEMAgent(Agent):
     def layers(self):
         return self.model.layers[:]
          
-    def backward(self, reward, terminal):
+    def backward(self, reward, env_id, terminal):
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
-                               training=self.training)
+                               env_id, training=self.training)
 
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:

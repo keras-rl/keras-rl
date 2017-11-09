@@ -222,9 +222,9 @@ class DDPGAgent(Agent):
 
         return action
 
-    def forward(self, observation):
+    def forward(self, observation, env_id):
         # Select an action.
-        state = self.memory.get_recent_state(observation)
+        state = self.memory.get_recent_state(observation, env_id)
         action = self.select_action(state)  # TODO: move this into policy
         if self.processor is not None:
             action = self.processor.process_action(action)
@@ -246,11 +246,11 @@ class DDPGAgent(Agent):
             names += self.processor.metrics_names[:]
         return names
 
-    def backward(self, reward, terminal=False):
+    def backward(self, reward, env_id, terminal=False):
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
-                               training=self.training)
+                               env_id, training=self.training)
 
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:

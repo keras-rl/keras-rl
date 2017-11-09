@@ -183,7 +183,7 @@ class Agent(object):
                 # This is were all of the work happens. We first perceive and compute the actions
                 # (forward step) and then use the rewards to improve (backward step).
                 for i in range(run_env_parally_in_n_processes):
-                    actions[i] = self.forward(observations[i])
+                    actions[i] = self.forward(observations[i], i)
 
                     if self.processor is not None:
                         actions = self.processor.process_action(actions)
@@ -215,7 +215,7 @@ class Agent(object):
                     if nb_max_episode_steps and episode_step[i] >= nb_max_episode_steps - 1:
                         # Force a terminal state.
                         done = [True]*run_env_parally_in_n_processes
-                    metrics = self.backward(rewards[i], terminal=done[i])
+                    metrics = self.backward(rewards[i], i, terminal=done[i])
                     episode_reward[i] += rewards[i]
 
                     step_logs = {
@@ -236,8 +236,8 @@ class Agent(object):
                         # resetting the environment. We need to pass in `terminal=False` here since
                         # the *next* state, that is the state of the newly reset environment, is
                         # always non-terminal by convention.
-                        self.forward(observations[i])
-                        self.backward(0., terminal=False)
+                        self.forward(observations[i], i)
+                        self.backward(0., i, terminal=False)
 
                         # This episode is finished, report and reset.
                         episode_logs = {

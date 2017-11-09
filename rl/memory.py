@@ -73,34 +73,34 @@ def zeroed_observation(observation):
 
 
 class Memory(object):
-    def __init__(self, window_length, ignore_episode_boundaries=False):
+    def __init__(self, window_length, num_parallel_envs, ignore_episode_boundaries=False):
         self.window_length = window_length
         self.ignore_episode_boundaries = ignore_episode_boundaries
 
-        self.recent_observations = deque(maxlen=window_length)
-        self.recent_terminals = deque(maxlen=window_length)
+        self.recent_observations = [deque(maxlen=window_length) for _ in range(num_parallel_envs)]
+        self.recent_terminals = [deque(maxlen=window_length) for _ in range(num_parallel_envs)]
 
     def sample(self, batch_size, batch_idxs=None):
         raise NotImplementedError()
 
-    def append(self, observation, action, reward, terminal, training=True):
-        self.recent_observations.append(observation)
-        self.recent_terminals.append(terminal)
+    def append(self, observation, action, reward, terminal, env_id, training=True):
+        self.recent_observations[env_id].append(observation)
+        self.recent_terminals[env_id].append(terminal)
 
-    def get_recent_state(self, current_observation):
+    def get_recent_state(self, current_observation, env_id):
         # This code is slightly complicated by the fact that subsequent observations might be
         # from different episodes. We ensure that an experience never spans multiple episodes.
         # This is probably not that important in practice but it seems cleaner.
         state = [current_observation]
-        idx = len(self.recent_observations) - 1
+        idx = len(self.recent_observations[env_id]) - 1
         for offset in range(0, self.window_length - 1):
             current_idx = idx - offset
-            current_terminal = self.recent_terminals[current_idx - 1] if current_idx - 1 >= 0 else False
+            current_terminal = self.recent_terminals[env_id][current_idx - 1] if current_idx - 1 >= 0 else False
             if current_idx < 0 or (not self.ignore_episode_boundaries and current_terminal):
                 # The previously handled observation was terminal, don't add the current one.
                 # Otherwise we would leak into a different episode.
                 break
-            state.insert(0, self.recent_observations[current_idx])
+            state.insert(0, self.recent_observations[env_id][current_idx])
         while len(state) < self.window_length:
             state.insert(0, zeroed_observation(state[0]))
         return state
@@ -178,8 +178,8 @@ class SequentialMemory(Memory):
         assert len(experiences) == batch_size
         return experiences
 
-    def append(self, observation, action, reward, terminal, training=True):
-        super(SequentialMemory, self).append(observation, action, reward, terminal, training=training)
+    def append(self, observation, action, reward, terminal, env_id, training=True):
+        super(SequentialMemory, self).append(observation, action, reward, terminal, env_id, training=training)
         
         # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
         # and weather the next state is `terminal` or not.
@@ -220,8 +220,8 @@ class EpisodeParameterMemory(Memory):
             batch_total_rewards.append(self.total_rewards[idx])
         return batch_params, batch_total_rewards
 
-    def append(self, observation, action, reward, terminal, training=True):
-        super(EpisodeParameterMemory, self).append(observation, action, reward, terminal, training=training)
+    def append(self, observation, action, reward, terminal, env_id, training=True):
+        super(EpisodeParameterMemory, self).append(observation, action, reward, terminal, env_id, training=training)
         if training:
             self.intermediate_rewards.append(reward)
 

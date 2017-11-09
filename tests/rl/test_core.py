@@ -109,7 +109,7 @@ def test_fit_observations():
 def test_copy_observations():
     methods = [
         'fit',
-        # 'test',
+        'test',
     ]
 
     for method in methods:
@@ -158,5 +158,4 @@ def test_copy_observations():
     
 
 if __name__ == '__main__':
-    # pytest.main([__file__])
-    test_copy_observations()
+    pytest.main([__file__])

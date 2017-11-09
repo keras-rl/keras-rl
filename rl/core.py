@@ -164,10 +164,13 @@ class Agent(object):
 
                             observations = deepcopy(observations)
                             if self.processor is not None:
-                                    observations[i], rewards[i], done[i], info[i] = self.processor.process_step(observations[i], rewards[i], done[i], info[i])
+                                    observations[i], rewards[i], done[i], info[i] = \
+                                        self.processor.process_step(observations[i], rewards[i], done[i], info[i])
                             callbacks.on_action_end(actions)
                             if done[i]:
-                                warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(nb_random_start_steps))
+                                warnings.warn('Env ended before {} random steps could be performed at the start. You '
+                                              'should probably lower the `nb_max_start_steps` '
+                                              'parameter.'.format(nb_random_start_steps))
                                 observations = deepcopy(envs[i].reset())
                                 if self.processor is not None:
                                     observations = self.processor.process_observation(observations)
@@ -261,10 +264,15 @@ class Agent(object):
 
         return history
 
-    def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
+    def test(self, envs, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
              nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1):
         """Callback that is called before training begins."
         """
+        if type(envs) is list or type(envs) is tuple:
+            env = envs[0]
+        else:
+            env = envs
+
         if not self.compiled:
             raise RuntimeError('Your tried to test your agent but it hasn\'t been compiled yet. Please call `compile()` before `test()`.')
         if action_repetition < 1:
@@ -337,7 +345,7 @@ class Agent(object):
             while not done:
                 callbacks.on_step_begin(episode_step)
 
-                action = self.forward(observation)
+                action = self.forward(observation, 0)
                 if self.processor is not None:
                     action = self.processor.process_action(action)
                 reward = 0.
@@ -361,7 +369,7 @@ class Agent(object):
                         break
                 if nb_max_episode_steps and episode_step >= nb_max_episode_steps - 1:
                     done = True
-                self.backward(reward, terminal=done)
+                self.backward(reward, 0, terminal=done)
                 episode_reward += reward
 
                 step_logs = {
@@ -380,8 +388,8 @@ class Agent(object):
             # resetting the environment. We need to pass in `terminal=False` here since
             # the *next* state, that is the state of the newly reset environment, is
             # always non-terminal by convention.
-            self.forward(observation)
-            self.backward(0., terminal=False)
+            self.forward(observation, 0)
+            self.backward(0., 0, terminal=False)
 
             # Report end of episode.
             episode_logs = {
@@ -399,19 +407,21 @@ class Agent(object):
         """
         pass
 
-    def forward(self, observation):
+    def forward(self, observation, env_id):
         """Takes the an observation from the environment and returns the action to be taken next.
         If the policy is implemented by a neural network, this corresponds to a forward (inference) pass.
 
         # Argument
             observation (object): The current observation from the environment.
+            env_id (int): The id of the environment that this observation comes from.
+                   This parameter is Particularly important when there are multiple environment instances.
 
         # Returns
             The next action to be executed in the environment.
         """
         raise NotImplementedError()
 
-    def backward(self, reward, terminal):
+    def backward(self, reward, env_id, terminal):
         """Updates the agent after having executed the action returned by `forward`.
         If the policy is implemented by a neural network, this corresponds to a weight update using back-prop.
 

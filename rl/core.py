@@ -201,7 +201,7 @@ class Agent(object):
                         observations[i], r[i], done[i], info[i] = envs[i].step(actions[i])
                         observations = deepcopy(observations)
                         if self.processor is not None:
-                            observations, r[i], done[i], info[i] = self.processor.process_step(observations, r, done, info[i])
+                            observations[i], r[i], done[i], info[i] = self.processor.process_step(observations[i], r[i], done, info[i])
                         for key, value in info[i].items():
                             if not np.isreal(value):
                                 continue
@@ -245,7 +245,7 @@ class Agent(object):
                             'nb_episode_steps': episode_step[i],
                             'nb_steps': self.step,
                         }
-                        callbacks.on_episode_end(episode[i], episode_logs[i])
+                        callbacks.on_episode_end(episode[i], episode_logs)
 
                         episode[i] += 1
                         observations = []

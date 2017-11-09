@@ -120,7 +120,7 @@ class SARSAAgent(Agent):
         if self.compiled:
             self.model.reset_states()
 
-    def forward(self, observation):
+    def forward(self, observation, _):
         # Select an action.
         q_values = self.compute_q_values([observation])
         if self.training:
@@ -136,7 +136,7 @@ class SARSAAgent(Agent):
 
         return action
 
-    def backward(self, reward, terminal):
+    def backward(self, reward, _, terminal):
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working

@@ -217,9 +217,9 @@ class DQNAgent(AbstractDQNAgent):
     def update_target_model_hard(self):
         self.target_model.set_weights(self.model.get_weights())
 
-    def forward(self, observation):
+    def forward(self, observation, env_id):
         # Select an action.
-        state = self.memory.get_recent_state(observation)
+        state = self.memory.get_recent_state(observation, env_id)
         q_values = self.compute_q_values(state)
         if self.training:
             action = self.policy.select_action(q_values=q_values)
@@ -232,11 +232,11 @@ class DQNAgent(AbstractDQNAgent):
 
         return action
 
-    def backward(self, reward, terminal):
+    def backward(self, reward, env_id, terminal):
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
-                               training=self.training)
+                               env_id, training=self.training)
 
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
@@ -637,9 +637,9 @@ class NAFAgent(AbstractDQNAgent):
 
         return action
 
-    def forward(self, observation):
+    def forward(self, observation, env_id):
         # Select an action.
-        state = self.memory.get_recent_state(observation)
+        state = self.memory.get_recent_state(observation, env_id)
         action = self.select_action(state)
         if self.processor is not None:
             action = self.processor.process_action(action)
@@ -650,11 +650,11 @@ class NAFAgent(AbstractDQNAgent):
 
         return action
 
-    def backward(self, reward, terminal):
+    def backward(self, reward, env_id, terminal):
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
-                               training=self.training)
+                               env_id, training=self.training)
 
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:

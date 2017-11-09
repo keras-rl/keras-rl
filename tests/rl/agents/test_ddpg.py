@@ -32,7 +32,7 @@ def test_single_ddpg_input():
     agent.fit(env, nb_steps=10)
 
     # ============================ test_multi_ddpg_input ============================
-    # running parallely crashes them both. Te recreate un comment the following line
+    # Running parallely crashes them both. Te recreate un comment the following line
     # def test_multi_ddpg_input(). Plese discuss this in an issue thread if any one can
     # figure out why
     nb_actions = 2

@@ -200,17 +200,20 @@ def freeze_by_binary_flag(model, flag_list):
 
 
 class EnvironmentInstance:
-    def __init__(self, get_env, environment_arguments):
+    def __init__(self, get_env, environment_arguments, command_complete, command_complete_global):
         self.result_q = Queue(1)
         self.command_q = Queue(1)
         self.environment_arguments = environment_arguments
         self.get_env = get_env
+        self.command_complete = command_complete
+        self.command_complete_global = command_complete_global
 
-        self.p = Process(target=self.execute_current_command)
+        self.p = Process(target=self.execute_current_command, args=(command_complete, command_complete_global))
         self.p.daemon = True
         self.p.start()
+        self.busy = False
 
-    def execute_current_command(self):
+    def execute_current_command(self, command_complete, command_complete_global):
         e = self.get_env(*self.environment_arguments)
         self.action_space = e.action_space
         while True:
@@ -223,24 +226,37 @@ class EnvironmentInstance:
                 else:
                     observation = e.reset()
                 self.result_q.put(observation)
+                command_complete.set()
+                command_complete_global.set()
 
             elif command[0] == 'step':
                 self.result_q.put(e.step(command[1]))
+                command_complete.set()
+                command_complete_global.set()
             else:
                 self.result_q.close()
                 self.command_q.close()
                 del e
+                # Just to help crash the rest of the code. and not wait for ever.
+                command_complete.set()
+                command_complete_global.set()
 
     def set_command(self, command):
         self.command_q.put(command)
 
     def get_results(self):
+        self.busy = False
         return self.result_q.get()
 
     def reset(self):
-        self.set_command(['reset',])
-        return self.result_q.get()
+        if not self.busy:
+            self.set_command(['reset',])
+            self.busy = True
+            self.command_complete.clear()
+
 
     def step(self, action):
-        self.set_command(['step', action])
-        return self.result_q.get()
+        if not self.busy:
+            self.set_command(['step', action])
+            self.busy = True
+            self.command_complete.clear()

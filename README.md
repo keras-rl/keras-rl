@@ -76,7 +76,7 @@ Training times can be very long depending on the complexity of the environment.
 You can load the weights using the `load_weights` method on the respective agents.
 
 ## Requirements
-- Python 2.7
+- Python 2.7 or Python 3.5
 - [Keras](http://keras.io) >= 1.0.7
 
 That's it. However, if you want to run the examples, you'll also need the following dependencies:

@@ -3,6 +3,7 @@ import numpy as np
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
 import keras.backend as K
+from keras import __version__ as keras_version
 
 
 def clone_model(model, custom_objects={}):
@@ -90,11 +91,19 @@ class AdditionalUpdatesOptimizer(optimizers.Optimizer):
         self.optimizer = optimizer
         self.additional_updates = additional_updates
 
-    def get_updates(self, params, constraints, loss):
-        updates = self.optimizer.get_updates(params, constraints, loss)
-        updates += self.additional_updates
-        self.updates = updates
-        return self.updates
+    if int(keras_version.split('.')[0]) == 1:
+        def get_updates(self, params, constraints, loss):
+            updates = self.optimizer.get_updates(params,
+                                                 constraints, loss)
+            updates += self.additional_updates
+            self.updates = updates
+            return self.updates
+    else:
+        def get_updates(self, loss, params):
+            updates = self.optimizer.get_updates(loss, params)
+            updates += self.additional_updates
+            self.updates = updates
+            return self.updates
 
     def get_config(self):
         return self.optimizer.get_config()

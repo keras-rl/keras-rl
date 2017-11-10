@@ -141,7 +141,7 @@ class Agent(object):
             while self.step < nb_steps:
                 for i in range(run_env_parally_in_n_processes):
                     r = [None] * run_env_parally_in_n_processes
-                    if not observations[i]:  # start of a new episode
+                    if observations[i] is None:  # start of a new episode
                         callbacks.on_episode_begin(episode[i])
                         episode_step[i] = 0
                         episode_reward[i] = 0
@@ -258,7 +258,7 @@ class Agent(object):
 
                     if skip_to_next_env_inst:
                         skip_to_next_env_inst = False
-                        if i == run_env_parally_in_n_processes - 1:
+                        if i == run_env_parally_in_n_processes - 1 and run_env_parally_in_n_processes > 1:
                             command_complete_any.wait()  # Wait for at least one environment to finish
                             command_complete_any.clear()  # Signaling that that event has been consumed
                         else:
@@ -304,9 +304,9 @@ class Agent(object):
                         episode_step[i] = 0
                         episode_reward[i] = 0
                         done[i] = False
-
-            command_complete_any.wait() # Wait for at least one environment to finish
-            command_complete_any.clear() # Signaling that that event has been consumed
+            if run_env_parally_in_n_processes > 1:
+                command_complete_any.wait() # Wait for at least one environment to finish
+                command_complete_any.clear() # Signaling that that event has been consumed
         except KeyboardInterrupt:
             # We catch keyboard interrupts here so that training can be be safely aborted.
             # This is so common that we've built this right into this function, which ensures that

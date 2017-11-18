@@ -85,17 +85,17 @@ def huber_loss(y_true, y_pred, clip_value):
 
 
 def GeneralizedAdvantageEstimator(critic, state, reward, gamma, lamb):
-    # TODO: irresponsible draft, all details likely wrong
+    # TODO: we still need to fix an interface
     # See https://danieltakeshi.github.io/2017/04/02/notes-on-the-generalized-advantage-estimation-paper/
     assert len(state) == len(reward)
     n = len(state)
-    value = critic.predict_on_batch(np.array(state)).flatten()
-    delta = reward + gamma * np.roll(value, 1) - value
+    value = critic.predict_on_batch(state).flatten()
+    delta = reward + gamma * np.roll(value, -1) - value
     # No premature optimization for now...
     result = [0]
     r = gamma * lamb
-    for i in range(0, n):
-        result.append(result[-1] * r + delta[n-i])
+    for i in range(1, n):
+        result.append(result[-1] * r + delta[n-1-i])
     return result[:0:-1]
 
 

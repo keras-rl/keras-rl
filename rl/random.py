@@ -1,6 +1,9 @@
 from __future__ import division
 import numpy as np
 
+from keras import backend as K
+from keras.layers import Lambda
+import math
 
 class RandomProcess(object):
     def reset_states(self):
@@ -57,3 +60,36 @@ class OrnsteinUhlenbeckProcess(AnnealedGaussianProcess):
 
     def reset_states(self):
         self.x_prev = self.x0 if self.x0 is not None else np.zeros(self.size)
+
+# For PPO use
+# sigma is a np array of shape (n,)
+class IndependentGaussianProcess(object):
+    def __init__(self, sigma):
+        dim = sigma.shape
+        assert len(dim) == 1
+        self.sigma = sigma
+        self.n = dim[0]
+
+    def get_param(self):
+        return self.sigma
+
+    def set_param(self, sigma):
+        dim = sigma.shape
+        assert len(dim) == 1 and dim[0] == self.n
+        self.sigma = sigma
+
+    # generate a random sample according to current distribution (specified by param sigma)
+    # Input: mu: np array of shape (n,)
+    # Output: np array of shape (n,)
+    def sample(self, mu):
+        assert mu.shape == (self.n,)
+        return np.random.normal(mu, self.sigma)
+
+    # return a keras layer to compute the log likelihood of selected action given current state
+    # Output: a lambda layer that accepts three arguments: [action, actor_out, sigma]
+    # and return a keras tensor of dimension (batch, 1)
+    def get_dist(self):
+        return Lambda(
+            lambda x:
+                K.constant(- self.n * math.log(2*math.pi) / 2 ) - K.sum(x[2], axis=1, keepdims=True)
+                - K.sum(K.exp( 2 * K.log(K.abs(x[0] - x[1])) - K.constant(math.log(2.0)) - 2 * x[2]), axis=1, keepdims=True))

@@ -64,32 +64,23 @@ class OrnsteinUhlenbeckProcess(AnnealedGaussianProcess):
 # For PPO use
 # sigma is a np array of shape (n,)
 class IndependentGaussianProcess(object):
-    def __init__(self, sigma):
-        dim = sigma.shape
-        assert len(dim) == 1
-        self.sigma = sigma
-        self.n = dim[0]
+    def __init__(self, n):
+        self.n = n
 
-    def get_param(self):
-        return self.sigma
-
-    def set_param(self, sigma):
-        dim = sigma.shape
-        assert len(dim) == 1 and dim[0] == self.n
-        self.sigma = sigma
-
-    # generate a random sample according to current distribution (specified by param sigma)
-    # Input: mu: np array of shape (n,)
+    # generate a random sample according to current distribution (specified by param mu and sigma)
+    # Input: x: python list with two elements mu and sigma, both np array of shape (n,)
     # Output: np array of shape (n,)
-    def sample(self, mu):
+    def sample(self, x):
+        mu, sigma = x
         assert mu.shape == (self.n,)
-        return np.random.normal(mu, self.sigma)
+        assert sigma.shape == (self.n,)
+        return np.random.normal(mu, sigma)
 
-    # return a keras layer to compute the log likelihood of selected action given current state
-    # Output: a lambda layer that accepts three arguments: [action, actor_out, sigma]
-    # and return a keras tensor of dimension (batch, 1)
-    def get_dist(self):
-        return Lambda(
-            lambda x:
-                K.constant(- self.n * math.log(2*math.pi) / 2 ) - K.sum(x[2], axis=1, keepdims=True)
-                - K.sum(K.exp( 2 * K.log(K.abs(x[0] - x[1])) - K.constant(math.log(2.0)) - 2 * x[2]), axis=1, keepdims=True))
+    # return a keras expression to compute the log likelihood of selected action given current state
+    # Input: a list of keras function, same as output from actor network except that the actual
+    #  selected action is appended to the list
+    # Output: keras tensor of dimension (batch, 1)
+    def get_dist(self, x):
+        mu, sigma, y = x
+        return K.constant(- self.n * math.log(2*math.pi) / 2 ) - K.sum(sigma, axis=1, keepdims=True) - \
+               K.sum(K.exp( 2 * K.log(K.abs(y - mu)) - K.constant(math.log(2.0)) - 2 * sigma), axis=1, keepdims=True)

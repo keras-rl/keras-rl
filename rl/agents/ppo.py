@@ -14,11 +14,13 @@ import keras.backend as K
 
 class PPOAgent(Agent):
     # Note on network architecture:
-    # actor should take as input the current state and candidate action, and should output a scalar
-    # representing the probability of taking that action.
+    # actor should take as input the current state, and should output a vector in the abstract
+    # sample space as defined by the user, which is then feed into the sampler, again supplied
+    # by the user. This sampler is responsible for transforming the abstract sample space into
+    # actual value in the action space, through a (known, fixed) random distribution
     # critic's only input is the current state, and should output a scalar representing estimated
     # value of this state
-    def __init__(self, actor, critic, memory, epsilon=0.2, nb_actor=3, nb_steps=1000, epoch=5, **kwargs):
+    def __init__(self, actor, critic, memory, sampler, epsilon=0.2, nb_actor=3, nb_steps=1000, epoch=5, **kwargs):
         super(Agent, self).__init__(**kwargs)
 
         # Parameters.
@@ -31,6 +33,7 @@ class PPOAgent(Agent):
         self.actor = actor
         self.critic = critic
         self.memory = memory
+        self.sampler = sampler
 
     def compile(self, optimizer, metrics=[]):
         # TODO
@@ -63,14 +66,16 @@ class PPOAgent(Agent):
         # TODO: Model for the overall objective
         action = Input(name='action')
         state = Input(name='state')
-        advantage = Input(name='advantage')
-        prob_theta = self.actor(action, state)
-        prob_thetaold = self.target_actor(action, state)
+        advantage = Input(name='advantage', shape=(1,))
+        actor_out = self.actor([state] + self.actor.inputs[1:])
+        target_actor_out = self.target_actor([state] + self.target_actor.inputs[1:])
+        log_prob_theta = Lambda(self.sampler.get_dist)(actor_out + [action])
+        log_prob_thetaold = Lambda(self.sampler.get_dist)(target_actor_out + [action])
         def clipped_loss(args):
-            prob_theta, prob_thetaold, advantage = args
-            prob_ratio = prob_theta / prob_thetaold
+            log_prob_theta, log_prob_thetaold, advantage = args
+            prob_ratio = K.exp(log_prob_theta - log_prob_thetaold)
             return K.minimum(prob_ratio * advantage, K.clip(prob_ratio, 1-self.epsilon, 1+self.epsilon) * advantage)
-        loss_out = Lambda(clipped_loss, name='loss')([prob_theta, prob_thetaold, advantage])
+        loss_out = Lambda(clipped_loss, name='loss')([log_prob_theta, log_prob_thetaold, advantage])
         trainable_model = Model(inputs=[action, state, advantage], outputs=loss_out)
         losses = [ lambda sample_out, network_out: network_out ]
         trainable_model.compile(optimizer=optimizer, loss=losses)
@@ -95,9 +100,9 @@ class PPOAgent(Agent):
 
     def forward(self, observation):
         # TODO
-        prob_dist = self.target_actor.predict_on_batch({ 'state': np.repeat(observation, self.nb_action),
-                                                         'action': np.arange(self.nb_action) })
-        return self.policy.select_action(prob_dist)
+        state = np.array([[ observation ]])
+        actor_out = [ x.flatten() for x in self.target_actor.predict_on_batch(state) ]
+        return self.sampler.sample(actor_out)
 
     @property
     def layers(self):

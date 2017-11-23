@@ -125,10 +125,10 @@ class BoltzmannGumbelQPolicy(Policy):
     """Implements Boltzmann-Gumbel exploration (BGE) adapted for Q learning
     based on the paper at https://arxiv.org/pdf/1705.10257.pdf.
 
-    BGE expects rewards in the range [0, 1], and it is recommended that
-    rewards be scaled into that range. The parameter C is associated with the
-    scale of the rewards, and should be set to approximately their standard
-    deviation."""
+    BGE is invariant with respect to the mean of the rewards but not their
+    variance. The parameter C, which defaults to 1, can be used to correct for
+    this, and should be set to the least upper bound on the standard deviation
+    of the rewards."""
 
     def __init__(self, C=1.0):
         super(BoltzmannGumbelQPolicy, self).__init__()
@@ -141,7 +141,7 @@ class BoltzmannGumbelQPolicy(Policy):
 
         if self.agent.step == 0:
             self.action_counts = np.ones(q_values.shape)
-        assert self.action_counts is not None, self.action_counts
+        assert self.action_counts is not None, (self.agent.step, self.action_counts)
         assert self.action_counts.shape == q_values.shape, (self.action_counts.shape, q_values.shape)
 
         beta = self.C/np.sqrt(self.action_counts)

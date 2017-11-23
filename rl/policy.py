@@ -119,3 +119,42 @@ class BoltzmannQPolicy(Policy):
         config['tau'] = self.tau
         config['clip'] = self.clip
         return config
+
+
+class BoltzmannGumbelQPolicy(Policy):
+    """Implements Boltzmann-Gumbel exploration (BGE) adapted for Q learning
+    based on the paper at https://arxiv.org/pdf/1705.10257.pdf.
+
+    BGE expects rewards in the range [0, 1], and it is recommended that
+    rewards be scaled into that range. The parameter C is associated with the
+    scale of the rewards, and should be set to approximately their standard
+    deviation."""
+
+    def __init__(self, C=1.0):
+        super(BoltzmannGumbelQPolicy, self).__init__()
+        self.C = C
+        self.action_counts = None
+
+    def select_action(self, q_values):
+        assert q_values.ndim == 1, q_values.ndim
+        q_values = q_values.astype('float64')
+
+        if self.agent.step == 0:
+            self.action_counts = np.ones(q_values.shape)
+        assert self.action_counts is not None, self.action_counts
+        assert self.action_counts.shape == q_values.shape, (self.action_counts.shape, q_values.shape)
+
+        beta = self.C/np.sqrt(self.action_counts)
+        Z = np.random.gumbel(size=q_values.shape)
+
+        perturbation = beta * Z
+        perturbed_q_values = q_values + perturbation
+        action = np.argmax(perturbed_q_values)
+
+        self.action_counts[action] += 1
+        return action
+
+    def get_config(self):
+        config = super(BoltzmannGumbelQPolicy, self).get_config()
+        config['C'] = self.C
+        return config

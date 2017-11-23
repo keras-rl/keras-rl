@@ -48,7 +48,7 @@ def get_soft_target_model_updates(target, source, tau):
 def get_object_config(o):
     if o is None:
         return None
-        
+
     config = {
         'class_name': o.__class__.__name__,
         'config': o.get_config()
@@ -90,7 +90,12 @@ class AdditionalUpdatesOptimizer(optimizers.Optimizer):
         self.optimizer = optimizer
         self.additional_updates = additional_updates
 
-    def get_updates(self, params, constraints, loss):
+    # Keras sometimes passes params and loss as keyword arguments,
+    # expecting constraints to be optional, so there must be a default
+    # value for constraints here; see for example:
+    # https://github.com/fchollet/keras/blob/master/keras/engine/training.py#L988-L990
+    def get_updates(self, params, constraints=None, loss=None):
+        assert loss is not None, (params, constraints, loss)
         updates = self.optimizer.get_updates(params, constraints, loss)
         updates += self.additional_updates
         self.updates = updates

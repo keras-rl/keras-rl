@@ -123,7 +123,8 @@ class BoltzmannQPolicy(Policy):
 
 class BoltzmannGumbelQPolicy(Policy):
     """Implements Boltzmann-Gumbel exploration (BGE) adapted for Q learning
-    based on the paper at https://arxiv.org/pdf/1705.10257.pdf.
+    based on the paper Boltzmann Exploration Done Right
+    (https://arxiv.org/pdf/1705.10257.pdf).
 
     BGE is invariant with respect to the mean of the rewards but not their
     variance. The parameter C, which defaults to 1, can be used to correct for
@@ -139,9 +140,14 @@ class BoltzmannGumbelQPolicy(Policy):
         assert q_values.ndim == 1, q_values.ndim
         q_values = q_values.astype('float64')
 
-        if self.agent.step == 0:
+        # If we are starting a new training iteration, we should reset the
+        # action_counts. Otherwise, either because we are testing or are in
+        # the middle of training, action_counts should already be initialized
+        # (in training, because we did so at the beginning, and in testing,
+        # because they should be loaded in from our config).
+        if self.agent.step == 0 and self.agent.training:
             self.action_counts = np.ones(q_values.shape)
-        assert self.action_counts is not None, (self.agent.step, self.action_counts)
+        assert self.action_counts is not None, (self.agent.step, self.agent.training)
         assert self.action_counts.shape == q_values.shape, (self.action_counts.shape, q_values.shape)
 
         beta = self.C/np.sqrt(self.action_counts)
@@ -151,10 +157,13 @@ class BoltzmannGumbelQPolicy(Policy):
         perturbed_q_values = q_values + perturbation
         action = np.argmax(perturbed_q_values)
 
-        self.action_counts[action] += 1
+        # Only update action counts during training, not testing.
+        if self.agent.training:
+            self.action_counts[action] += 1
         return action
 
     def get_config(self):
         config = super(BoltzmannGumbelQPolicy, self).get_config()
         config['C'] = self.C
+        config['action_counts'] = self.action_counts
         return config

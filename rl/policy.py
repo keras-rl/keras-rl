@@ -132,22 +132,24 @@ class BoltzmannGumbelQPolicy(Policy):
     of the rewards."""
 
     def __init__(self, C=1.0):
+        assert C > 0, "BoltzmannGumbelQPolicy C parameter must be > 0, not " + repr(C)
         super(BoltzmannGumbelQPolicy, self).__init__()
         self.C = C
         self.action_counts = None
 
     def select_action(self, q_values):
+        # we can't use BGE during testing, since we don't have access to the action_counts
+        assert self.agent.training, "BoltzmannGumbelQPolicy should only be used for training, not testing"
+
         assert q_values.ndim == 1, q_values.ndim
         q_values = q_values.astype('float64')
 
-        # If we are starting a new training iteration, we should reset the
-        # action_counts. Otherwise, either because we are testing or are in
-        # the middle of training, action_counts should already be initialized
-        # (in training, because we did so at the beginning, and in testing,
-        # because they should be loaded in from our config).
-        if self.agent.step == 0 and self.agent.training:
+        # If we are starting training, we should reset the action_counts.
+        # Otherwise, action_counts should already be initialized, since we
+        # always do so when we begin training.
+        if self.agent.step == 0:
             self.action_counts = np.ones(q_values.shape)
-        assert self.action_counts is not None, (self.agent.step, self.agent.training)
+        assert self.action_counts is not None, self.agent.step
         assert self.action_counts.shape == q_values.shape, (self.action_counts.shape, q_values.shape)
 
         beta = self.C/np.sqrt(self.action_counts)
@@ -157,13 +159,10 @@ class BoltzmannGumbelQPolicy(Policy):
         perturbed_q_values = q_values + perturbation
         action = np.argmax(perturbed_q_values)
 
-        # Only update action counts during training, not testing.
-        if self.agent.training:
-            self.action_counts[action] += 1
+        self.action_counts[action] += 1
         return action
 
     def get_config(self):
         config = super(BoltzmannGumbelQPolicy, self).get_config()
         config['C'] = self.C
-        config['action_counts'] = self.action_counts
         return config

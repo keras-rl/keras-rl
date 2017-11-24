@@ -134,7 +134,7 @@ class BoltzmannGumbelQPolicy(Policy):
     BGE is only available for training, not testing. For testing purposes, you
     can achieve approximately the same result as BGE after training for N steps
     on K actions with parameter C by using the BoltzmannQPolicy and setting
-    tau = sqrt(N/K)/C."""
+    tau = C/sqrt(N/K)."""
 
     def __init__(self, C=1.0):
         assert C > 0, "BoltzmannGumbelQPolicy C parameter must be > 0, not " + repr(C)

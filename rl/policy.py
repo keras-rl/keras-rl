@@ -129,7 +129,12 @@ class BoltzmannGumbelQPolicy(Policy):
     BGE is invariant with respect to the mean of the rewards but not their
     variance. The parameter C, which defaults to 1, can be used to correct for
     this, and should be set to the least upper bound on the standard deviation
-    of the rewards."""
+    of the rewards.
+
+    BGE is only available for training, not testing. For testing purposes, you
+    can achieve approximately the same result as BGE after training for N steps
+    on K actions with parameter C by using the BoltzmannQPolicy and setting
+    tau = sqrt(N/K)/C."""
 
     def __init__(self, C=1.0):
         assert C > 0, "BoltzmannGumbelQPolicy C parameter must be > 0, not " + repr(C)
@@ -138,7 +143,8 @@ class BoltzmannGumbelQPolicy(Policy):
         self.action_counts = None
 
     def select_action(self, q_values):
-        # we can't use BGE during testing, since we don't have access to the action_counts
+        # We can't use BGE during testing, since we don't have access to the
+        # action_counts at the end of training.
         assert self.agent.training, "BoltzmannGumbelQPolicy should only be used for training, not testing"
 
         assert q_values.ndim == 1, q_values.ndim

@@ -12,14 +12,17 @@ from rl.util import clone_optimizer, clone_model, GeneralizedAdvantageEstimator
 import keras.backend as K
 
 
+# TODO: We would need a new memory class that returns windowed info also for rewards
 class PPOAgent(Agent):
     # Note on network architecture:
-    # actor should take as input the current state, and should output a vector in the abstract
+    # actor should take as input a window of recent state, and should output a vector in the abstract
     # sample space as defined by the user, which is then feed into the sampler, again supplied
     # by the user. This sampler is responsible for transforming the abstract sample space into
     # actual value in the action space, through a (known, fixed) random distribution
+    # actor input shape: (window_length, dimension of observation space)
     # critic's only input is the current state, and should output a scalar representing estimated
     # value of this state
+    # critic input shape: (dimension of observation space,)
     def __init__(self, actor, critic, memory, sampler, epsilon=0.2, nb_actor=3, nb_steps=1000, epoch=5, **kwargs):
         super(Agent, self).__init__(**kwargs)
 
@@ -99,19 +102,24 @@ class PPOAgent(Agent):
         self.critic.save_weights(critic_filepath, overwrite=overwrite)
 
     def forward(self, observation):
-        # TODO
-        state = np.array([[ observation ]])
-        actor_out = [ x.flatten() for x in self.target_actor.predict_on_batch(state) ]
-        return self.sampler.sample(actor_out)
+        state_window = self.memory.get_recent_state(observation)
+        batch_single = np.array([ state_window ]) # TODO: use process_state_batch to support additional processing
+        actor_out = [ x.flatten() for x in self.target_actor.predict_on_batch(batch_single) ]
+        action = self.sampler.sample(actor_out)
+
+        # Book-keeping.
+        self.recent_observation = observation
+        self.recent_action = action
+
+        return action
 
     @property
     def layers(self):
         return self.actor.layers[:] + self.critic.layers[:]
 
     def _get_sample_batch(self):
-        experiences, info = self.memory.sample(self.batch_size)
+        experiences = self.memory.sample(self.batch_size)
         assert len(experiences) == self.batch_size
-        assert len(info) == self.batch_size
 
         # Start by extracting the necessary parameters (we use a vectorized implementation).
         state0_batch = []
@@ -120,12 +128,13 @@ class PPOAgent(Agent):
         terminal1_batch = []
         state1_batch = []
         gae_batch = []
-        for e, gae in zip(experiences, info):  # TODO: Okay to use zip?
+        for e in experiences:
             state0_batch.append(e.state0)
             state1_batch.append(e.state1)
             reward_batch.append(e.reward)
             action_batch.append(e.action)
             terminal1_batch.append(0. if e.terminal1 else 1.)
+            gae = GeneralizedAdvantageEstimator(self.critic, np.array(e.state0), np.array(e.reward), self.gamma, self.lamb)
             gae_batch.append(gae)
 
         # Prepare and validate parameters.
@@ -134,9 +143,10 @@ class PPOAgent(Agent):
         terminal1_batch = np.array(terminal1_batch)
         reward_batch = np.array(reward_batch)
         action_batch = np.array(action_batch)
+        gae_batch = np.array(gae_batch)
         assert reward_batch.shape == (self.batch_size,)
         assert terminal1_batch.shape == reward_batch.shape
-        assert action_batch.shape == (self.batch_size, self.nb_actions)
+        assert action_batch.shape == (self.batch_size, self.nb_actions) #Assume action is of shape (nb_actions,)
 
         return state0_batch, reward_batch, action_batch, terminal1_batch, state1_batch, gae_batch
 

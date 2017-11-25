@@ -84,12 +84,14 @@ def huber_loss(y_true, y_pred, clip_value):
         raise RuntimeError('Unknown backend "{}".'.format(K.backend()))
 
 
-def GeneralizedAdvantageEstimator(critic, state, reward, gamma, lamb):
-    # TODO: we still need to fix an interface
+def GeneralizedAdvantageEstimator(critic, state_batch, reward, gamma, lamb):
     # See https://danieltakeshi.github.io/2017/04/02/notes-on-the-generalized-advantage-estimation-paper/
-    assert len(state) == len(reward)
-    n = len(state)
-    value = critic.predict_on_batch(state).flatten()
+    #
+    # state_batch: a numpy array of batched input that can be feed into the critic network directly
+    # reward: numpy array of shape (batch_size,)
+    n = len(state_batch)
+    assert reward.shape == (n,)
+    value = critic.predict_on_batch(state_batch).flatten()
     delta = reward + gamma * np.roll(value, -1) - value
     # No premature optimization for now...
     result = [0]

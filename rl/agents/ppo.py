@@ -101,9 +101,15 @@ class PPOAgent(Agent):
         self.actor.save_weights(actor_filepath, overwrite=overwrite)
         self.critic.save_weights(critic_filepath, overwrite=overwrite)
 
+    def process_state_batch(self, batch):
+        batch = np.array(batch)
+        if self.processor is None:
+            return batch
+        return self.processor.process_state_batch(batch)
+
     def forward(self, observation):
         state_window = self.memory.get_recent_state(observation)
-        batch_single = np.array([ state_window ]) # TODO: use process_state_batch to support additional processing
+        batch_single = self.process_state_batch([ state_window ])
         actor_out = [ x.flatten() for x in self.target_actor.predict_on_batch(batch_single) ]
         action = self.sampler.sample(actor_out)
 
@@ -134,7 +140,9 @@ class PPOAgent(Agent):
             reward_batch.append(e.reward)
             action_batch.append(e.action)
             terminal1_batch.append(0. if e.terminal1 else 1.)
-            gae = GeneralizedAdvantageEstimator(self.critic, np.array(e.state0), np.array(e.reward), self.gamma, self.lamb)
+            gae = GeneralizedAdvantageEstimator(self.critic,
+                                                self.process_state_batch(e.state0),
+                                                self.process_state_batch(e.reward), self.gamma, self.lamb)
             gae_batch.append(gae)
 
         # Prepare and validate parameters.

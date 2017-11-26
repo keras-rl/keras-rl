@@ -1,5 +1,6 @@
 import os
 import itertools
+from collections import namedtuple
 
 import numpy as np
 from keras import optimizers, Input
@@ -7,10 +8,12 @@ from keras.engine import Model
 from keras.layers import Lambda
 
 from rl.core import Agent
+from rl.memory import FixedBuffer
 from rl.util import clone_optimizer, clone_model, GeneralizedAdvantageEstimator
 
 import keras.backend as K
 
+EpisodeMemory = namedtuple('EpisodeMemory', 'state,action,reward,advantage')
 
 # TODO: We would need a new memory class that returns windowed info also for rewards
 class PPOAgent(Agent):
@@ -37,6 +40,11 @@ class PPOAgent(Agent):
         self.critic = critic
         self.memory = memory
         self.sampler = sampler
+
+        # Initialize buffers
+        self.episode_memories = [EpisodeMemory(state=FixedBuffer(self.nb_steps), action=FixedBuffer(self.nb_steps),
+                                               reward=FixedBuffer(self.nb_steps), advantage=FixedBuffer(self.nb_steps))
+                                 for _ in range(self.nb_actor)]
 
     def compile(self, optimizer, metrics=[]):
         # TODO
@@ -86,6 +94,8 @@ class PPOAgent(Agent):
 
         # Other init
         self.round = 0
+        self.current_episode_memory = self.episode_memories[0]
+        self.finalize_episode = False
 
     def load_weights(self, filepath):
         filename, extension = os.path.splitext(filepath)
@@ -159,6 +169,33 @@ class PPOAgent(Agent):
         return state0_batch, reward_batch, action_batch, terminal1_batch, state1_batch, gae_batch
 
     def backward(self, reward, terminal=False):
+        if self.finalize_episode:
+            self.finalize_episode = False
+            # No need to append to the usual memory since next episode will not see anything in last episode anyway?
+            self.current_episode_memory.state.append(self.recent_observation)
+            self.current_episode_memory.action.append(self.recent_action)
+            self.current_episode_memory.reward.append(reward)
+
+            self.round += 1
+            self.current_episode_memory = self.episode_memories[self.round % self.nb_actor]
+        else:
+            if terminal:
+                self.finalize_episode = True
+            self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
+                               training=self.training)
+            self.current_episode_memory.state.append(self.recent_observation)
+            self.current_episode_memory.action.append(self.recent_action)
+            self.current_episode_memory.reward.append(reward)
+            return
+
+        if (self.round % self.nb_actor == 0) and self.round > 0:
+            # do training
+            # reset all episode memories
+            self.episode_memories = [EpisodeMemory(state=FixedBuffer(self.nb_steps), action=FixedBuffer(self.nb_steps),
+                                                   reward=FixedBuffer(self.nb_steps),
+                                                   advantage=FixedBuffer(self.nb_steps))
+                                     for _ in range(self.nb_actor)]
+            self.current_episode_memory = self.episode_memories[0]
         # TODO: Just a sketch
         # Store most recent experience in memory.
         #if self.step % self.memory_interval == 0:

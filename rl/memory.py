@@ -59,6 +59,33 @@ class RingBuffer(object):
             raise RuntimeError()
         self.data[(self.start + self.length - 1) % self.maxlen] = v
 
+class FixedBuffer(object):
+    def __init__(self, maxlen):
+        self.maxlen = maxlen
+        self.length = 0
+        self.data = [None for _ in range(maxlen)]
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= self.length:
+            raise KeyError()
+        return self.data[idx]
+
+    def __setitem__(self, idx, value):
+        if idx < 0 or idx >= self.length:
+            raise KeyError()
+        self.data[idx] = value
+
+    def append(self, value):
+        if self.length >= self.maxlen:
+            raise KeyError()
+        self.data[self.length] = value
+        self.length += 1
+
+    def get_list(self):
+        return self.data[:self.length]
 
 def zeroed_observation(observation):
     if hasattr(observation, 'shape'):

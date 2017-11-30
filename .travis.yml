@@ -43,7 +43,7 @@ install:
   - pip install pep8 pytest-pep8
   - pip install tensorflow
   # Bleeding-edge: pip install git+https://github.com/Theano/Theano.git
-  - pip install theano>=0.9.0rc1
+  - pip install "theano<1.0"
   - pip install gym
   # Bleeding-edge: pip install git+https://github.com/fchollet/keras.git;
   - pip install "keras>=2.0.7";

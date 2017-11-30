@@ -48,7 +48,7 @@ def get_soft_target_model_updates(target, source, tau):
 def get_object_config(o):
     if o is None:
         return None
-        
+
     config = {
         'class_name': o.__class__.__name__,
         'config': o.get_config()

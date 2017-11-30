@@ -10,7 +10,7 @@ from keras.layers import Input, merge, Dense, Flatten
 
 from rl.agents.ddpg import DDPGAgent
 from rl.memory import SequentialMemory
-from rl.core import MultiInputProcessor
+from rl.processors import MultiInputProcessor
 
 from ..util import MultiInputTestEnv
 

@@ -52,7 +52,7 @@ install:
   - if [[ "$LEGACY_KERAS" == "1" ]]; then
       pip install keras==1.2.2;
     else
-      pip install keras;
+      pip install "keras<2.0.7";
     fi
 
   - python setup.py install

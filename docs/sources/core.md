@@ -50,33 +50,7 @@ or write your own.
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L529)</span>
-### MultiInputProcessor
-
-```python
-rl.core.MultiInputProcessor(nb_inputs)
-```
-
-Converts observations from an environment with multiple observations for use in a neural network
-policy.
-
-In some cases, you have environments that return multiple different observations per timestep 
-(in a robotics context, for example, a camera may be used to view the scene and a joint encoder may
-be used to report the angles for each joint). Usually, this can be handled by a policy that has
-multiple inputs, one for each modality. However, observations are returned by the environment
-in the form of a tuple `[(modality1_t, modality2_t, ..., modalityn_t) for t in T]` but the neural network
-expects them in per-modality batches like so: `[[modality1_1, ..., modality1_T], ..., [[modalityn_1, ..., modalityn_T]]`.
-This processor converts observations appropriate for this use case.
-
-__Arguments__
-
-- __nb_inputs__ (integer): The number of inputs, that is different modalities, to be used.
-	Your neural network that you use for the policy must have a corresponding number of
-	inputs.
-
-----
-
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L566)</span>
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L533)</span>
 ### Env
 
 ```python
@@ -90,7 +64,7 @@ implementation.
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L642)</span>
+<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L609)</span>
 ### Space
 
 ```python

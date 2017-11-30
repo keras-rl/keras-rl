@@ -8,7 +8,7 @@ from keras.layers import Input, Dense, merge
 from keras.optimizers import SGD
 import keras.backend as K
 
-from rl.util import clone_optimizer, clone_model, huber_loss
+from rl.util import clone_optimizer, clone_model, huber_loss, WhiteningNormalizer
 
 
 def test_clone_sequential_model():
@@ -66,6 +66,23 @@ def test_huber_loss():
     assert_allclose(K.eval(huber_loss(a, b, 1.)), np.array([.125, .125, 1.5, 1.5]))
     assert_allclose(K.eval(huber_loss(a, b, 3.)), np.array([.125, .125, 2., 2.]))
     assert_allclose(K.eval(huber_loss(a, b, np.inf)), np.array([.125, .125, 2., 2.]))
+
+
+def test_whitening_normalizer():
+    x = np.random.normal(loc=.2, scale=2., size=(1000, 5))
+    normalizer = WhiteningNormalizer(shape=(5,))
+    normalizer.update(x[:500])
+    normalizer.update(x[500:])
+
+    assert_allclose(normalizer.mean, np.mean(x, axis=0))
+    assert_allclose(normalizer.std, np.std(x, axis=0))
+    
+    x_norm = normalizer.normalize(x)
+    assert_allclose(np.mean(x_norm, axis=0), np.zeros(5, dtype=normalizer.dtype), atol=1e-5)
+    assert_allclose(np.std(x_norm, axis=0), np.ones(5, dtype=normalizer.dtype), atol=1e-5)
+
+    x_denorm = normalizer.denormalize(x_norm)
+    assert_allclose(x_denorm, x)
 
 
 if __name__ == '__main__':

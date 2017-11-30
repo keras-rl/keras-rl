@@ -63,7 +63,7 @@ python examples/dqn_cartpole.py
 This is a very simple example and it should converge relatively quickly, so it's a great way to get started!
 It also visualizes the game during training, so you can watch it learn. How cool is that?
 
-Unfortunately, he documentation of `keras-rl` is currently almost non-existent.
+Unfortunately, the documentation of `keras-rl` is currently almost non-existent.
 However, you can find a couple of more examples that illustrate the usage of both DQN (for tasks with discrete actions) as well as for DDPG (for tasks with continuous actions).
 While these examples are not replacement for a proper documentation, they should be enough to get started quickly and to see the magic of reinforcement learning yourself.
 I also encourage you to play around with other environments (OpenAI Gym has plenty) and maybe even try to find better hyperparameters for the existing ones.
@@ -76,7 +76,7 @@ Training times can be very long depending on the complexity of the environment.
 You can load the weights using the `load_weights` method on the respective agents.
 
 ## Requirements
-- Python 2.7
+- Python 2.7 or Python 3.5
 - [Keras](http://keras.io) >= 1.0.7
 
 That's it. However, if you want to run the examples, you'll also need the following dependencies:

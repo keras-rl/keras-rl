@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import time
 import warnings
 from copy import deepcopy
 
@@ -6,6 +7,9 @@ import numpy as np
 from keras.callbacks import History
 
 from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Visualizer, CallbackList
+import util
+
+import multiprocessing
 
 
 class Agent(object):
@@ -43,15 +47,17 @@ class Agent(object):
 
     def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
-            nb_max_episode_steps=None):
+            nb_max_episode_steps=None, run_env_parally_in_n_processes=1, environment_arguments=[]):
         """Trains the agent on the given environment.
 
         # Arguments
             env: (`Env` instance): Environment that the agent interacts with. See [Env](#env) for details.
+                IF run_env_parally_in_n_processes is set ot anything other than 1 then a call to env is
+                assumed to return an object of Environment that the agent interacts with.
             nb_steps (integer): Number of training steps to be performed.
-            action_repetition (integer): Number of times the agent repeats the same action without
+            action_repetition (integer): Number of times the agent repeats the same actions without
                 observing the environment again. Setting this to a value > 1 can be useful
-                if a single action only has a very small effect on the environment.
+                if a single actions only has a very small effect on the environment.
             callbacks (list of `keras.callbacks.Callback` or `rl.callbacks.Callback` instances):
                 List of callbacks to apply during training. See [callbacks](/callbacks) for details.
             verbose (integer): 0 for no logging, 1 for interval logging (compare `log_interval`), 2 for episode logging
@@ -62,8 +68,8 @@ class Agent(object):
                 of each episode using `start_step_policy`. Notice that this is an upper limit since
                 the exact number of steps to be performed is sampled uniformly from [0, max_start_steps]
                 at the beginning of each episode.
-            start_step_policy (`lambda observation: action`): The policy
-                to follow if `nb_max_start_steps` > 0. If set to `None`, a random action is performed.
+            start_step_policy (`lambda observations: actions`): The policy
+                to follow if `nb_max_start_steps` > 0. If set to `None`, a random actions is performed.
             log_interval (integer): If `verbose` = 1, the number of steps that are considered to be an interval.
             nb_max_episode_steps (integer): Number of steps per episode that the agent performs before
                 automatically resetting the environment. Set to `None` if each episode should run
@@ -94,7 +100,21 @@ class Agent(object):
             callbacks.set_model(self)
         else:
             callbacks._set_model(self)
-        callbacks._set_env(env)
+        # visualization can not happen as before when there are multiple envs. Revert to
+        # single environment mode.
+        if run_env_parally_in_n_processes == 1:
+            callbacks._set_env(env)
+            envs = [env]
+        else:
+            envs = []
+            command_complete = []
+            command_complete_any = multiprocessing.Event()
+            # create lots and lots of instances of environments in different processes
+            for i in range(run_env_parally_in_n_processes):
+                command_complete.append(multiprocessing.Event())
+                envs.append(util.EnvironmentInstance(env, environment_arguments, command_complete[i],
+                                                     command_complete_any))
+
         params = {
             'nb_steps': nb_steps,
         }
@@ -105,119 +125,188 @@ class Agent(object):
         self._on_train_begin()
         callbacks.on_train_begin()
 
-        episode = 0
+        episode = [0]*run_env_parally_in_n_processes
+        episode_step = [0] * run_env_parally_in_n_processes
+        episode_reward = [0] * run_env_parally_in_n_processes
         self.step = 0
-        observation = None
-        episode_reward = None
-        episode_step = None
+        observations = [None] * run_env_parally_in_n_processes
+        rewards = [None] * run_env_parally_in_n_processes
+        info = [None] * run_env_parally_in_n_processes
+        actions = [None] * run_env_parally_in_n_processes
+        done = [None] * run_env_parally_in_n_processes
+        accumulated_info = [{} for _ in range(run_env_parally_in_n_processes)]
         did_abort = False
+        skip_to_next_env_inst = False
         try:
             while self.step < nb_steps:
-                if observation is None:  # start of a new episode
-                    callbacks.on_episode_begin(episode)
-                    episode_step = 0
-                    episode_reward = 0.
+                for i in range(run_env_parally_in_n_processes):
+                    r = [None] * run_env_parally_in_n_processes
+                    if observations[i] is None:  # start of a new episode
+                        callbacks.on_episode_begin(episode[i])
+                        episode_step[i] = 0
+                        episode_reward[i] = 0
 
-                    # Obtain the initial observation by resetting the environment.
-                    self.reset_states()
-                    observation = deepcopy(env.reset())
-                    if self.processor is not None:
-                        observation = self.processor.process_observation(observation)
-                    assert observation is not None
-
-                    # Perform random starts at beginning of episode and do not record them into the experience.
-                    # This slightly changes the start position between games.
-                    nb_random_start_steps = 0 if nb_max_start_steps == 0 else np.random.randint(nb_max_start_steps)
-                    for _ in range(nb_random_start_steps):
-                        if start_step_policy is None:
-                            action = env.action_space.sample()
+                        # Obtain the initial observations by resetting the environment.
+                        # This happens even if only single env has terminated. This is theoretically wrong but for
+                        # non-recurrent agents is still ok.
+                        self.reset_states()
+                        if run_env_parally_in_n_processes == 1:
+                            observations[i] = deepcopy(envs[i].reset())
                         else:
-                            action = start_step_policy(observation)
+                            envs[i].reset()
+                            if command_complete[i].is_set():
+                                observations[i] = deepcopy(envs[i].get_results())
+                            else:
+                                continue # Goes to next env instance.
+
                         if self.processor is not None:
-                            action = self.processor.process_action(action)
-                        callbacks.on_action_begin(action)
-                        observation, reward, done, info = env.step(action)
-                        observation = deepcopy(observation)
-                        if self.processor is not None:
-                            observation, reward, done, info = self.processor.process_step(observation, reward, done, info)
-                        callbacks.on_action_end(action)
-                        if done:
-                            warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(nb_random_start_steps))
-                            observation = deepcopy(env.reset())
+                           observations[i] = self.processor.process_observation(observations[i])
+                        assert observations[i] is not None
+
+                        # Perform random starts at beginning of episode and do not record them into the experience.
+                        # This slightly changes the start position between games.
+                        nb_random_start_steps = 0 if nb_max_start_steps == 0 else np.random.randint(nb_max_start_steps)
+
+                        actions[i] = None
+                        done[i] = None
+                        rewards[i] = None
+                        info[i] = None
+
+                        for _ in range(nb_random_start_steps):
+                            if start_step_policy is None:
+                                actions[i] = envs[i].action_space.sample()
+                            else:
+                                actions[i] = start_step_policy(observations[i])
+
                             if self.processor is not None:
-                                observation = self.processor.process_observation(observation)
+                                actions[i] = self.processor.process_action(actions[i])
+
+                            callbacks.on_action_begin(actions[i])
+                            if run_env_parally_in_n_processes == 1:
+                                observations[i], rewards[i], done[i], info[i] = envs[i].step(actions[i])
+                            else:
+                                envs[i].step(actions[i])
+                                if command_complete[i].is_set():
+                                    observations[i], r[i], done[i], info[i] = envs[i].get_results()
+                                    skip_to_next_env_inst = False
+                                else:
+                                    skip_to_next_env_inst = True
+                                    break
+
+                            observations[i] = deepcopy(observations[i])
+                            if self.processor is not None:
+                                    observations[i], rewards[i], done[i], info[i] = \
+                                        self.processor.process_step(observations[i], rewards[i], done[i], info[i])
+                            callbacks.on_action_end(actions)
+                            if done[i]:
+                                warnings.warn('Env ended before {} random steps could be performed at the start. You '
+                                              'should probably lower the `nb_max_start_steps` '
+                                              'parameter.'.format(nb_random_start_steps))
+                                observations[i] = deepcopy(envs[i].reset())
+                                if self.processor is not None:
+                                    observations[i] = self.processor.process_observation(observations[i])
+                                break
+
+                        if skip_to_next_env_inst:
+                            skip_to_next_env_inst = False
+                            continue
+
+                    # At this point, we expect to be fully initialized.
+                    assert episode_reward[i] is not None
+                    assert episode_step[i] is not None
+                    assert observations[i] is not None
+
+                    # Run a single step.
+                    callbacks.on_step_begin(episode_step)
+                    # This is were all of the work happens. We first perceive and compute the actions
+                    # (forward step) and then use the rewards to improve (backward step).
+                    actions[i] = self.forward(observations[i], i)
+
+                    if self.processor is not None:
+                        actions = self.processor.process_action(actions)
+                    rewards[i] = 0.
+                    done[i] = False
+
+                    accumulated_info[i] = {}
+
+                    for _ in range(action_repetition):
+                        callbacks.on_action_begin(actions[i])
+                        if run_env_parally_in_n_processes == 1:
+                            observations[i], r[i], done[i], info[i] = envs[i].step(actions[i])
+                        else:
+                            envs[i].step(actions[i])
+                            if command_complete[i].is_set():
+                                observations[i], r[i], done[i], info[i] = envs[i].get_results()
+                                skip_to_next_env_inst = False
+                            else:
+                                skip_to_next_env_inst = True
+                                break
+
+                        observations[i] = deepcopy(observations[i])
+                        if self.processor is not None:
+                            observations[i], r[i], done[i], info[i] = self.processor.process_step(observations[i], r[i], done, info[i])
+                        for key, value in info[i].items():
+                            if not np.isreal(value):
+                                continue
+                            if key not in accumulated_info[i]:
+                                accumulated_info[i][key] = np.zeros_like(value)
+                            accumulated_info[i][key] += value
+                        callbacks.on_action_end(actions)
+                        rewards[i] += r[i]
+                        if done[i]:
                             break
 
-                # At this point, we expect to be fully initialized.
-                assert episode_reward is not None
-                assert episode_step is not None
-                assert observation is not None
-
-                # Run a single step.
-                callbacks.on_step_begin(episode_step)
-                # This is were all of the work happens. We first perceive and compute the action
-                # (forward step) and then use the reward to improve (backward step).
-                action = self.forward(observation)
-                if self.processor is not None:
-                    action = self.processor.process_action(action)
-                reward = 0.
-                accumulated_info = {}
-                done = False
-                for _ in range(action_repetition):
-                    callbacks.on_action_begin(action)
-                    observation, r, done, info = env.step(action)
-                    observation = deepcopy(observation)
-                    if self.processor is not None:
-                        observation, r, done, info = self.processor.process_step(observation, r, done, info)
-                    for key, value in info.items():
-                        if not np.isreal(value):
+                    if skip_to_next_env_inst:
+                        skip_to_next_env_inst = False
+                        if i == run_env_parally_in_n_processes - 1 and run_env_parally_in_n_processes > 1:
+                            command_complete_any.wait()  # Wait for at least one environment to finish
+                            command_complete_any.clear()  # Signaling that that event has been consumed
+                        else:
                             continue
-                        if key not in accumulated_info:
-                            accumulated_info[key] = np.zeros_like(value)
-                        accumulated_info[key] += value
-                    callbacks.on_action_end(action)
-                    reward += r
-                    if done:
-                        break
-                if nb_max_episode_steps and episode_step >= nb_max_episode_steps - 1:
-                    # Force a terminal state.
-                    done = True
-                metrics = self.backward(reward, terminal=done)
-                episode_reward += reward
 
-                step_logs = {
-                    'action': action,
-                    'observation': observation,
-                    'reward': reward,
-                    'metrics': metrics,
-                    'episode': episode,
-                    'info': accumulated_info,
-                }
-                callbacks.on_step_end(episode_step, step_logs)
-                episode_step += 1
-                self.step += 1
+                    if nb_max_episode_steps and episode_step[i] >= nb_max_episode_steps - 1:
+                        # Force a terminal state.
+                        done = [True]*run_env_parally_in_n_processes
+                    metrics = self.backward(rewards[i], i, terminal=done[i])
+                    episode_reward[i] += rewards[i]
 
-                if done:
-                    # We are in a terminal state but the agent hasn't yet seen it. We therefore
-                    # perform one more forward-backward call and simply ignore the action before
-                    # resetting the environment. We need to pass in `terminal=False` here since
-                    # the *next* state, that is the state of the newly reset environment, is
-                    # always non-terminal by convention.
-                    self.forward(observation)
-                    self.backward(0., terminal=False)
-
-                    # This episode is finished, report and reset.
-                    episode_logs = {
-                        'episode_reward': episode_reward,
-                        'nb_episode_steps': episode_step,
-                        'nb_steps': self.step,
+                    step_logs = {
+                        'actions': actions[i],
+                        'observations': observations[i],
+                        'reward': rewards[i],
+                        'metrics': metrics,
+                        'episode': episode[i],
+                        'info': accumulated_info[i],
                     }
-                    callbacks.on_episode_end(episode, episode_logs)
+                    callbacks.on_step_end(episode_step[i], step_logs)
+                    episode_step[i] += 1
+                    self.step += 1
 
-                    episode += 1
-                    observation = None
-                    episode_step = None
-                    episode_reward = None
+                    if done[i]:
+                        # We are in a terminal state but the agent hasn't yet seen it. We therefore
+                        # perform one more forward-backward call and simply ignore the actions before
+                        # resetting the environment. We need to pass in `terminal=False` here since
+                        # the *next* state, that is the state of the newly reset environment, is
+                        # always non-terminal by convention.
+                        self.forward(observations[i], i)
+                        self.backward(0., i, terminal=False)
+
+                        # This episode is finished, report and reset.
+                        episode_logs = {
+                            'episode_reward': episode_reward[i],
+                            'nb_episode_steps': episode_step[i],
+                            'nb_steps': self.step,
+                        }
+                        callbacks.on_episode_end(episode[i], episode_logs)
+
+                        episode[i] += 1
+                        observations[i] = None
+                        episode_step[i] = 0
+                        episode_reward[i] = 0
+                        done[i] = False
+            if run_env_parally_in_n_processes > 1:
+                command_complete_any.wait() # Wait for at least one environment to finish
+                command_complete_any.clear() # Signaling that that event has been consumed
         except KeyboardInterrupt:
             # We catch keyboard interrupts here so that training can be be safely aborted.
             # This is so common that we've built this right into this function, which ensures that
@@ -228,10 +317,15 @@ class Agent(object):
 
         return history
 
-    def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
+    def test(self, envs, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
              nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1):
         """Callback that is called before training begins."
         """
+        if type(envs) is list or type(envs) is tuple:
+            env = envs[0]
+        else:
+            env = envs
+
         if not self.compiled:
             raise RuntimeError('Your tried to test your agent but it hasn\'t been compiled yet. Please call `compile()` before `test()`.')
         if action_repetition < 1:
@@ -304,7 +398,7 @@ class Agent(object):
             while not done:
                 callbacks.on_step_begin(episode_step)
 
-                action = self.forward(observation)
+                action = self.forward(observation, 0)
                 if self.processor is not None:
                     action = self.processor.process_action(action)
                 reward = 0.
@@ -328,7 +422,7 @@ class Agent(object):
                         break
                 if nb_max_episode_steps and episode_step >= nb_max_episode_steps - 1:
                     done = True
-                self.backward(reward, terminal=done)
+                self.backward(reward, 0, terminal=done)
                 episode_reward += reward
 
                 step_logs = {
@@ -347,8 +441,8 @@ class Agent(object):
             # resetting the environment. We need to pass in `terminal=False` here since
             # the *next* state, that is the state of the newly reset environment, is
             # always non-terminal by convention.
-            self.forward(observation)
-            self.backward(0., terminal=False)
+            self.forward(observation, 0)
+            self.backward(0., 0, terminal=False)
 
             # Report end of episode.
             episode_logs = {
@@ -366,19 +460,21 @@ class Agent(object):
         """
         pass
 
-    def forward(self, observation):
+    def forward(self, observation, env_id):
         """Takes the an observation from the environment and returns the action to be taken next.
         If the policy is implemented by a neural network, this corresponds to a forward (inference) pass.
 
         # Argument
             observation (object): The current observation from the environment.
+            env_id (int): The id of the environment that this observation comes from.
+                   This parameter is Particularly important when there are multiple environment instances.
 
         # Returns
             The next action to be executed in the environment.
         """
         raise NotImplementedError()
 
-    def backward(self, reward, terminal):
+    def backward(self, reward, env_id, terminal):
         """Updates the agent after having executed the action returned by `forward`.
         If the policy is implemented by a neural network, this corresponds to a weight update using back-prop.
 

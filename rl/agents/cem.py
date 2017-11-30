@@ -56,8 +56,14 @@ class CEMAgent(Agent):
         self.model.compile(optimizer='sgd', loss='mse')
         self.compiled = True
 
-    def load_weights(self, filepath):
-        self.model.load_weights(filepath)
+    def load_weights(self, filepath, by_name=False):
+        self.model.load_weights(filepath, by_name)
+
+    def freeze_unfreeze_n_layers(self, n, freeze=True):
+        freeze_unfreeze_n_layers(self.model, n, freeze)
+
+    def freeze_by_binary_flag(self, flag_list):
+        freeze_by_binary_flag(self.model, flag_list)
 
     def save_weights(self, filepath, overwrite=False):
         self.model.save_weights(filepath, overwrite=overwrite)
@@ -113,9 +119,9 @@ class CEMAgent(Agent):
         sampled_weights = self.get_weights_list(weights_flat)
         self.model.set_weights(sampled_weights)
 
-    def forward(self, observation):
+    def forward(self, observation, env_id):
         # Select an action.
-        state = self.memory.get_recent_state(observation)
+        state = self.memory.get_recent_state(observation, env_id)
         action = self.select_action(state)
         if self.processor is not None:
             action = self.processor.process_action(action)
@@ -130,11 +136,11 @@ class CEMAgent(Agent):
     def layers(self):
         return self.model.layers[:]
          
-    def backward(self, reward, terminal):
+    def backward(self, reward, env_id, terminal):
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
-                               training=self.training)
+                               env_id, training=self.training)
 
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:

@@ -101,8 +101,14 @@ class SARSAAgent(Agent):
 
         self.compiled = True
 
-    def load_weights(self, filepath):
-        self.model.load_weights(filepath)
+    def load_weights(self, filepath, by_name=False):
+        self.model.load_weights(filepath, by_name)
+        
+    def freeze_unfreeze_n_layers(self, n, freeze=True):
+        freeze_unfreeze_n_layers(self.model, n, freeze)
+
+    def freeze_by_binary_flag(self, flag_list):
+        freeze_by_binary_flag(self.model, flag_list)
 
     def save_weights(self, filepath, overwrite=False):
         self.model.save_weights(filepath, overwrite=overwrite)
@@ -114,7 +120,7 @@ class SARSAAgent(Agent):
         if self.compiled:
             self.model.reset_states()
 
-    def forward(self, observation):
+    def forward(self, observation, _):
         # Select an action.
         q_values = self.compute_q_values([observation])
         if self.training:
@@ -130,7 +136,7 @@ class SARSAAgent(Agent):
 
         return action
 
-    def backward(self, reward, terminal):
+    def backward(self, reward, _, terminal):
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working

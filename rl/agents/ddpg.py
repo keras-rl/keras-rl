@@ -144,19 +144,24 @@ class DDPGAgent(Agent):
         updates += self.actor.updates  # include other updates of the actor, e.g. for BN
 
         # Finally, combine it all into a callable function.
-        if self.uses_learning_phase:
-            critic_inputs += [K.learning_phase()]
-        self.actor_train_fn = K.function(critic_inputs, [self.actor(critic_inputs)], updates=updates)
+        if K.backend() == 'tensorflow':
+            self.actor_train_fn = K.function(critic_inputs + [K.learning_phase()],
+                                             [self.actor(critic_inputs)], updates=updates)
+        else:
+            if self.uses_learning_phase:
+                critic_inputs += [K.learning_phase()]
+            self.actor_train_fn = K.function(critic_inputs, [self.actor(critic_inputs)],
+                                             updates=updates)
         self.actor_optimizer = actor_optimizer
 
         self.compiled = True
 
-    def load_weights(self, filepath):
+    def load_weights(self, filepath, by_name=False):
         filename, extension = os.path.splitext(filepath)
         actor_filepath = filename + '_actor' + extension
         critic_filepath = filename + '_critic' + extension
-        self.actor.load_weights(actor_filepath)
-        self.critic.load_weights(critic_filepath)
+        self.actor.load_weights(actor_filepath, by_name)
+        self.critic.load_weights(critic_filepath, by_name)
         self.update_target_models_hard()
 
     def save_weights(self, filepath, overwrite=False):
@@ -171,6 +176,21 @@ class DDPGAgent(Agent):
         self.target_actor.set_weights(self.actor.get_weights())
 
     # TODO: implement pickle
+
+    def freeze_unfreeze_n_layers(self, n, freeze=True, operate_on_actor=True,
+                                 operate_on_critic=True):
+        if operate_on_actor:
+            freeze_unfreeze_n_layers(self.actor, n, freeze)
+
+        if operate_on_critic:
+            freeze_unfreeze_n_layers(self.critic, n, freeze)
+
+    def freeze_by_binary_flag(self, list_actor, list_critic):
+        if list_actor:
+            freeze_by_binary_flag(self.actor, list_actor)
+
+        if list_critic:
+            freeze_by_binary_flag(self.critic, list_critic)
 
     def reset_states(self):
         if self.random_process is not None:
@@ -202,9 +222,9 @@ class DDPGAgent(Agent):
 
         return action
 
-    def forward(self, observation):
+    def forward(self, observation, env_id):
         # Select an action.
-        state = self.memory.get_recent_state(observation)
+        state = self.memory.get_recent_state(observation, env_id)
         action = self.select_action(state)  # TODO: move this into policy
         if self.processor is not None:
             action = self.processor.process_action(action)
@@ -226,11 +246,11 @@ class DDPGAgent(Agent):
             names += self.processor.metrics_names[:]
         return names
 
-    def backward(self, reward, terminal=False):
+    def backward(self, reward, env_id, terminal=False):
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
-                               training=self.training)
+                               env_id, training=self.training)
 
         metrics = [np.nan for _ in self.metrics_names]
         if not self.training:

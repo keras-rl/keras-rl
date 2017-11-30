@@ -33,15 +33,15 @@ class TestAgent(Agent):
         super(TestAgent, self).__init__(**kwargs)
         self.memory = memory
 
-    def forward(self, observation):
+    def forward(self, observation, env_id):
         action = observation
         self.recent_action = action
         self.recent_observation = observation
         return action
 
-    def backward(self, reward, terminal):
+    def backward(self, reward, env_id, terminal):
         metrics = [np.nan for _ in self.metrics_names]
-        self.memory.append(self.recent_observation, self.recent_action, reward, terminal)
+        self.memory.append(self.recent_observation, self.recent_action, reward, terminal, env_id)
         return metrics
 
     def compile(self):
@@ -114,7 +114,7 @@ def test_copy_observations():
 
     for method in methods:
         original_observations = []
-        
+
         class LocalEnv(Env):
             def __init__(self):
                 super(LocalEnv, self).__init__()

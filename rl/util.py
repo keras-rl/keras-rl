@@ -1,4 +1,7 @@
+import logging
 import numpy as np
+
+from multiprocessing import Process, Queue
 
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
@@ -136,3 +139,129 @@ class WhiteningNormalizer(object):
 
         self.mean = self._sum / float(self._count)
         self.std = np.sqrt(np.maximum(np.square(self.eps), self._sumsq / float(self._count) - np.square(self.mean)))
+
+
+def _freeze_unfreeze_layers_of_model(model, freeze=True):
+    """Freezes layes so they are not changes during training. essential for transfer learning."""
+    for layer_idx in range(len(model.layers)):
+        if hasattr(model.layers[layer_idx], 'layers'):
+            NnBase._freeze_unfreeze_layers_of_model(model.layers[layer_idx])
+        else:
+            model.layers[layer_idx].trainable = not freeze
+
+
+def freeze_unfreeze_n_layers(model, n, freeze=True):
+    """Freezes either first n layers or last n layers of a network depending upon if
+    n is +ve or -ve"""
+    if not model.optimizer:
+        raise RuntimeError(
+            'Your tried to fit your model but it hasn\'t been compiled yet. '
+            'Please call `compile()`. Otherwise this is error prone.')
+    if n < 0:
+        n += len(model.layers)
+        idx_range = range(n, len(model.layers), 1)
+    else:
+        idx_range = range(n)
+    for i in idx_range:
+        if len(model.layers[i].get_weights()) > 0:
+            if freeze:
+                logging.info("Freezing " + model.layers[i].name)
+            else:
+                logging.info("Unfreezing " + model.layers[i].name)
+            if hasattr(model.layers[i], 'layers'):
+                # If a model layer is itself a model then it freezes recursively
+                _freeze_unfreeze_layers_of_model(model.layers[i], freeze)
+            else:
+                model.layers[i].trainable = not freeze
+
+    model.compile(loss=model.loss, optimizer=model.optimizer, metrics=model.metrics)
+
+
+def freeze_by_binary_flag(model, flag_list):
+    """Takes a flag_list of binary values which is as long as number of layers in the model.
+    Any layer with a True flag gets frozen"""
+    if not model.optimizer:
+        raise RuntimeError(
+            'Your tried to fit your model but it hasn\'t been compiled yet. '
+            'Please call `compile()`. Otherwise this is error prone.')
+
+    if len(flag_list) != len(model.layers):
+        raise RuntimeError('The number of flags provided doesn\'t match number of layers in the model  = '
+                           ''+ str(len(flag_list)) + 'number of ids = ' + str(len(model.layers)))
+    for i in range(len(flag_list)):
+        if flag_list[i] == 1:
+            if len(model.layers[i].get_weights()) <= 0:
+                raise RuntimeError("Trying to freeze layer with no weights")
+            else:
+                logging.info("Freezing " + model.layers[i].name)
+
+                if hasattr(model.layers[i], 'layers'):
+                    # If a model layer is itself a model then it freezes recursively
+                    _freeze_unfreeze_layers_of_model(model.layers[i])
+                else:
+                    model.layers[i].trainable = False
+
+    model.compile(loss=model.loss, optimizer=model.optimizer, metrics=model.metrics)
+
+
+class EnvironmentInstance:
+    def __init__(self, get_env, environment_arguments, command_complete, command_complete_global):
+        self.result_q = Queue(1)
+        self.command_q = Queue(1)
+        self.environment_arguments = environment_arguments
+        self.get_env = get_env
+        self.command_complete = command_complete
+        self.command_complete_global = command_complete_global
+
+        self.p = Process(target=self.execute_current_command, args=(command_complete, command_complete_global))
+        self.p.daemon = True
+        self.p.start()
+        self.busy = False
+
+    def execute_current_command(self, command_complete, command_complete_global):
+        e = self.get_env(*self.environment_arguments)
+        self.action_space = e.action_space
+        while True:
+            command = self.command_q.get()
+            if command[0] == 'reset':
+                if len(command) > 1:
+                    keyword, sep, value = command[1].partition('=')
+                    kwargs = {keyword: value.strip('"')}
+                    observation = e.reset(**kwargs)
+                else:
+                    observation = e.reset()
+                self.result_q.put(observation)
+                command_complete.set()
+                command_complete_global.set()
+
+            elif command[0] == 'step':
+                self.result_q.put(e.step(command[1]))
+                command_complete.set()
+                command_complete_global.set()
+            else:
+                self.result_q.close()
+                self.command_q.close()
+                del e
+                # Just to help crash the rest of the code. and not wait for ever.
+                command_complete.set()
+                command_complete_global.set()
+
+    def set_command(self, command):
+        self.command_q.put(command)
+
+    def get_results(self):
+        self.busy = False
+        return self.result_q.get()
+
+    def reset(self):
+        if not self.busy:
+            self.set_command(['reset',])
+            self.busy = True
+            self.command_complete.clear()
+
+
+    def step(self, action):
+        if not self.busy:
+            self.set_command(['step', action])
+            self.busy = True
+            self.command_complete.clear()

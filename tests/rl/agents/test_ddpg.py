@@ -1,18 +1,13 @@
 from __future__ import division
 from __future__ import absolute_import
 
-import pytest
-import numpy as np
-from numpy.testing import assert_allclose
-
 from keras.models import Model, Sequential
 from keras.layers import Input, merge, Dense, Flatten
 
 from rl.agents.ddpg import DDPGAgent
 from rl.memory import SequentialMemory
 from rl.processors import MultiInputProcessor
-
-from ..util import MultiInputTestEnv
+from tests.rl import util
 
 
 def test_single_ddpg_input():
@@ -32,7 +27,9 @@ def test_single_ddpg_input():
     agent = DDPGAgent(actor=actor, critic=critic, critic_action_input=action_input, memory=memory,
                       nb_actions=2, nb_steps_warmup_critic=5, nb_steps_warmup_actor=5, batch_size=4)
     agent.compile('sgd')
-    agent.fit(MultiInputTestEnv((3,)), nb_steps=10)
+    # import ipdb; ipdb.set_trace()
+    env = util.MultiInputTestEnv((3,))
+    agent.fit(env, nb_steps=10)
 
 
 def test_multi_ddpg_input():
@@ -40,7 +37,7 @@ def test_multi_ddpg_input():
 
     actor_observation_input1 = Input(shape=(2, 3), name='actor_observation_input1')
     actor_observation_input2 = Input(shape=(2, 4), name='actor_observation_input2')
-    actor = Sequential()
+    # actor = Sequential()
     x = merge([actor_observation_input1, actor_observation_input2], mode='concat')
     x = Flatten()(x)
     x = Dense(nb_actions)(x)
@@ -60,4 +57,5 @@ def test_multi_ddpg_input():
                       nb_actions=2, nb_steps_warmup_critic=5, nb_steps_warmup_actor=5, batch_size=4,
                       processor=processor)
     agent.compile('sgd')
-    agent.fit(MultiInputTestEnv([(3,), (4,)]), nb_steps=10)
+    env = util.MultiInputTestEnv([(3,), (4,)])
+    agent.fit(env, nb_steps=10)

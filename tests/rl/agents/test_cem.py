@@ -25,7 +25,6 @@ def test_single_cem_input():
     agent.compile()
     agent.fit(MultiInputTestEnv((3,)), nb_steps=100)
 
-
 def test_multi_cem_input():
     input1 = Input(shape=(2, 3))
     input2 = Input(shape=(2, 4))

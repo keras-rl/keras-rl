@@ -119,3 +119,56 @@ class BoltzmannQPolicy(Policy):
         config['tau'] = self.tau
         config['clip'] = self.clip
         return config
+
+
+class BoltzmannGumbelQPolicy(Policy):
+    """Implements Boltzmann-Gumbel exploration (BGE) adapted for Q learning
+    based on the paper Boltzmann Exploration Done Right
+    (https://arxiv.org/pdf/1705.10257.pdf).
+
+    BGE is invariant with respect to the mean of the rewards but not their
+    variance. The parameter C, which defaults to 1, can be used to correct for
+    this, and should be set to the least upper bound on the standard deviation
+    of the rewards.
+
+    BGE is only available for training, not testing. For testing purposes, you
+    can achieve approximately the same result as BGE after training for N steps
+    on K actions with parameter C by using the BoltzmannQPolicy and setting
+    tau = C/sqrt(N/K)."""
+
+    def __init__(self, C=1.0):
+        assert C > 0, "BoltzmannGumbelQPolicy C parameter must be > 0, not " + repr(C)
+        super(BoltzmannGumbelQPolicy, self).__init__()
+        self.C = C
+        self.action_counts = None
+
+    def select_action(self, q_values):
+        # We can't use BGE during testing, since we don't have access to the
+        # action_counts at the end of training.
+        assert self.agent.training, "BoltzmannGumbelQPolicy should only be used for training, not testing"
+
+        assert q_values.ndim == 1, q_values.ndim
+        q_values = q_values.astype('float64')
+
+        # If we are starting training, we should reset the action_counts.
+        # Otherwise, action_counts should already be initialized, since we
+        # always do so when we begin training.
+        if self.agent.step == 0:
+            self.action_counts = np.ones(q_values.shape)
+        assert self.action_counts is not None, self.agent.step
+        assert self.action_counts.shape == q_values.shape, (self.action_counts.shape, q_values.shape)
+
+        beta = self.C/np.sqrt(self.action_counts)
+        Z = np.random.gumbel(size=q_values.shape)
+
+        perturbation = beta * Z
+        perturbed_q_values = q_values + perturbation
+        action = np.argmax(perturbed_q_values)
+
+        self.action_counts[action] += 1
+        return action
+
+    def get_config(self):
+        config = super(BoltzmannGumbelQPolicy, self).get_config()
+        config['C'] = self.C
+        return config

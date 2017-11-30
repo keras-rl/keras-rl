@@ -40,7 +40,6 @@ install:
   - source activate test-environment
   - pip install pytest-xdist
   # See https://github.com/pytest-dev/pytest-cov/issues/124 for details
-  - pip install pytest-cov==2.2.1 python-coveralls coverage==3.7.1
   - pip install pep8 pytest-pep8
   - pip install tensorflow
   # Bleeding-edge: pip install git+https://github.com/Theano/Theano.git

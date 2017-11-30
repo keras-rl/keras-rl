@@ -2,12 +2,12 @@ from __future__ import division
 import warnings
 
 import keras.backend as K
+from keras.models import Model
 from keras.layers import Lambda, Input, Layer, Dense
 
 from rl.core import Agent
 from rl.policy import EpsGreedyQPolicy, GreedyQPolicy
 from rl.util import *
-from rl.keras_future import Model
 
 
 def mean_q(y_true, y_pred):
@@ -127,7 +127,7 @@ class DQNAgent(AbstractDQNAgent):
             else:
                 assert False, "dueling_type must be one of {'avg','max','naive'}"
 
-            model = Model(input=model.input, output=outputlayer)
+            model = Model(inputs=model.input, outputs=outputlayer)
 
         # Related objects.
         self.model = model
@@ -182,7 +182,7 @@ class DQNAgent(AbstractDQNAgent):
         mask = Input(name='mask', shape=(self.nb_actions,))
         loss_out = Lambda(clipped_masked_error, output_shape=(1,), name='loss')([y_pred, y_true, mask])
         ins = [self.model.input] if type(self.model.input) is not list else self.model.input
-        trainable_model = Model(input=ins + [y_true, mask], output=[loss_out, y_pred])
+        trainable_model = Model(inputs=ins + [y_true, mask], outputs=[loss_out, y_pred])
         assert len(trainable_model.output_names) == 2
         combined_metrics = {trainable_model.output_names[1]: metrics}
         losses = [
@@ -603,7 +603,7 @@ class NAFAgent(AbstractDQNAgent):
         mu_out = self.mu_model(os_in)
         A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)([L_out, mu_out, a_in])
         combined_out = Lambda(lambda x: x[0]+x[1], output_shape=lambda x: x[0])([A_out, V_out])
-        combined = Model(input=[a_in] + os_in, output=[combined_out])
+        combined = Model(inputs=[a_in] + os_in, outputs=[combined_out])
         # Compile combined model.
         if self.target_model_update < 1.:
             # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.

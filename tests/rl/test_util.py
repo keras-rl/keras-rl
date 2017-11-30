@@ -4,7 +4,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 from keras.models import Model, Sequential
-from keras.layers import Input, Dense, merge
+from keras.layers import Input, Dense, Concatenate
 from keras.optimizers import SGD
 import keras.backend as K
 
@@ -29,7 +29,7 @@ def test_clone_sequential_model():
 def test_clone_graph_model():
     in1 = Input(shape=(2,))
     in2 = Input(shape=(3,))
-    x = Dense(8)(merge([in1, in2], mode='concat'))
+    x = Dense(8)(Concatenate()([in1, in2]))
     graph = Model([in1, in2], x)
     graph.compile(optimizer='sgd', loss='mse')
 

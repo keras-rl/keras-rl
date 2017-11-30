@@ -3,14 +3,13 @@ import random
 import numpy as np
 import gym
 
-from keras.models import Sequential
-from keras.layers import Dense, Activation, Flatten, Input
+from keras.models import Sequential, Model
+from keras.layers import Dense, Activation, Flatten, Input, Concatenate
 from keras.optimizers import Adam
 
 from rl.agents import NAFAgent, DDPGAgent
 from rl.random import OrnsteinUhlenbeckProcess
 from rl.memory import SequentialMemory
-from rl.keras_future import Model, concatenate
 
 
 def test_cdqn():
@@ -35,11 +34,11 @@ def test_cdqn():
     
     action_input = Input(shape=(nb_actions,), name='action_input')
     observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
-    x = concatenate([action_input, Flatten()(observation_input)])
+    x = Concatenate()([action_input, Flatten()(observation_input)])
     x = Dense(16)(x)
     x = Activation('relu')(x)
     x = Dense(((nb_actions * nb_actions + nb_actions) // 2))(x)
-    L_model = Model(input=[action_input, observation_input], output=x)
+    L_model = Model(inputs=[action_input, observation_input], outputs=x)
 
     memory = SequentialMemory(limit=1000, window_length=1)
     random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3, size=nb_actions)
@@ -71,12 +70,12 @@ def test_ddpg():
     action_input = Input(shape=(nb_actions,), name='action_input')
     observation_input = Input(shape=(1,) + env.observation_space.shape, name='observation_input')
     flattened_observation = Flatten()(observation_input)
-    x = concatenate([action_input, flattened_observation])
+    x = Concatenate()([action_input, flattened_observation])
     x = Dense(16)(x)
     x = Activation('relu')(x)
     x = Dense(1)(x)
     x = Activation('linear')(x)
-    critic = Model(input=[action_input, observation_input], output=x)
+    critic = Model(inputs=[action_input, observation_input], outputs=x)
     
     memory = SequentialMemory(limit=1000, window_length=1)
     random_process = OrnsteinUhlenbeckProcess(theta=.15, mu=0., sigma=.3)

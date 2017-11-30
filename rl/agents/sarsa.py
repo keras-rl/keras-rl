@@ -3,6 +3,7 @@ import collections
 import numpy as np
 
 from keras.callbacks import History
+from keras.models import Model
 from keras.layers import Input, Lambda
 import keras.backend as K
 
@@ -11,7 +12,6 @@ from rl.agents.dqn import mean_q
 from rl.util import huber_loss
 from rl.policy import EpsGreedyQPolicy, GreedyQPolicy
 from rl.util import get_object_config
-from rl.keras_future import Model
 
 
 class SARSAAgent(Agent):
@@ -89,7 +89,7 @@ class SARSAAgent(Agent):
         mask = Input(name='mask', shape=(self.nb_actions,))
         loss_out = Lambda(clipped_masked_error, output_shape=(1,), name='loss')([y_pred, y_true, mask])
         ins = [self.model.input] if type(self.model.input) is not list else self.model.input
-        trainable_model = Model(input=ins + [y_true, mask], output=[loss_out, y_pred])
+        trainable_model = Model(inputs=ins + [y_true, mask], outputs=[loss_out, y_pred])
         assert len(trainable_model.output_names) == 2
         combined_metrics = {trainable_model.output_names[1]: metrics}
         losses = [

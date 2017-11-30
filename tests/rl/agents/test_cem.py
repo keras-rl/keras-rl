@@ -6,7 +6,7 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 from keras.models import Model, Sequential
-from keras.layers import Input, merge, Dense, Flatten
+from keras.layers import Input, Dense, Flatten, Concatenate
 
 from rl.agents.cem import CEMAgent
 from rl.memory import EpisodeParameterMemory
@@ -29,10 +29,10 @@ def test_single_cem_input():
 def test_multi_cem_input():
     input1 = Input(shape=(2, 3))
     input2 = Input(shape=(2, 4))
-    x = merge([input1, input2], mode='concat')
+    x = Concatenate()([input1, input2])
     x = Flatten()(x)
     x = Dense(2)(x)
-    model = Model(input=[input1, input2], output=x)
+    model = Model(inputs=[input1, input2], outputs=x)
 
     memory = EpisodeParameterMemory(limit=10, window_length=2)
     processor = MultiInputProcessor(nb_inputs=2)

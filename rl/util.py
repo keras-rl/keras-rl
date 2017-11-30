@@ -90,13 +90,8 @@ class AdditionalUpdatesOptimizer(optimizers.Optimizer):
         self.optimizer = optimizer
         self.additional_updates = additional_updates
 
-    # Keras sometimes passes params and loss as keyword arguments,
-    # expecting constraints to be optional, so there must be a default
-    # value for constraints here; see for example:
-    # https://github.com/fchollet/keras/blob/master/keras/engine/training.py#L988-L990
-    def get_updates(self, params, constraints=None, loss=None):
-        assert loss is not None, (params, constraints, loss)
-        updates = self.optimizer.get_updates(params, constraints, loss)
+    def get_updates(self, params, loss):
+        updates = self.optimizer.get_updates(params=params, loss=loss)
         updates += self.additional_updates
         self.updates = updates
         return self.updates

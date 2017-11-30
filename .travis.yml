@@ -12,8 +12,6 @@ matrix:
         - python: 2.7
           env: KERAS_BACKEND=tensorflow
         - python: 2.7
-          env: KERAS_BACKEND=tensorflow LEGACY_KERAS=1
-        - python: 2.7
           env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8
         - python: 2.7
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
@@ -42,19 +40,13 @@ install:
   - source activate test-environment
   - pip install pytest-xdist
   # See https://github.com/pytest-dev/pytest-cov/issues/124 for details
-  - pip install pytest-cov==2.2.1 python-coveralls coverage==3.7.1
   - pip install pep8 pytest-pep8
   - pip install tensorflow
   # Bleeding-edge: pip install git+https://github.com/Theano/Theano.git
-  - pip install theano>=0.9.0rc1
+  - pip install "theano<1.0"
   - pip install gym
   # Bleeding-edge: pip install git+https://github.com/fchollet/keras.git;
-  - if [[ "$LEGACY_KERAS" == "1" ]]; then
-      pip install keras==1.2.2;
-    else
-      pip install "keras<2.0.7";
-    fi
-
+  - pip install "keras>=2.0.7";
   - python setup.py install
 
 # command to run tests.

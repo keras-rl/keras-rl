@@ -60,10 +60,16 @@ class RingBuffer(object):
         self.data[(self.start + self.length - 1) % self.maxlen] = v
 
 class FixedBuffer(object):
-    def __init__(self, maxlen):
+    def __init__(self, maxlen, val=None):
         self.maxlen = maxlen
-        self.length = 0
-        self.data = [None for _ in range(maxlen)]
+        if val is None:
+            self.data = [None for _ in range(maxlen)]
+            self.length = 0
+        else:
+            if maxlen < len(val):
+                raise AttributeError()
+            self.data = val
+            self.length = len(val)
 
     def __len__(self):
         return self.length

@@ -88,15 +88,16 @@ def GeneralizedAdvantageEstimator(critic, state_batch, reward, gamma, lamb):
     # See https://danieltakeshi.github.io/2017/04/02/notes-on-the-generalized-advantage-estimation-paper/
     #
     # state_batch: a numpy array of batched input that can be feed into the critic network directly
+    #  note that it must also contain the ending state, i.e. has batch_size + 1 entries
     # reward: numpy array of shape (batch_size,)
-    n = len(state_batch)
+    n = len(state_batch) - 1
     assert reward.shape == (n,)
     value = critic.predict_on_batch(state_batch).flatten()
-    delta = reward + gamma * np.roll(value, -1) - value
+    delta = reward + gamma * value[1:, ] - value[:-1, ]
     # No premature optimization for now...
     result = [0]
     r = gamma * lamb
-    for i in range(1, n):
+    for i in range(0, n):
         result.append(result[-1] * r + delta[n-1-i])
     return result[:0:-1]
 

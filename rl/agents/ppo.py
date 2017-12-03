@@ -21,8 +21,7 @@ def state_windowing(states, window_len):
         y[0:shift, ] = 0
         return y
 
-    result = np.stack( [ naive_pad(states, i, axis=0) for i in reversed(range(window_len))], axis=1 )
-    return { 'state0': result[:-1, ], 'state1': result[1:, ] }
+    return np.stack( [ naive_pad(states, i, axis=0) for i in reversed(range(window_len))], axis=1 )
 
 # TODO: We would need a new memory class that returns windowed info also for rewards
 class PPOAgent(Agent):
@@ -129,9 +128,11 @@ class PPOAgent(Agent):
     def complete_episode(self, episode):
         episode_len = len(episode.state) - 1
         assert episode_len == len(episode.action) and episode_len == len(episode.reward)
-        windowed_states = state_windowing(episode.state, self.memory.window_length)
+        windowed_states = state_windowing(np.array(episode.state.get_list()), self.memory.window_length)
         # Compute GAE
-        # TODO
+        gae = GeneralizedAdvantageEstimator(self.critic, windowed_states, np.array(episode.reward.get_list()),
+                                            self.gamma, self.lamb)
+        episode.advantage = FixedBuffer(self.nb_steps, val=gae)
 
     def forward(self, observation):
         state_window = self.memory.get_recent_state(observation)

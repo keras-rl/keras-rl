@@ -15,6 +15,15 @@ import keras.backend as K
 
 EpisodeMemory = namedtuple('EpisodeMemory', 'state,action,reward,advantage')
 
+def state_windowing(states, window_len):
+    def naive_pad(x, shift, axis=0):
+        y = np.roll(x, shift, axis)
+        y[0:shift, ] = 0
+        return y
+
+    result = np.stack( [ naive_pad(states, i, axis=0) for i in reversed(range(window_len))], axis=1 )
+    return { 'state0': result[:-1, ], 'state1': result[1:, ] }
+
 # TODO: We would need a new memory class that returns windowed info also for rewards
 class PPOAgent(Agent):
     # Note on network architecture:
@@ -117,6 +126,13 @@ class PPOAgent(Agent):
             return batch
         return self.processor.process_state_batch(batch)
 
+    def complete_episode(self, episode):
+        episode_len = len(episode.state) - 1
+        assert episode_len == len(episode.action) and episode_len == len(episode.reward)
+        windowed_states = state_windowing(episode.state, self.memory.window_length)
+        # Compute GAE
+        # TODO
+
     def forward(self, observation):
         state_window = self.memory.get_recent_state(observation)
         batch_single = self.process_state_batch([ state_window ])
@@ -173,8 +189,8 @@ class PPOAgent(Agent):
             self.finalize_episode = False
             # No need to append to the usual memory since next episode will not see anything in last episode anyway?
             self.current_episode_memory.state.append(self.recent_observation)
-            self.current_episode_memory.action.append(self.recent_action)
-            self.current_episode_memory.reward.append(reward)
+            #self.current_episode_memory.action.append(self.recent_action)
+            #self.current_episode_memory.reward.append(reward)
 
             self.round += 1
             self.current_episode_memory = self.episode_memories[self.round % self.nb_actor]

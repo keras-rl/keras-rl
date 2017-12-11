@@ -212,6 +212,19 @@ class PPOAgent(Agent):
             batch_reward    = np.concatenate([ self.episode_memories[i].reward.get_list()         for i in range(self.nb_actor) ])
             batch_advantage = np.concatenate([ self.episode_memories[i].advantage.get_list()      for i in range(self.nb_actor) ])
             batch_action    = np.concatenate([ self.episode_memories[i].action.get_list()         for i in range(self.nb_actor) ])
+
+            # Set dummy output with matching shape
+            assert batch_state.shape[0] == batch_reward.shape[0] and batch_state.shape[0] == batch_advantage.shape[0] \
+                and batch_state.shape[0] == batch_action.shape[0]
+            total_batch_size = batch_state.shape[0]
+            dummy_out = np.zeros((total_batch_size, 1))
+            self.trainable_model.fit([batch_action, batch_state, batch_advantage],
+                                     dummy_out, epochs=self.epoch, batch_size=self.batch_size)
+            # Copy results to target_actor
+            self.target_actor.set_weights(self.actor.get_weights())
+
+            #TODO: train value network
+
             # reset all episode memories
             self.episode_memories = [EpisodeMemory(state=FixedBuffer(self.nb_steps), windowed_state=None,
                                                    action=FixedBuffer(self.nb_steps), reward=FixedBuffer(self.nb_steps),

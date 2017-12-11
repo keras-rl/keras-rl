@@ -25,15 +25,31 @@ def state_windowing(states, window_len):
 
 # TODO: We would need a new memory class that returns windowed info also for rewards
 class PPOAgent(Agent):
-    # Note on network architecture:
-    # actor should take as input a window of recent state, and should output a vector in the abstract
-    # sample space as defined by the user, which is then feed into the sampler, again supplied
-    # by the user. This sampler is responsible for transforming the abstract sample space into
-    # actual value in the action space, through a (known, fixed) random distribution
-    # actor input shape: (window_length, dimension of observation space)
-    # critic's only input is the current state, and should output a scalar representing estimated
-    # value of this state
-    # critic input shape: (dimension of observation space,)
+    """
+    Single threaded implementation of the Proximal Policy Optimization algorithm, using an A2C (Advantage
+    Actor-Critic) architecture.
+
+    Note on network architecture
+    ============================
+    actor should take as input a window of recent state, and should output a vector in the abstract
+    sample space as defined by the user, which is then feed into the sampler, again supplied
+    by the user. This sampler is responsible for transforming the abstract sample space into
+    actual value in the action space, through a (known, fixed) random distribution
+    actor input shape: (window_length, dimension of observation space)
+    critic's only input is the current state, and should output a scalar representing estimated
+    value of this state
+    critic input shape: (dimension of observation space,)
+
+    :param actor: Actor network
+    :param critic: Critic network
+    :param memory: Memory object to hold a history of simulation run. As opposed to other agents, we only use it
+    superficially as replay buffer is not used in A2C architecture.
+    :param sampler: User supplied sampler. See notes above for explanation.
+    :param epsilon: Cutoff for the clipped loss function
+    :param nb_actor: Number of concurrent actors running simulation (They are still executed sequential in this version)
+    :param nb_steps: Number of steps to run in each simulation episode before termination. Should match with xx in yy
+    :param epoch: Number of training epoch for the actor network.
+    """
     def __init__(self, actor, critic, memory, sampler, epsilon=0.2, nb_actor=3, nb_steps=1000, epoch=5, **kwargs):
         super(Agent, self).__init__(**kwargs)
 

@@ -85,11 +85,18 @@ def huber_loss(y_true, y_pred, clip_value):
 
 
 def GeneralizedAdvantageEstimator(critic, state_batch, reward, gamma, lamb):
-    # See https://danieltakeshi.github.io/2017/04/02/notes-on-the-generalized-advantage-estimation-paper/
-    #
-    # state_batch: a numpy array of batched input that can be feed into the critic network directly
-    #  note that it must also contain the ending state, i.e. has batch_size + 1 entries
-    # reward: numpy array of shape (batch_size,)
+    """
+    Compute the Generalized Advantage Estimator.
+
+    See https://danieltakeshi.github.io/2017/04/02/notes-on-the-generalized-advantage-estimation-paper/
+
+    :param critic: Critic network.
+    :param state_batch: A numpy array of batched input that can be feed into the critic network directly. Note that it must also contain the ending state, i.e. has batch_size + 1 entries.
+    :param reward: numpy array of shape (batch_size,)
+    :param gamma: Tuning parameter gamma.
+    :param lamb: Tuning parameter lambda.
+    :return: Python List of GAE values in ascending time order (matched with parameter reward)
+    """
     n = len(state_batch) - 1
     assert reward.shape == (n,)
     value = critic.predict_on_batch(state_batch).flatten()

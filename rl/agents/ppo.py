@@ -13,7 +13,7 @@ from rl.util import clone_optimizer, clone_model, GeneralizedAdvantageEstimator
 
 import keras.backend as K
 
-EpisodeMemory = namedtuple('EpisodeMemory', 'state,action,reward,advantage')
+EpisodeMemory = namedtuple('EpisodeMemory', 'state,windowed_state,action,reward,advantage')
 
 def state_windowing(states, window_len):
     def naive_pad(x, shift, axis=0):
@@ -50,8 +50,9 @@ class PPOAgent(Agent):
         self.sampler = sampler
 
         # Initialize buffers
-        self.episode_memories = [EpisodeMemory(state=FixedBuffer(self.nb_steps), action=FixedBuffer(self.nb_steps),
-                                               reward=FixedBuffer(self.nb_steps), advantage=FixedBuffer(self.nb_steps))
+        self.episode_memories = [EpisodeMemory(state=FixedBuffer(self.nb_steps), windowed_state=None,
+                                               action=FixedBuffer(self.nb_steps), reward=FixedBuffer(self.nb_steps),
+                                               advantage=None)
                                  for _ in range(self.nb_actor)]
 
     def compile(self, optimizer, metrics=[]):
@@ -129,6 +130,7 @@ class PPOAgent(Agent):
         episode_len = len(episode.state) - 1
         assert episode_len == len(episode.action) and episode_len == len(episode.reward)
         windowed_states = state_windowing(np.array(episode.state.get_list()), self.memory.window_length)
+        episode.windowed_state = FixedBuffer(self.nb_steps, val=windowed_states)
         # Compute GAE
         gae = GeneralizedAdvantageEstimator(self.critic, windowed_states, np.array(episode.reward.get_list()),
                                             self.gamma, self.lamb)
@@ -190,8 +192,7 @@ class PPOAgent(Agent):
             self.finalize_episode = False
             # No need to append to the usual memory since next episode will not see anything in last episode anyway?
             self.current_episode_memory.state.append(self.recent_observation)
-            #self.current_episode_memory.action.append(self.recent_action)
-            #self.current_episode_memory.reward.append(reward)
+            self.complete_episode(self.current_episode_memory)
 
             self.round += 1
             self.current_episode_memory = self.episode_memories[self.round % self.nb_actor]
@@ -207,10 +208,14 @@ class PPOAgent(Agent):
 
         if (self.round % self.nb_actor == 0) and self.round > 0:
             # do training
+            batch_state     = np.concatenate([ self.episode_memories[i].windowed_state.get_list() for i in range(self.nb_actor) ])
+            batch_reward    = np.concatenate([ self.episode_memories[i].reward.get_list()         for i in range(self.nb_actor) ])
+            batch_advantage = np.concatenate([ self.episode_memories[i].advantage.get_list()      for i in range(self.nb_actor) ])
+            batch_action    = np.concatenate([ self.episode_memories[i].action.get_list()         for i in range(self.nb_actor) ])
             # reset all episode memories
-            self.episode_memories = [EpisodeMemory(state=FixedBuffer(self.nb_steps), action=FixedBuffer(self.nb_steps),
-                                                   reward=FixedBuffer(self.nb_steps),
-                                                   advantage=FixedBuffer(self.nb_steps))
+            self.episode_memories = [EpisodeMemory(state=FixedBuffer(self.nb_steps), windowed_state=None,
+                                                   action=FixedBuffer(self.nb_steps), reward=FixedBuffer(self.nb_steps),
+                                                   advantage=None)
                                      for _ in range(self.nb_actor)]
             self.current_episode_memory = self.episode_memories[0]
         # TODO: Just a sketch

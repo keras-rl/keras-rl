@@ -211,6 +211,14 @@ class PPOAgent(Agent):
             self.target_actor.set_weights(self.actor.get_weights())
 
             #TODO: train value network
+            predict_value = self.critic.predict_on_batch(batch_state[1:]).flatten()
+            # Compute r_t + gamma * V(s_t+1) and update the target ys accordingly,
+            discounted_reward_batch = self.gamma * predict_value
+            #discounted_reward_batch *= terminal1_batch
+            assert discounted_reward_batch.shape == batch_reward.shape
+            targets = (batch_reward + discounted_reward_batch).reshape(self.batch_size, 1)
+
+            self.critic.train_on_batch(batch_state[:-1], targets)
 
             # reset all episode memories
             self.episode_memories = [EpisodeMemory(state=FixedBuffer(self.nb_steps), windowed_state=None,

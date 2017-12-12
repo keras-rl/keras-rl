@@ -61,25 +61,53 @@ class OrnsteinUhlenbeckProcess(AnnealedGaussianProcess):
     def reset_states(self):
         self.x_prev = self.x0 if self.x0 is not None else np.zeros(self.size)
 
-# For PPO use
-# sigma is a np array of shape (n,)
-class IndependentGaussianProcess(object):
+class ProbabilityDistribution(object):
+    """Specify a parametric family of fixed probability distribution. Currently used by the ``PPOAgent`` class.
+    Implementation of this interface should supports both methods ``sample`` and ``get_dist``."""
+    def sample(self, x):
+        """
+        Generate a single random sample according to the probability distribution.
+
+        :param x: Python list of parameters for the random vector, where each parameter is a numpy array.
+        :return: Sampled value. Should be a numpy array.
+        """
+        pass
+
+    def get_dist(self, x):
+        """
+        Return a keras expression to compute the log likelihood of selected value given a fixed parameter.
+
+        :param x: Python list of keras function, consisting of all parameters for the random vector (in the same format as in ``sample``), plus the sampled value at the end. All values come in batched form.
+        :return: Keras tensor of dimension ``(batch, 1)``
+
+        .. note::
+        In application, the actor network should output exactly the parameters for the random vector, which is then
+        passed to ``sample`` to generate the actual action.
+        """
+        pass
+
+
+class IndependentGaussianProcess(ProbabilityDistribution):
+    """
+    Specifies a Multivariate Gaussian/Normal Distribution, with a diagonal covariance matrix (i.e. each component
+    in the random vector are independent).
+
+    The random parameters are ``mu`` (mean) and ``sigma`` (standard deviation), both numpy array of shape
+    ``(n,)``, where n is the dimension of the random vector.
+
+    The generated output is also a numpy array of shape ``(n,)``.
+
+    .. seealso:: :class:`ProbabilityDistribution`
+    """
     def __init__(self, n):
         self.n = n
 
-    # generate a random sample according to current distribution (specified by param mu and sigma)
-    # Input: x: python list with two elements mu and sigma, both np array of shape (n,)
-    # Output: np array of shape (n,)
     def sample(self, x):
         mu, sigma = x
         assert mu.shape == (self.n,)
         assert sigma.shape == (self.n,)
         return np.random.normal(mu, sigma)
 
-    # return a keras expression to compute the log likelihood of selected action given current state
-    # Input: a list of keras function, same as output from actor network except that the actual
-    #  selected action is appended to the list
-    # Output: keras tensor of dimension (batch, 1)
     def get_dist(self, x):
         mu, sigma, y = x
         return K.constant(- self.n * math.log(2*math.pi) / 2 ) - K.sum(sigma, axis=1, keepdims=True) - \

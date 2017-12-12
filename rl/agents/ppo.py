@@ -42,22 +42,28 @@ class PPOAgent(Agent):
 
     :param actor: Actor network
     :param critic: Critic network
-    :param memory: Memory object to hold a history of simulation run. As opposed to other agents, we only use it
-    superficially as replay buffer is not used in A2C architecture.
+    :param memory: Memory object to hold a history of simulation run. As opposed to other agents, we only use it superficially as replay buffer is not used in A2C architecture.
     :param sampler: User supplied sampler. See notes above for explanation.
+    :param batch_size: Minibatch size used during training.
     :param epsilon: Cutoff for the clipped loss function
     :param nb_actor: Number of concurrent actors running simulation (They are still executed sequential in this version)
     :param nb_steps: Number of steps to run in each simulation episode before termination. Should match with xx in yy
     :param epoch: Number of training epoch for the actor network.
+    :param gamma: Parameter gamma for the GAE.
+    :param lamb: Parameter lamb for the GAE.
     """
-    def __init__(self, actor, critic, memory, sampler, epsilon=0.2, nb_actor=3, nb_steps=1000, epoch=5, **kwargs):
+    def __init__(self, actor, critic, memory, sampler, batch_size=16, epsilon=0.2, nb_actor=3, nb_steps=1000, epoch=5,
+                 gamma=0.9, lamb=0.95, **kwargs):
         super(Agent, self).__init__(**kwargs)
 
         # Parameters.
+        self.batch_size = batch_size
         self.epsilon = epsilon
         self.nb_actor = nb_actor
         self.nb_steps = nb_steps
         self.epoch = epoch
+        self.gamma = gamma
+        self.lamb = lamb
 
         # Related objects.
         self.actor = actor
@@ -142,7 +148,7 @@ class PPOAgent(Agent):
             return batch
         return self.processor.process_state_batch(batch)
 
-    def complete_episode(self, episode):
+    def _complete_episode(self, episode):
         episode_len = len(episode.state) - 1
         assert episode_len == len(episode.action) and episode_len == len(episode.reward)
         windowed_states = state_windowing(np.array(episode.state.get_list()), self.memory.window_length)
@@ -173,7 +179,7 @@ class PPOAgent(Agent):
             self.finalize_episode = False
             # No need to append to the usual memory since next episode will not see anything in last episode anyway?
             self.current_episode_memory.state.append(self.recent_observation)
-            self.complete_episode(self.current_episode_memory)
+            self._complete_episode(self.current_episode_memory)
 
             self.round += 1
             self.current_episode_memory = self.episode_memories[self.round % self.nb_actor]

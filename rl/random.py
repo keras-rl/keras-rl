@@ -92,8 +92,8 @@ class IndependentGaussianProcess(ProbabilityDistribution):
     Specifies a Multivariate Gaussian/Normal Distribution, with a diagonal covariance matrix (i.e. each component
     in the random vector are independent).
 
-    The random parameters are ``mu`` (mean) and ``sigma`` (standard deviation), both numpy array of shape
-    ``(n,)``, where n is the dimension of the random vector.
+    The random parameters are ``mu`` (mean) and ``log_sigma`` (natural log of standard deviation), both numpy
+    array of shape ``(n,)``, where n is the dimension of the random vector.
 
     The generated output is also a numpy array of shape ``(n,)``.
 
@@ -103,12 +103,12 @@ class IndependentGaussianProcess(ProbabilityDistribution):
         self.n = n
 
     def sample(self, x):
-        mu, sigma = x
+        mu, log_sigma = x
         assert mu.shape == (self.n,)
-        assert sigma.shape == (self.n,)
-        return np.random.normal(mu, sigma)
+        assert log_sigma.shape == (self.n,)
+        return np.random.normal(mu, np.exp(log_sigma))
 
     def get_dist(self, x):
-        mu, sigma, y = x
-        return K.constant(- self.n * math.log(2*math.pi) / 2 ) - K.sum(sigma, axis=1, keepdims=True) - \
-               K.sum(K.exp( 2 * K.log(K.abs(y - mu)) - K.constant(math.log(2.0)) - 2 * sigma), axis=1, keepdims=True)
+        mu, log_sigma, y = x
+        return K.constant(- self.n * math.log(2*math.pi) / 2 ) - K.sum(log_sigma, axis=1, keepdims=True) - \
+               K.sum(K.exp( 2 * K.log(K.abs(y - mu)) - K.constant(math.log(2.0)) - 2 * log_sigma), axis=1, keepdims=True)

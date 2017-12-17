@@ -4,11 +4,11 @@ import numpy as np
 from numpy.testing import assert_allclose
 
 from keras.models import Model, Sequential
-from keras.layers import Input, Dense, merge
+from keras.layers import Input, Dense, merge, Lambda
 from keras.optimizers import SGD
 import keras.backend as K
 
-from rl.util import clone_optimizer, clone_model, huber_loss
+from rl.util import clone_optimizer, clone_model, huber_loss, GeneralizedAdvantageEstimator
 
 
 def test_clone_sequential_model():
@@ -67,6 +67,21 @@ def test_huber_loss():
     assert_allclose(K.eval(huber_loss(a, b, 3.)), np.array([.125, .125, 2., 2.]))
     assert_allclose(K.eval(huber_loss(a, b, np.inf)), np.array([.125, .125, 2., 2.]))
 
+
+def test_generalized_advantage_estimator():
+    value_net = Sequential([Lambda(lambda x : - x ** 2, input_shape=(2,)),
+                            Dense(1, kernel_initializer='ones')])
+    value_net.compile(optimizer='rmsprop', loss='mse')
+    test_states = np.array([ [3.0, 4.0],
+                             [3.0, 3.4],
+                             [2.7, 3.2],
+                             [2.8, 2.1],
+                             [-0.2, 1.3],
+                             [0.3, 0.6] ])
+    test_reward = np.array([ -14.2, -11.9, -10.5, -10.7, -3.8 ])
+    assert_allclose(value_net.predict_on_batch(np.array([[3.0, 4.0]])), np.array([[-25.0]]))
+    result = GeneralizedAdvantageEstimator(value_net, test_states, test_reward, 0.9, 0.5)
+    assert False, result
 
 if __name__ == '__main__':
     pytest.main([__file__])

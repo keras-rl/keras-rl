@@ -23,7 +23,7 @@ def state_windowing(states, window_len):
 
     return np.stack( [ naive_pad(states, i, axis=0) for i in reversed(range(window_len))], axis=1 )
 
-# TODO: We would need a new memory class that returns windowed info also for rewards
+
 class PPOAgent(Agent):
     """
     Single threaded implementation of the Proximal Policy Optimization algorithm, using an A2C (Advantage
@@ -31,19 +31,43 @@ class PPOAgent(Agent):
 
     Note on network architecture
     ============================
-    actor should take as input a window of recent state, and should output a vector in the abstract
+    The actor network should take as input a window of recent states, and should output a vector in the abstract
     sample space as defined by the user, which is then feed into the sampler, again supplied
-    by the user. This sampler is responsible for transforming the abstract sample space into
-    actual value in the action space, through a (known, fixed) random distribution
-    actor input shape: (window_length, dimension of observation space)
-    critic's only input is the current state, and should output a scalar representing estimated
-    value of this state
-    critic input shape: (dimension of observation space,)
+    by the user. This sampler (instance of interface ``ProbabilityDistribution``) is responsible for
+    transforming the abstract sample space into actual value in the action space, through a (known,
+    fixed) random distribution, by calling ``self.sampler.sample``.
+    The critic network have the same input as actor, and should output a scalar representing estimated
+    value of this state.
 
-    :param actor: Actor network
-    :param critic: Critic network
-    :param memory: Memory object to hold a history of simulation run. As opposed to other agents, we only use it superficially as replay buffer is not used in A2C architecture.
-    :param sampler: User supplied sampler. See notes above for explanation.
+    Internal design
+    ===============
+    First, we replaced the usual ``Memory`` class with our own ``EpisodeMemory`` to deal with the unique
+    demand in this scenario. In particular, we need to deal with windowing, and more importantly the
+    custom objective function contains a value (Advantage Estimate) that is derived from the state transitions
+    in a rather non-trivial way - this is handled by leaving ``windowed_state`` and ``advantage`` blank until
+    the very end of the episode, upon which we do all the computations (which information-theoretically do
+    depends on the entire episode anyway), to recover all values and fill it in via ``_complete_episode``.
+    Another intrinsic difference is that in the basic framework any individual datum in the experience
+    replay buffer is disposable, which is not true in A2C since we perform training in batch here. (Aside
+    from the need to retain data to derive the missing info) Hence we also use our own buffer implementation
+    called ``FixedBuffer``. This works because PPO uses the GAE which has a fixed size lookahead that is known
+    statically.
+
+    As for the A2C framework itself, we use the attribute ``self.episode_memories`` to hold the memories/buffers -
+    one for each concurrent actor, so it is a python list of ``EpisodeMemory``. Since this is a single-threaded
+    implementation, we will still adhere to the framework of the base class ``Agent``, and only simulate the
+    concurrency via round-robin execution. To be precise, as we simulate many runs using the actor network,
+    the information of each episode will be saved to each concurrent actor one by one. One batch mode training
+    will occur each time a full round is completed - that is, when each concurrent actor has saved one new episode.
+    When this happen we aggregate the (new) episodes from each actors into a big, fixed data set, which is then
+    feed to the training algorithm for some iterations. (this ensure information efficiency by making sure the
+    learning value in those episodes are more fully exploited) After that, both networks are updated, the
+    data sets and all buffers are cleared, and we begin anew.
+
+    :param actor: Actor network, input shape ``(window_length, dimensions of observation space)``. (Keras' own batch dimension is implicit as usual)
+    :param critic: Critic network, input shape ``(window_length, dimensions of observation space)``. (Keras' own batch dimension is implicit as usual)
+    :param memory: ``Memory`` object to hold a history of simulation run. As opposed to other agents, we only use it superficially as replay buffer is not used in A2C architecture.
+    :param sampler: User supplied sampler, should be an instance of the interface ``ProbabilityDistribution``. See notes above for explanation of its role.
     :param batch_size: Minibatch size used during training.
     :param epsilon: Cutoff for the clipped loss function
     :param nb_actor: Number of concurrent actors running simulation (They are still executed sequential in this version)

@@ -36,6 +36,10 @@ class PPOAgent(Agent):
     by the user. This sampler (instance of interface ``ProbabilityDistribution``) is responsible for
     transforming the abstract sample space into actual value in the action space, through a (known,
     fixed) random distribution, by calling ``self.sampler.sample``.
+    The actor network can have dummy inputs. An example use case would be to act as the source of
+    trainable parameter independent from the network, such as the noise level/volatility to add to output.
+    In such case all but one of the multiple inputs of the network must be dummy, and the index of the
+    actual (sole) input (as occur in ``network.inputs``) should be specified through ``actor_input_index``.
     The critic network have the same input as actor, and should output a scalar representing estimated
     value of this state.
 
@@ -65,6 +69,7 @@ class PPOAgent(Agent):
     data sets and all buffers are cleared, and we begin anew.
 
     :param actor: Actor network, input shape ``(window_length, dimensions of observation space)``. (Keras' own batch dimension is implicit as usual)
+    :param actor_input_index: Index of the actual/non-dummy input to the actor network as occur in ``network.inputs``. Ignored if there is only one input.
     :param critic: Critic network, input shape ``(window_length, dimensions of observation space)``. (Keras' own batch dimension is implicit as usual)
     :param memory: ``Memory`` object to hold a history of simulation run. As opposed to other agents, we only use it superficially as replay buffer is not used in A2C architecture.
     :param sampler: User supplied sampler, should be an instance of the interface ``ProbabilityDistribution``. See notes above for explanation of its role.
@@ -76,7 +81,7 @@ class PPOAgent(Agent):
     :param gamma: Parameter gamma for the GAE.
     :param lamb: Parameter lamb for the GAE.
     """
-    def __init__(self, actor, critic, memory, sampler, batch_size=16, epsilon=0.2, nb_actor=3, nb_steps=1000, epoch=5,
+    def __init__(self, actor, actor_input_index, critic, memory, sampler, batch_size=16, epsilon=0.2, nb_actor=3, nb_steps=1000, epoch=5,
                  gamma=0.9, lamb=0.95, **kwargs):
         super(Agent, self).__init__(**kwargs)
 
@@ -88,6 +93,13 @@ class PPOAgent(Agent):
         self.epoch = epoch
         self.gamma = gamma
         self.lamb = lamb
+        self.actor_input_index = actor_input_index
+
+        # Validate actor_input_index
+        if not hasattr(actor.inputs, '__len__') or len(actor.inputs) == 1:
+            self.actor_input_index = 0
+        elif actor_input_index < 0 or actor_input_index >= len(actor.inputs):
+            raise ValueError('actor_input_index out of the range of actor "{}"\'s input list.'.format(actor))
 
         # Related objects.
         self.actor = actor
@@ -100,6 +112,14 @@ class PPOAgent(Agent):
                                                action=FixedBuffer(self.nb_steps), reward=FixedBuffer(self.nb_steps),
                                                advantage=None)
                                  for _ in range(self.nb_actor)]
+
+    def _get_replaced_actor_input_list(self, state_input, target=False):
+        s = self.actor_input_index
+        if target:
+            network = self.target_actor
+        else:
+            network = self.actor
+        return network.inputs[0:s] + [state_input] + network.inputs[s+1:]
 
     def compile(self, optimizer, metrics=[]):
         # TODO
@@ -133,8 +153,8 @@ class PPOAgent(Agent):
         action = Input(name='action')
         state = Input(name='state')
         advantage = Input(name='advantage', shape=(1,))
-        actor_out = self.actor([state] + self.actor.inputs[1:])
-        target_actor_out = self.target_actor([state] + self.target_actor.inputs[1:])
+        actor_out = self.actor(self._get_replaced_actor_input_list(state))
+        target_actor_out = self.target_actor(self._get_replaced_actor_input_list(state, target=True))
         log_prob_theta = Lambda(self.sampler.get_dist)(actor_out + [action])
         log_prob_thetaold = Lambda(self.sampler.get_dist)(target_actor_out + [action])
         def clipped_loss(args):

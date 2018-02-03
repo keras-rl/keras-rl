@@ -81,7 +81,7 @@ def test_generalized_advantage_estimator():
     test_reward = np.array([ -14.2, -11.9, -10.5, -10.7, -3.8 ])
     assert_allclose(value_net.predict_on_batch(np.array([[3.0, 4.0]])), np.array([[-25.0]]))
     result = GeneralizedAdvantageEstimator(value_net, test_states, test_reward, 0.9, 0.5)
-    assert False, result
+    assert_allclose(result, np.array([-11.817766, -9.141702, -4.499338, -1.120750, -2.475000]), atol=1e-5)
 
 if __name__ == '__main__':
     pytest.main([__file__])

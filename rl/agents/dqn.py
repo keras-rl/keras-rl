@@ -635,8 +635,6 @@ class NAFAgent(AbstractDQNAgent):
         # Select an action.
         state = self.memory.get_recent_state(observation)
         action = self.select_action(state)
-        if self.processor is not None:
-            action = self.processor.process_action(action)
 
         # Book-keeping.
         self.recent_observation = observation

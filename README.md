@@ -32,7 +32,7 @@ As of today, the following algorithms have been implemented:
 - Dueling network DQN (Dueling DQN) [[9]](https://arxiv.org/abs/1511.06581)
 - Deep SARSA [[10]](http://people.inf.elte.hu/lorincz/Files/RL_2006/SuttonBook.pdf)
 
-You can find more information on each agent in the [wiki](https://github.com/matthiasplappert/keras-rl/wiki/Agent-Overview).
+You can find more information on each agent in the [doc](http://keras-rl.readthedocs.io/en/latest/agents/overview/).
 
 I'm currently working on the following algorithms, which can be found on the `experimental` branch:
 

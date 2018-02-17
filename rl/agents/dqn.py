@@ -558,7 +558,7 @@ class NAFAgent(AbstractDQNAgent):
     """Write me
     """
     def __init__(self, V_model, L_model, mu_model, random_process=None,
-                 covariance_mode='full', *args, **kwargs):
+                 covariance_mode='full', target_episode_update=False, *args, **kwargs):
         super(NAFAgent, self).__init__(*args, **kwargs)
 
         # TODO: Validate (important) input.
@@ -571,6 +571,9 @@ class NAFAgent(AbstractDQNAgent):
         self.V_model = V_model
         self.L_model = L_model
         self.mu_model = mu_model
+        self.combined_model = None
+        self.model = None
+        self.target_episode_update = target_episode_update
 
         # State.
         self.reset_states()
@@ -626,6 +629,7 @@ class NAFAgent(AbstractDQNAgent):
 
         combined.compile(loss=clipped_error, optimizer=optimizer, metrics=metrics)
         self.combined_model = combined
+        self.model = self.combined_model
 
         self.compiled = True
 
@@ -713,8 +717,15 @@ class NAFAgent(AbstractDQNAgent):
             if self.processor is not None:
                 metrics += self.processor.metrics
 
-        if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
-            self.update_target_model_hard()
+            print('metrics: ', self.combined_model.metrics_names, ' : ', metrics)
+
+        if self.target_model_update >= 1:
+            if self.target_episode_update:
+                if terminal:
+                    self.update_target_model_hard()
+            else:
+                if self.step % self.target_model_update == 0:
+                    self.update_target_model_hard()
 
         return metrics
 
@@ -722,13 +733,14 @@ class NAFAgent(AbstractDQNAgent):
     def layers(self):
         return self.combined_model.layers[:]
 
-    def get_config(self):
+    def get_config(self, include_networks=True):
         config = super(NAFAgent, self).get_config()
-        config['V_model'] = get_object_config(self.V_model)
-        config['mu_model'] = get_object_config(self.mu_model)
-        config['L_model'] = get_object_config(self.L_model)
-        if self.compiled:
-            config['target_V_model'] = get_object_config(self.target_V_model)
+        if include_networks:
+            config['V_model'] = get_object_config(self.V_model)
+            config['mu_model'] = get_object_config(self.mu_model)
+            config['L_model'] = get_object_config(self.L_model)
+            if self.compiled:
+                config['target_V_model'] = get_object_config(self.target_V_model)
         return config
 
     @property

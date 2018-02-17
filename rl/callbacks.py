@@ -415,6 +415,7 @@ class RlTensorBoard(TensorBoard):
         self.validation_data = [action_batch, state0_batch, np.expand_dims(Rs, 1), np.ones(self.agent.batch_size)]
 
     def on_epoch_end(self, epoch, logs=None):
+        import tensorflow as tf
         self.set_validation_data()
         logs = logs or {}
 

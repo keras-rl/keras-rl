@@ -33,7 +33,9 @@ class Agent(object):
     def __init__(self, processor=None):
         self.processor = processor
         self.training = False
+        self.stop_training = False
         self.step = 0
+        self.episode_step = 0
 
     def get_config(self):
         """Configuration of the agent for serialization.
@@ -77,7 +79,6 @@ class Agent(object):
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
         self.training = True
-        self.stop_training = False
 
         callbacks = [] if not callbacks else callbacks[:]
 
@@ -267,7 +268,7 @@ class Agent(object):
         for episode in range(nb_episodes):
             callbacks.on_episode_begin(episode)
             episode_reward = 0.
-            episode_step = 0
+            self.episode_step = 0
 
             # Obtain the initial observation by resetting the environment.
             self.reset_states()
@@ -302,7 +303,7 @@ class Agent(object):
             # Run the episode until we're done.
             done = False
             while not done:
-                callbacks.on_step_begin(episode_step)
+                callbacks.on_step_begin(self.episode_step)
 
                 action = self.forward(observation)
                 if self.processor is not None:
@@ -326,7 +327,7 @@ class Agent(object):
                     if d:
                         done = True
                         break
-                if nb_max_episode_steps and episode_step >= nb_max_episode_steps - 1:
+                if nb_max_episode_steps and self.episode_step >= nb_max_episode_steps - 1:
                     done = True
                 self.backward(reward, terminal=done)
                 episode_reward += reward
@@ -338,8 +339,8 @@ class Agent(object):
                     'episode': episode,
                     'info': accumulated_info,
                 }
-                callbacks.on_step_end(episode_step, step_logs)
-                episode_step += 1
+                callbacks.on_step_end(self.episode_step, step_logs)
+                self.episode_step += 1
                 self.step += 1
 
             # We are in a terminal state but the agent hasn't yet seen it. We therefore
@@ -353,7 +354,7 @@ class Agent(object):
             # Report end of episode.
             episode_logs = {
                 'episode_reward': episode_reward,
-                'nb_steps': episode_step,
+                'nb_steps': self.episode_step,
             }
             callbacks.on_episode_end(episode, episode_logs)
         callbacks.on_train_end()

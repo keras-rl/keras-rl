@@ -7,8 +7,9 @@ from tempfile import mkdtemp
 
 import numpy as np
 
-from keras.callbacks import Callback as KerasCallback, CallbackList as KerasCallbackList
+from keras.callbacks import Callback as KerasCallback, CallbackList as KerasCallbackList, TensorBoard, CSVLogger
 from keras.utils.generic_utils import Progbar
+# from rl.core import Agent
 
 
 class Callback(KerasCallback):
@@ -35,6 +36,15 @@ class Callback(KerasCallback):
 
 
 class CallbackList(KerasCallbackList):
+    def set_model(self, model):
+        from rl.core import Agent
+        for callback in self.callbacks:
+            if issubclass(type(model), Agent) and \
+                    (issubclass(type(callback), TensorBoard)):
+                        callback.set_model(model.model)
+            else:
+                callback.set_model(model)
+
     def _set_env(self, env):
         for callback in self.callbacks:
             if callable(getattr(callback, '_set_env', None)):

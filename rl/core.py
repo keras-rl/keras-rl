@@ -5,8 +5,7 @@ from copy import deepcopy
 import numpy as np
 from keras.callbacks import History
 
-from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Visualizer, CallbackList
-
+from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Visualizer, CallbackList, CSVLogger
 
 class Agent(object):
     """Abstract base class for all implemented agents.
@@ -78,6 +77,7 @@ class Agent(object):
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
         self.training = True
+        self.stop_training = False
 
         callbacks = [] if not callbacks else callbacks[:]
 
@@ -109,13 +109,13 @@ class Agent(object):
         self.step = 0
         observation = None
         episode_reward = None
-        episode_step = None
+        self.episode_step = None
         did_abort = False
         try:
             while self.step < nb_steps:
                 if observation is None:  # start of a new episode
                     callbacks.on_episode_begin(episode)
-                    episode_step = 0
+                    self.episode_step = 0
                     episode_reward = 0.
 
                     # Obtain the initial observation by resetting the environment.
@@ -150,11 +150,11 @@ class Agent(object):
 
                 # At this point, we expect to be fully initialized.
                 assert episode_reward is not None
-                assert episode_step is not None
+                assert self.episode_step is not None
                 assert observation is not None
 
                 # Run a single step.
-                callbacks.on_step_begin(episode_step)
+                callbacks.on_step_begin(self.episode_step)
                 # This is were all of the work happens. We first perceive and compute the action
                 # (forward step) and then use the reward to improve (backward step).
                 action = self.forward(observation)
@@ -179,7 +179,7 @@ class Agent(object):
                     reward += r
                     if done:
                         break
-                if nb_max_episode_steps and episode_step >= nb_max_episode_steps - 1:
+                if nb_max_episode_steps and self.episode_step >= nb_max_episode_steps - 1:
                     # Force a terminal state.
                     done = True
                 metrics = self.backward(reward, terminal=done)
@@ -193,8 +193,8 @@ class Agent(object):
                     'episode': episode,
                     'info': accumulated_info,
                 }
-                callbacks.on_step_end(episode_step, step_logs)
-                episode_step += 1
+                callbacks.on_step_end(self.episode_step, step_logs)
+                self.episode_step += 1
                 self.step += 1
 
                 if done:
@@ -209,14 +209,14 @@ class Agent(object):
                     # This episode is finished, report and reset.
                     episode_logs = {
                         'episode_reward': episode_reward,
-                        'nb_episode_steps': episode_step,
+                        'nb_episode_steps': self.episode_step,
                         'nb_steps': self.step,
                     }
                     callbacks.on_episode_end(episode, episode_logs)
 
                     episode += 1
                     observation = None
-                    episode_step = None
+                    self.episode_step = None
                     episode_reward = None
         except KeyboardInterrupt:
             # We catch keyboard interrupts here so that training can be be safely aborted.

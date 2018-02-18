@@ -414,7 +414,7 @@ class RlTensorBoard(TensorBoard):
 
         self.validation_data = [action_batch, state0_batch, np.expand_dims(Rs, 1), np.ones(self.agent.batch_size)]
 
-    def on_epoch_end(self, epoch, logs=None):
+    def on_episode_end(self, episode, logs=None):
         import tensorflow as tf
         self.set_validation_data()
         logs = logs or {}
@@ -423,7 +423,7 @@ class RlTensorBoard(TensorBoard):
             raise ValueError('If printing histograms, validation_data must be '
                              'provided, and cannot be a generator.')
         if self.validation_data and self.histogram_freq:
-            if epoch % self.histogram_freq == 0:
+            if episode % self.histogram_freq == 0:
                 val_data = self.validation_data
                 tensors = (self.model.inputs +
                            self.model.targets +
@@ -446,14 +446,14 @@ class RlTensorBoard(TensorBoard):
                     feed_dict = dict(zip(tensors, batch_val))
                     result = self.sess.run([self.merged], feed_dict=feed_dict)
                     summary_str = result[0]
-                    self.writer.add_summary(summary_str, epoch)
+                    self.writer.add_summary(summary_str, episode)
                     i += self.batch_size
 
         if self.embeddings_freq and self.embeddings_ckpt_path:
-            if epoch % self.embeddings_freq == 0:
+            if episode % self.embeddings_freq == 0:
                 self.saver.save(self.sess,
                                 self.embeddings_ckpt_path,
-                                epoch)
+                                episode)
 
         for name, value in logs.items():
             if name in ['batch', 'size']:
@@ -465,5 +465,5 @@ class RlTensorBoard(TensorBoard):
             except:
                 summary_value.simple_value = value
             summary_value.tag = name
-            self.writer.add_summary(summary, epoch)
+            self.writer.add_summary(summary, episode)
         self.writer.flush()

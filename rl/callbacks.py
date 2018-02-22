@@ -242,7 +242,7 @@ class TrainIntervalLogger(Callback):
         if self.info_names is None:
             self.info_names = logs['info'].keys()
         values = [('reward', logs['reward'])]
-        self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
+        self.progbar.update((self.step % self.interval) + 1, values=values)
         self.step += 1
         self.metrics.append(logs['metrics'])
         if len(self.info_names) > 0:

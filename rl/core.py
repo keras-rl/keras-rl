@@ -41,9 +41,11 @@ class Agent(object):
         """
         return {}
 
-    def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
+    def fit(self, env, nb_steps, test_nb_episodes, action_repetition=1, callbacks=None, verbose=1,
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
-            nb_max_episode_steps=None):
+            nb_max_episode_steps=None, test_interval=10000, test_action_repetition=1, test_visualize=True,
+            test_nb_max_episode_steps=None, test_nb_max_start_steps=0, test_start_step_policy=None,
+            test_callbacks=None):
         """Trains the agent on the given environment.
 
         # Arguments
@@ -68,6 +70,7 @@ class Agent(object):
             nb_max_episode_steps (integer): Number of steps per episode that the agent performs before
                 automatically resetting the environment. Set to `None` if each episode should run
                 (potentially indefinitely) until the environment signals a terminal state.
+            test_interval (integer): Validation interval, in steps.
 
         # Returns
             A `keras.callbacks.History` instance that recorded the entire training process.
@@ -104,6 +107,8 @@ class Agent(object):
             callbacks._set_params(params)
         self._on_train_begin()
         callbacks.on_train_begin()
+
+        validation_scheduled = False
 
         episode = 0
         self.step = 0
@@ -197,6 +202,10 @@ class Agent(object):
                 episode_step += 1
                 self.step += 1
 
+                # Schedule validation after the current episode finishes
+                if self.step % test_interval == 0:
+                    validation_scheduled = True
+
                 if done:
                     # We are in a terminal state but the agent hasn't yet seen it. We therefore
                     # perform one more forward-backward call and simply ignore the action before
@@ -218,6 +227,21 @@ class Agent(object):
                     observation = None
                     episode_step = None
                     episode_reward = None
+                    if validation_scheduled:
+                        # Save training progress
+                        last_step = self.step
+                        # Perform validation
+                        print('\n')
+                        self.test(env, nb_episodes=test_nb_episodes, action_repetition=test_action_repetition,
+                                  visualize=test_visualize, nb_max_episode_steps=test_nb_max_episode_steps,
+                                  nb_max_start_steps=test_nb_max_start_steps, start_step_policy=test_start_step_policy,
+                                  callbacks=test_callbacks, verbose=verbose)
+                        # Resume training
+                        self.training = True
+                        self.step = last_step
+                        validation_scheduled = False
+                        print('Resuming training\n')
+
         except KeyboardInterrupt:
             # We catch keyboard interrupts here so that training can be be safely aborted.
             # This is so common that we've built this right into this function, which ensures that

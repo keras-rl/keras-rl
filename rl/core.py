@@ -114,6 +114,7 @@ class Agent(object):
         did_abort = False
         try:
             while self.step < nb_steps:
+                self.training = True
                 if observation is None:  # start of a new episode
                     callbacks.on_episode_begin(episode)
                     self.episode_step = 0
@@ -186,6 +187,8 @@ class Agent(object):
                 metrics = self.backward(reward, terminal=done)
                 episode_reward += reward
 
+                # AHA
+                last_distance = info['distance']
                 step_logs = {
                     'action': action,
                     'observation': observation,
@@ -207,11 +210,17 @@ class Agent(object):
                     self.forward(observation)
                     self.backward(0., terminal=False)
 
+                    # AHA
+                    # Conflict becuase test sets step=0
+                    # test_history = self.test(env, nb_episodes=10, nb_max_episode_steps=4)
+
                     # This episode is finished, report and reset.
                     episode_logs = {
                         'episode_reward': episode_reward,
                         'nb_episode_steps': self.episode_step,
                         'nb_steps': self.step,
+                        'last_train_distance': last_distance,
+                        # 'last_test_distance': np.mean(test_history.history['last_distance'])
                     }
                     callbacks.on_episode_end(episode, episode_logs)
 
@@ -332,6 +341,9 @@ class Agent(object):
                 self.backward(reward, terminal=done)
                 episode_reward += reward
 
+                # AHA
+                last_distance = info['distance']
+
                 step_logs = {
                     'action': action,
                     'observation': observation,
@@ -355,6 +367,7 @@ class Agent(object):
             episode_logs = {
                 'episode_reward': episode_reward,
                 'nb_steps': self.episode_step,
+                'last_distance': last_distance
             }
             callbacks.on_episode_end(episode, episode_logs)
         callbacks.on_train_end()

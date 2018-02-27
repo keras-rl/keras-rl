@@ -717,6 +717,8 @@ class NAFAgent(AbstractDQNAgent):
             if self.processor is not None:
                 metrics += self.processor.metrics
 
+            print('metrics: ', self.combined_model.metrics_names, ' : ', metrics)
+
         if self.target_model_update >= 1:
             if self.target_episode_update:
                 if terminal:

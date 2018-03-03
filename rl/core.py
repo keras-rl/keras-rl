@@ -41,7 +41,7 @@ class Agent(object):
         """
         return {}
 
-    def fit(self, env, nb_steps, test_nb_episodes, action_repetition=1, callbacks=None, verbose=1,
+    def fit(self, env, nb_steps, test_nb_episodes=1, action_repetition=1, callbacks=None, verbose=1,
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
             nb_max_episode_steps=None, test_interval=10000, test_action_repetition=1, test_visualize=True,
             test_nb_max_episode_steps=None, test_nb_max_start_steps=0, test_start_step_policy=None,

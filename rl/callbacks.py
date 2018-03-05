@@ -88,6 +88,9 @@ class CallbackList(KerasCallbackList):
 
 
 class TestLogger(Callback):
+    def __init__(self):
+        self.episode_reward = []
+
     def on_train_begin(self, logs):
         print('Testing for {} episodes ...'.format(self.params['nb_episodes']))
 
@@ -98,6 +101,14 @@ class TestLogger(Callback):
             logs['episode_reward'],
             logs['nb_steps'],
         ]
+        print(template.format(*variables))
+        self.episode_reward.append(variables[1])
+
+    def on_train_end(self, logs):
+        avg_reward = np.mean(self.episode_reward)
+        reward_var = np.var(self.episode_reward)
+        template = 'Average reward: {0:.3f}, reward variance: {1:.3f}'
+        variables = [avg_reward, reward_var]
         print(template.format(*variables))
 
 
@@ -242,7 +253,7 @@ class TrainIntervalLogger(Callback):
         if self.info_names is None:
             self.info_names = logs['info'].keys()
         values = [('reward', logs['reward'])]
-        self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
+        self.progbar.update((self.step % self.interval) + 1, values=values)
         self.step += 1
         self.metrics.append(logs['metrics'])
         if len(self.info_names) > 0:

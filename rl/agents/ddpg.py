@@ -75,6 +75,13 @@ class DDPGAgent(Agent):
         self.compiled = False
         self.reset_states()
 
+        if type(self.random_process) in (list, tuple):
+            # If using separate random process for each action, the noise output of each must have size 1,
+            # and there must be as many random processes as there are actions.
+            assert len(self.random_process) == self.nb_actions, 'If using separate random process for each action, one process for each action must be provided.'
+            for p in random_process:
+                assert p.size == 1, 'If using separate random process for each action, the noise output of each must have size 1.'
+
     @property
     def uses_learning_phase(self):
         return self.actor.uses_learning_phase or self.critic.uses_learning_phase
@@ -178,7 +185,11 @@ class DDPGAgent(Agent):
 
     def reset_states(self):
         if self.random_process is not None:
-            self.random_process.reset_states()
+            if type(self.random_process) in (list, tuple):
+                for p in self.random_process:
+                    p.reset_states()
+            else:
+                self.random_process.reset_states()
         self.recent_action = None
         self.recent_observation = None
         if self.compiled:
@@ -200,9 +211,15 @@ class DDPGAgent(Agent):
 
         # Apply noise, if a random process is set.
         if self.training and self.random_process is not None:
-            noise = self.random_process.sample()
-            assert noise.shape == action.shape
-            action += noise
+            if type(self.random_process) in (list, tuple):
+                for i in range(self.nb_actions):
+                    noise = self.random_process[i].sample()
+                    assert noise.shape == (1, )
+                    action[i] += noise
+            else:
+                noise = self.random_process.sample()
+                assert noise.shape == action.shape
+                action += noise
 
         return action
 

@@ -16,7 +16,7 @@ All agents share a common API. This allows you to easily switch between differen
 That being said, keep in mind that some agents make assumptions regarding the action space, i.e. assume discrete
 or continuous actions.
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L44)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L44)</span>
 
 ### fit
 
@@ -58,7 +58,7 @@ A `keras.callbacks.History` instance that recorded the entire training process.
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L231)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L231)</span>
 
 ### test
 
@@ -72,7 +72,7 @@ Callback that is called before training begins."
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L391)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L391)</span>
 
 ### compile
 
@@ -91,7 +91,7 @@ __Arguments__
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L39)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L39)</span>
 
 ### get_config
 
@@ -105,7 +105,7 @@ Configuration of the agent for serialization.
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L364)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L364)</span>
 
 ### reset_states
 
@@ -119,7 +119,7 @@ Resets all internally kept states after an episode is completed.
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L400)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L400)</span>
 
 ### load_weights
 
@@ -137,7 +137,7 @@ __Arguments__
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L408)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L408)</span>
 
 ### save_weights
 

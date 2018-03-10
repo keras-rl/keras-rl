@@ -141,7 +141,7 @@ def class_to_source_link(cls):
     path = module_name.replace('.', '/')
     path += '.py'
     line = inspect.getsourcelines(cls)[-1]
-    link = 'https://github.com/matthiasplappert/keras-rl/blob/master/' + path + '#L' + str(line)
+    link = 'https://github.com/keras-rl/keras-rl/blob/master/' + path + '#L' + str(line)
     return '[[source]](' + link + ')'
 
 
@@ -151,7 +151,7 @@ def function_to_source_link(fn):
     path = module_name.replace('.', '/')
     path += '.py'
     line = inspect.getsourcelines(fn)[-1]
-    link = 'https://github.com/matthiasplappert/keras-rl/blob/master/' + path + '#L' + str(line)
+    link = 'https://github.com/keras-rl/keras-rl/blob/master/' + path + '#L' + str(line)
     return '[[source]](' + link + ')'
 
 

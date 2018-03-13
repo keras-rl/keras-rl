@@ -13,6 +13,14 @@
   </tr>
 </table>
 
+## News
+
+**03/13/2018** - More maintainers from [Sicara](http://www.sicara.com) have joined this repo to help Matthias. The roadmap for the next few weeks is the following:
+- Fix Travis build and update for Keras v2.1.5
+- Add documentation
+- Review issues and PR
+- Add state-of-the-art algorithms (A3C, DDPG)
+
 ## What is it?
 `keras-rl` implements some state-of-the art deep reinforcement learning algorithms in Python and seamlessly integrates with the deep learning library [Keras](http://keras.io). Just like Keras, it works with either [Theano](http://deeplearning.net/software/theano/) or [TensorFlow](https://www.tensorflow.org/), which means that you can train your algorithm efficiently either on CPU or GPU.
 Furthermore, `keras-rl` works with [OpenAI Gym](https://gym.openai.com/) out of the box. This means that evaluating and playing around with different algorithms is easy.

@@ -1,4 +1,4 @@
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/processors.py#L7)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/processors.py#L7)</span>
 ### MultiInputProcessor
 
 ```python
@@ -24,7 +24,7 @@ __Arguments__
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/processors.py#L40)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/processors.py#L40)</span>
 ### WhiteningNormalizerProcessor
 
 ```python

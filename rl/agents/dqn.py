@@ -90,7 +90,7 @@ class DQNAgent(AbstractDQNAgent):
     """
     # Arguments 
         model__: A Keras model. 
-        policy__: A Keras-rl policy that are defined in [policy](https://github.com/matthiasplappert/keras-rl/blob/master/rl/policy.py). 
+        policy__: A Keras-rl policy that are defined in [policy](https://github.com/keras-rl/keras-rl/blob/master/rl/policy.py). 
         test_policy__: A Keras-rl policy. 
         enable_double_dqn__: A boolean which enable target network as a second network proposed by van Hasselt et al. to decrease overfitting. 
         enable_dueling_dqn__: A boolean which enable dueling architecture proposed by Mnih et al. 

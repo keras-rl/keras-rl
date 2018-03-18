@@ -69,7 +69,14 @@ class ProbabilityDistribution(object):
         Generate a single random sample according to the probability distribution.
 
         :param x: Python list of parameters for the random vector, where each parameter is a numpy array.
-        :return: Sampled value. Should be a numpy array.
+        :return: Sampled value. Should be a numpy array with dimension same as ``self.sample_dim()``.
+        """
+        pass
+
+    def sample_dim(self):
+        """
+        Get the tensor dimension spec for the generated random sample
+        :return: Dimension of the random samples
         """
         pass
 
@@ -107,6 +114,9 @@ class IndependentGaussianProcess(ProbabilityDistribution):
         assert mu.shape == (self.n,)
         assert log_sigma.shape == (self.n,)
         return np.random.normal(mu, np.exp(log_sigma))
+
+    def sample_dim(self):
+        return (self.n,)
 
     def get_dist(self, x):
         mu, log_sigma, y = x

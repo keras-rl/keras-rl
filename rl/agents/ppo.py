@@ -167,8 +167,10 @@ class PPOAgent(Agent):
         self.critic.compile(optimizer=critic_optimizer)
 
         # TODO: Model for the overall objective
-        action = Input(name='action')
-        state = Input(name='state')
+        actor_input_shape = self.actor.inputs[self.actor_input_index]._keras_shape[1:]
+        window_len = actor_input_shape[0]
+        action = Input(name='action', shape=(window_len,) + self.sampler.sample_dim())
+        state = Input(name='state', shape=actor_input_shape)
         advantage = Input(name='advantage', shape=(1,))
         actor_out = self.actor(self._get_replaced_actor_input_list(state))
         target_actor_out = self.target_actor(self._get_replaced_actor_input_list(state, target=True))
@@ -181,7 +183,7 @@ class PPOAgent(Agent):
         loss_out = Lambda(clipped_loss, name='loss')([log_prob_theta, log_prob_thetaold, advantage])
         trainable_model = Model(inputs=[action, state, advantage] +
                                        self._get_actor_dummy_inputs(target=True) +
-                                       self._get_actor_dummy_inputs(target=False), 
+                                       self._get_actor_dummy_inputs(target=False),
                                 outputs=loss_out)
         losses = [ lambda sample_out, network_out: network_out ]
         trainable_model.compile(optimizer=optimizer, loss=losses)

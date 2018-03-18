@@ -43,6 +43,10 @@ class PPOAgent(Agent):
     The critic network have the same input as actor, and should output a scalar representing estimated
     value of this state.
 
+    Algorithm
+    =========
+    TODO
+
     Internal design
     ===============
     First, we replaced the usual ``Memory`` class with our own ``EpisodeMemory`` to deal with the unique
@@ -95,6 +99,10 @@ class PPOAgent(Agent):
         self.lamb = lamb
         self.actor_input_index = actor_input_index
 
+        if hasattr(critic.output, '__len__') and len(critic.output) > 1:
+            raise ValueError('Critic "{}" has more than one output. PPO expects a critic that has a single output.'.format(critic))
+        if hasattr(critic.inputs, '__len__') and len(critic.inputs) > 1:
+            raise ValueError('Critic "{}" has more than one input. PPO expects a critic that has a single input.'.format(critic))
         # Validate actor_input_index
         if not hasattr(actor.inputs, '__len__') or len(actor.inputs) == 1:
             self.actor_input_index = 0
@@ -121,6 +129,14 @@ class PPOAgent(Agent):
             network = self.actor
         return network.inputs[0:s] + [state_input] + network.inputs[s+1:]
 
+    def _get_actor_dummy_inputs(self, target=False):
+        s = self.actor_input_index
+        if target:
+            network = self.target_actor
+        else:
+            network = self.actor
+        return network.inputs[0:s] + network.inputs[s + 1:]
+
     def compile(self, optimizer, metrics=[]):
         # TODO
         if type(optimizer) in (list, tuple):
@@ -146,6 +162,7 @@ class PPOAgent(Agent):
         self.target_actor.name += '_copy'
         for layer in self.target_actor.layers:
             layer.trainable = False
+            layer.name += '_copy'
         #self.actor.compile(optimizer='sgd', loss='mse')
         self.critic.compile(optimizer=critic_optimizer)
 
@@ -162,7 +179,10 @@ class PPOAgent(Agent):
             prob_ratio = K.exp(log_prob_theta - log_prob_thetaold)
             return K.minimum(prob_ratio * advantage, K.clip(prob_ratio, 1-self.epsilon, 1+self.epsilon) * advantage)
         loss_out = Lambda(clipped_loss, name='loss')([log_prob_theta, log_prob_thetaold, advantage])
-        trainable_model = Model(inputs=[action, state, advantage], outputs=loss_out)
+        trainable_model = Model(inputs=[action, state, advantage] +
+                                       self._get_actor_dummy_inputs(target=True) +
+                                       self._get_actor_dummy_inputs(target=False), 
+                                outputs=loss_out)
         losses = [ lambda sample_out, network_out: network_out ]
         trainable_model.compile(optimizer=optimizer, loss=losses)
         self.trainable_model = trainable_model

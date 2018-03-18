@@ -9,7 +9,7 @@ from keras.optimizers import Adam
 from rl.agents import DQNAgent, CEMAgent, SARSAAgent
 from rl.policy import EpsGreedyQPolicy
 from rl.memory import SequentialMemory, EpisodeParameterMemory
-from utils.envs import TwoRoundDeterministicRewardEnv
+from utils.gym.envs import TwoRoundDeterministicRewardEnv
 
 
 def test_dqn():

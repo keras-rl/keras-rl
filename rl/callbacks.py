@@ -7,6 +7,7 @@ from tempfile import mkdtemp
 
 import numpy as np
 
+from keras import __version__ as KERAS_VERSION
 from keras.callbacks import Callback as KerasCallback, CallbackList as KerasCallbackList
 from keras.utils.generic_utils import Progbar
 
@@ -242,7 +243,10 @@ class TrainIntervalLogger(Callback):
         if self.info_names is None:
             self.info_names = logs['info'].keys()
         values = [('reward', logs['reward'])]
-        self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
+        if KERAS_VERSION > '2.1.3':
+            self.progbar.update((self.step % self.interval) + 1, values=values)
+        else:
+            self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
         self.step += 1
         self.metrics.append(logs['metrics'])
         if len(self.info_names) > 0:

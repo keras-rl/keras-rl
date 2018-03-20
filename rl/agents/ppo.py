@@ -9,20 +9,11 @@ from keras.layers import Lambda
 
 from rl.core import Agent
 from rl.memory import FixedBuffer
-from rl.util import clone_optimizer, clone_model, GeneralizedAdvantageEstimator
+from rl.util import clone_optimizer, clone_model, GeneralizedAdvantageEstimator, state_windowing
 
 import keras.backend as K
 
 EpisodeMemory = namedtuple('EpisodeMemory', 'state,windowed_state,action,reward,advantage')
-
-def state_windowing(states, window_len):
-    def naive_pad(x, shift, axis=0):
-        y = np.roll(x, shift, axis)
-        y[0:shift, ] = 0
-        return y
-
-    return np.stack( [ naive_pad(states, i, axis=0) for i in reversed(range(window_len))], axis=1 )
-
 
 class PPOAgent(Agent):
     """
@@ -86,8 +77,8 @@ class PPOAgent(Agent):
     :param lamb: Parameter lamb for the GAE.
     """
     def __init__(self, actor, actor_input_index, critic, memory, sampler, batch_size=16, epsilon=0.2, nb_actor=3, nb_steps=1000, epoch=5,
-                 gamma=0.9, lamb=0.95, **kwargs):
-        super(Agent, self).__init__(**kwargs)
+                 gamma=0.9, lamb=0.95, custom_model_objects={}, **kwargs):
+        super(PPOAgent, self).__init__(**kwargs)
 
         # Parameters.
         self.batch_size = batch_size
@@ -114,6 +105,9 @@ class PPOAgent(Agent):
         self.critic = critic
         self.memory = memory
         self.sampler = sampler
+
+        # Misc objects
+        self.custom_model_objects = custom_model_objects
 
         # Initialize buffers
         self.episode_memories = [EpisodeMemory(state=FixedBuffer(self.nb_steps), windowed_state=None,
@@ -166,9 +160,10 @@ class PPOAgent(Agent):
         #self.actor.compile(optimizer='sgd', loss='mse')
         self.critic.compile(optimizer=critic_optimizer)
 
-        # TODO: Model for the overall objective
+        # Model for the overall objective
         actor_input_shape = self.actor.inputs[self.actor_input_index]._keras_shape[1:]
         window_len = actor_input_shape[0]
+        assert window_len == self.memory.window_length
         action = Input(name='action', shape=(window_len,) + self.sampler.sample_dim())
         state = Input(name='state', shape=actor_input_shape)
         advantage = Input(name='advantage', shape=(1,))
@@ -261,10 +256,10 @@ class PPOAgent(Agent):
 
         if (self.round % self.nb_actor == 0) and self.round > 0:
             # do training
-            batch_state     = np.concatenate([ self.episode_memories[i].windowed_state.get_list() for i in range(self.nb_actor) ])
-            batch_reward    = np.concatenate([ self.episode_memories[i].reward.get_list()         for i in range(self.nb_actor) ])
-            batch_advantage = np.concatenate([ self.episode_memories[i].advantage.get_list()      for i in range(self.nb_actor) ])
-            batch_action    = np.concatenate([ self.episode_memories[i].action.get_list()         for i in range(self.nb_actor) ])
+            batch_state     = np.concatenate([ self.episode_memories[i].windowed_state.get_list()[:-1] for i in range(self.nb_actor) ])
+            batch_reward    = np.concatenate([ self.episode_memories[i].reward.get_list()              for i in range(self.nb_actor) ])
+            batch_advantage = np.concatenate([ self.episode_memories[i].advantage.get_list()           for i in range(self.nb_actor) ])
+            batch_action    = np.concatenate([ self.episode_memories[i].action.get_list()              for i in range(self.nb_actor) ])
 
             # Set dummy output with matching shape
             assert batch_state.shape[0] == batch_reward.shape[0] and batch_state.shape[0] == batch_advantage.shape[0] \
@@ -277,14 +272,16 @@ class PPOAgent(Agent):
             self.target_actor.set_weights(self.actor.get_weights())
 
             #TODO: train value network
-            predict_value = self.critic.predict_on_batch(batch_state[1:]).flatten()
+            predict_value = np.concatenate([ self.critic.predict_on_batch(
+                self.episode_memories[i].windowed_state.get_list()[1:]).flatten() for i in range(self.nb_actor) ])
             # Compute r_t + gamma * V(s_t+1) and update the target ys accordingly,
             discounted_reward_batch = self.gamma * predict_value
             #discounted_reward_batch *= terminal1_batch
             assert discounted_reward_batch.shape == batch_reward.shape
-            targets = (batch_reward + discounted_reward_batch).reshape(self.batch_size, 1)
+            assert batch_reward.shape == (total_batch_size,)
+            targets = (batch_reward + discounted_reward_batch).reshape(total_batch_size, 1)
 
-            self.critic.train_on_batch(batch_state[:-1], targets)
+            self.critic.fit(batch_state, targets, epochs=self.epoch, batch_size=self.batch_size)
 
             # reset all episode memories
             self.episode_memories = [EpisodeMemory(state=FixedBuffer(self.nb_steps), windowed_state=None,

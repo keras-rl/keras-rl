@@ -123,3 +123,11 @@ class AdditionalUpdatesOptimizer(optimizers.Optimizer):
 
     def get_config(self):
         return self.optimizer.get_config()
+
+def state_windowing(states, window_len):
+    def naive_pad(x, shift, axis=0):
+        y = np.roll(x, shift, axis)
+        y[0:shift, ] = 0
+        return y
+
+    return np.stack( [ naive_pad(states, i, axis=0) for i in reversed(range(window_len))], axis=1 )

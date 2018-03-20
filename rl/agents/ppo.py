@@ -158,7 +158,7 @@ class PPOAgent(Agent):
             layer.trainable = False
             layer.name += '_copy'
         #self.actor.compile(optimizer='sgd', loss='mse')
-        self.critic.compile(optimizer=critic_optimizer)
+        self.critic.compile(optimizer=critic_optimizer, loss='mse')
 
         # Model for the overall objective
         actor_input_shape = self.actor.inputs[self.actor_input_index]._keras_shape[1:]
@@ -188,6 +188,8 @@ class PPOAgent(Agent):
         self.round = 0
         self.current_episode_memory = self.episode_memories[0]
         self.finalize_episode = False
+
+        self.compiled = True
 
     def load_weights(self, filepath):
         filename, extension = os.path.splitext(filepath)

@@ -15,8 +15,10 @@
 
 ## News
 
+**03/20/2018** - Travis build is functional, Keras v2.1.5 and gym v0.10.3 are now supported
+
 **03/13/2018** - More maintainers from [Sicara](http://www.sicara.com) have joined this repo to help Matthias. The roadmap for the next few weeks is the following:
-- Fix Travis build and update for Keras v2.1.5
+- ~~Fix Travis build and update for Keras v2.1.5~~
 - Add documentation
 - Review issues and PR
 - Add state-of-the-art algorithms (A3C, DDPG)
@@ -80,7 +82,7 @@ If you have questions or problems, please file an issue or, even better, fix the
 
 ## Do I have to train the models myself?
 Training times can be very long depending on the complexity of the environment.
-[This repo](https://github.com/keras-rl/keras-rl-weights) provides some weights that were obtained by running (at least some) of the examples that are included in `keras-rl`.
+[This repo](https://github.com/matthiasplappert/keras-rl-weights) provides some weights that were obtained by running (at least some) of the examples that are included in `keras-rl`.
 You can load the weights using the `load_weights` method on the respective agents.
 
 ## Requirements

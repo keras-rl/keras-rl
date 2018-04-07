@@ -35,6 +35,7 @@ class Agent(object):
         self.processor = processor
         self.training = False
         self.step = 0
+        self.epoch = 0
 
     def get_config(self):
         """Configuration of the agent for serialization.
@@ -78,7 +79,8 @@ class Agent(object):
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
 
         self.training = True
-
+        self.epoch += 1
+        
         callbacks = [] if not callbacks else callbacks[:]
 
         if verbose == 1:
@@ -97,6 +99,7 @@ class Agent(object):
         callbacks._set_env(env)
         params = {
             'nb_steps': nb_steps,
+            'epoch': self.epoch
         }
         if hasattr(callbacks, 'set_params'):
             callbacks.set_params(params)
@@ -186,6 +189,7 @@ class Agent(object):
                 episode_reward += reward
 
                 step_logs = {
+                    'epoch': self.epoch,
                     'action': action,
                     'observation': observation,
                     'reward': reward,
@@ -211,6 +215,7 @@ class Agent(object):
                         'episode_reward': episode_reward,
                         'nb_episode_steps': episode_step,
                         'nb_steps': self.step,
+                        'epoch': self.epoch
                     }
                     callbacks.on_episode_end(episode, episode_logs)
 
@@ -256,6 +261,7 @@ class Agent(object):
         callbacks._set_env(env)
         params = {
             'nb_episodes': nb_episodes,
+            'epoch': self.epoch
         }
         if hasattr(callbacks, 'set_params'):
             callbacks.set_params(params)
@@ -332,6 +338,7 @@ class Agent(object):
                 episode_reward += reward
 
                 step_logs = {
+                    'epoch': self.epoch,
                     'action': action,
                     'observation': observation,
                     'reward': reward,
@@ -354,13 +361,14 @@ class Agent(object):
             episode_logs = {
                 'episode_reward': episode_reward,
                 'nb_steps': episode_step,
+                'epoch': self.epoch
             }
             callbacks.on_episode_end(episode, episode_logs)
         callbacks.on_train_end()
         self._on_test_end()
 
         return history
-
+      
     def reset_states(self):
         """Resets all internally kept states after an episode is completed.
         """

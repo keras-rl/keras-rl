@@ -12,6 +12,16 @@ Experience = namedtuple('Experience', 'state0, action, reward, state1, terminal1
 
 
 def sample_batch_indexes(low, high, size):
+    """Return a sample of (size) unique elements between low and high
+
+        # Argument
+            low (int): The minimum value for our samples
+            high (int): The maximum value for our samples
+            size (int): The number of samples to pick
+
+        # Returns
+            A list of samples of length size, with values between low and high
+        """
     if high - low >= size:
         # We have enough data. Draw without replacement, that is each index is unique in the
         # batch. We cannot use `np.random.choice` here because it is horribly inefficient as
@@ -43,11 +53,24 @@ class RingBuffer(object):
         return self.length
 
     def __getitem__(self, idx):
+        """Return element of buffer at specific index
+
+        # Argument
+            idx (int): Index wanted
+
+        # Returns
+            The element of buffer at given index
+        """
         if idx < 0 or idx >= self.length:
             raise KeyError()
         return self.data[(self.start + idx) % self.maxlen]
 
     def append(self, v):
+        """Append an element to the buffer
+
+        # Argument
+            v (object): Element to append
+        """
         if self.length < self.maxlen:
             # We have space, simply increase the length.
             self.length += 1
@@ -61,6 +84,14 @@ class RingBuffer(object):
 
 
 def zeroed_observation(observation):
+    """Return an array of zeros with same shape as given observation
+
+    # Argument
+        observation (list): List of observation
+    
+    # Return
+        A np.ndarray of zeros with observation.shape
+    """
     if hasattr(observation, 'shape'):
         return np.zeros(observation.shape)
     elif hasattr(observation, '__iter__'):
@@ -88,6 +119,14 @@ class Memory(object):
         self.recent_terminals.append(terminal)
 
     def get_recent_state(self, current_observation):
+        """Return list of last observations
+
+        # Argument
+            current_observation (object): Last observation
+
+        # Returns
+            A list of the last observations
+        """
         # This code is slightly complicated by the fact that subsequent observations might be
         # from different episodes. We ensure that an experience never spans multiple episodes.
         # This is probably not that important in practice but it seems cleaner.
@@ -106,6 +145,11 @@ class Memory(object):
         return state
 
     def get_config(self):
+        """Return configuration (window_length, ignore_episode_boundaries) for Memory
+        
+        # Return
+            A dict with keys window_length and ignore_episode_boundaries
+        """
         config = {
             'window_length': self.window_length,
             'ignore_episode_boundaries': self.ignore_episode_boundaries,
@@ -126,6 +170,14 @@ class SequentialMemory(Memory):
         self.observations = RingBuffer(limit)
 
     def sample(self, batch_size, batch_idxs=None):
+        """Return a randomized batch of experiences
+
+        # Argument
+            batch_size (int): Size of the all batch
+            batch_idxs (int): Indexes to extract
+        # Returns
+            A list of experiences randomly selected
+        """
         # It is not possible to tell whether the first state in the memory is terminal, because it
         # would require access to the "terminal" flag associated to the previous state. As a result
         # we will never return this first state (only using `self.terminals[0]` to know whether the
@@ -188,6 +240,14 @@ class SequentialMemory(Memory):
         return experiences
 
     def append(self, observation, action, reward, terminal, training=True):
+        """Append an observation to the memory
+
+        # Argument
+            observation (dict): Observation returned by environment
+            action (int): Action taken to obtain this observation
+            reward (float): Reward obtained by taking this action
+            terminal (boolean): Is the state terminal
+        """ 
         super(SequentialMemory, self).append(observation, action, reward, terminal, training=training)
         
         # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
@@ -200,9 +260,19 @@ class SequentialMemory(Memory):
 
     @property
     def nb_entries(self):
+        """Return number of observations
+
+        # Returns
+            Number of observations
+        """
         return len(self.observations)
 
     def get_config(self):
+        """Return configurations of SequentialMemory
+
+        # Returns
+            Dict of config
+        """
         config = super(SequentialMemory, self).get_config()
         config['limit'] = self.limit
         return config
@@ -218,6 +288,14 @@ class EpisodeParameterMemory(Memory):
         self.total_rewards = RingBuffer(limit)
 
     def sample(self, batch_size, batch_idxs=None):
+        """Return a randomized batch of params and rewards
+
+        # Argument
+            batch_size (int): Size of the all batch
+            batch_idxs (int): Indexes to extract
+        # Returns
+            A list of params randomly selected and a list of associated rewards
+        """
         if batch_idxs is None:
             batch_idxs = sample_batch_indexes(0, self.nb_entries, size=batch_size)
         assert len(batch_idxs) == batch_size
@@ -230,11 +308,27 @@ class EpisodeParameterMemory(Memory):
         return batch_params, batch_total_rewards
 
     def append(self, observation, action, reward, terminal, training=True):
+        """Append a reward to the memory
+
+        # Argument
+            observation (dict): Observation returned by environment
+            action (int): Action taken to obtain this observation
+            reward (float): Reward obtained by taking this action
+            terminal (boolean): Is the state terminal
+        """
         super(EpisodeParameterMemory, self).append(observation, action, reward, terminal, training=training)
         if training:
             self.intermediate_rewards.append(reward)
 
     def finalize_episode(self, params):
+        """Append an observation to the memory
+
+        # Argument
+            observation (dict): Observation returned by environment
+            action (int): Action taken to obtain this observation
+            reward (float): Reward obtained by taking this action
+            terminal (boolean): Is the state terminal
+        """
         total_reward = sum(self.intermediate_rewards)
         self.total_rewards.append(total_reward)
         self.params.append(params)
@@ -242,9 +336,19 @@ class EpisodeParameterMemory(Memory):
 
     @property
     def nb_entries(self):
+        """Return number of episode rewards
+
+        # Returns
+            Number of episode rewards
+        """
         return len(self.total_rewards)
 
     def get_config(self):
+        """Return configurations of SequentialMemory
+
+        # Returns
+            Dict of config
+        """
         config = super(SequentialMemory, self).get_config()
         config['limit'] = self.limit
         return config

@@ -26,6 +26,9 @@ class MultiInputProcessor(Processor):
 
     def process_state_batch(self, state_batch):
         input_batches = [[] for x in range(self.nb_inputs)]
+        if hasattr(state_batch, 'shape'): 
+            if state_batch.shape >= (1,1):
+                if isinstance(state_batch[0][0], dict): return self.handle_dict(state_batch) 
         for state in state_batch:
             processed_state = [[] for x in range(self.nb_inputs)]
             for observation in state:
@@ -36,6 +39,22 @@ class MultiInputProcessor(Processor):
                 input_batches[idx].append(s)
         return [np.array(x) for x in input_batches]
 
+    def handle_dict(self,state_batch):
+        """Handles dict-like observations"""
+        names = state_batch[0][0].keys()
+        ordered_dict = dict()
+        for key in names: 
+            order = np.zeros((len(state_batch), 
+                              state_batch[0][0][key].shape[0], 
+                              state_batch[0][0][key].shape[1], 
+                              state_batch[0][0][key].shape[2]))
+            missinglayer=0 
+            for j in range(len(state_batch)): 
+                for i in range(order.shape[1]): 
+                    assert len(state_batch[j][missinglayer]) == self.nb_inputs
+                    order[j, i] = state_batch[j][missinglayer][key][i][0]
+            ordered_dict[key] = order
+return ordered_dict
 
 class WhiteningNormalizerProcessor(Processor):
     """Normalizes the observations to have zero mean and standard deviation of one,

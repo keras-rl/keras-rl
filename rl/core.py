@@ -114,8 +114,8 @@ class Agent(object):
         self._on_train_begin()
         callbacks.on_train_begin()
 
-        episode = 0
-        self.step = 0
+        episode = np.int16(0)
+        self.step = np.int16(0)
         observation = None
         episode_reward = None
         episode_step = None
@@ -124,8 +124,8 @@ class Agent(object):
             while self.step < nb_steps:
                 if observation is None:  # start of a new episode
                     callbacks.on_episode_begin(episode)
-                    episode_step = 0
-                    episode_reward = 0.
+                    episode_step = np.float32(0)
+                    episode_reward = np.float32(0)
 
                     # Obtain the initial observation by resetting the environment.
                     self.reset_states()
@@ -169,7 +169,7 @@ class Agent(object):
                 action = self.forward(observation)
                 if self.processor is not None:
                     action = self.processor.process_action(action)
-                reward = 0.
+                reward = np.float32(0)
                 accumulated_info = {}
                 done = False
                 for _ in range(action_repetition):

@@ -26,7 +26,8 @@ class MultiInputProcessor(Processor):
         input_batches = [[] for x in range(self.nb_inputs)]
         if hasattr(state_batch, 'shape'): 
             if state_batch.shape >= (1,1):
-                if isinstance(state_batch[0][0], dict): return self.handle_dict(state_batch) 
+                if isinstance(state_batch[0][0], dict): 
+                    return self.handle_dict(state_batch) 
         for state in state_batch:
             processed_state = [[] for x in range(self.nb_inputs)]
             for observation in state:
@@ -44,10 +45,9 @@ class MultiInputProcessor(Processor):
         for key in names: 
             dim = len(state_batch[0][0][key].shape)
             order_dim = (len(state_batch),)
-            for dim_count in range(dim): order_dim = order_dim + (state_batch[0][0][key].shape[dim_count],)
+            for dim_count in range(dim): 
+                order_dim = order_dim + (state_batch[0][0][key].shape[dim_count],)
             order = np.zeros(order_dim)
-
-
             missinglayer=0 
             for j in range(len(state_batch)): 
                 for i in range(order.shape[1]): 

@@ -324,7 +324,9 @@ class DQNAgent(AbstractDQNAgent):
             ins = [state0_batch] if type(self.model.input) is not list else state0_batch
             if isinstance(ins, dict): 
                 ins.update({'y_true': targets, 'mask': masks})
-            metrics = self.trainable_model.train_on_batch(ins + [targets, masks], [dummy_targets, targets])
+            else:
+                ins += [targets, masks]
+            metrics = self.trainable_model.train_on_batch(ins, [dummy_targets, targets])
             metrics = [metric for idx, metric in enumerate(metrics) if idx not in (1, 2)]  # throw away individual losses
             metrics += self.policy.metrics
             if self.processor is not None:

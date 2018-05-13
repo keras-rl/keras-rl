@@ -1,4 +1,4 @@
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L11)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L11)</span>
 ### Agent
 
 ```python
@@ -30,7 +30,7 @@ __Arguments__
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L454)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L454)</span>
 ### Processor
 
 ```python
@@ -50,7 +50,7 @@ or write your own.
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L533)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L533)</span>
 ### Env
 
 ```python
@@ -64,7 +64,7 @@ implementation.
 
 ----
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/core.py#L609)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/core.py#L609)</span>
 ### Space
 
 ```python

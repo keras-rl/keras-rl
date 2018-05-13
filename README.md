@@ -1,7 +1,7 @@
 # Deep Reinforcement Learning for Keras
-[![Build Status](https://api.travis-ci.org/matthiasplappert/keras-rl.svg?branch=master)](https://travis-ci.org/matthiasplappert/keras-rl)
+[![Build Status](https://api.travis-ci.org/keras-rl/keras-rl.svg?branch=master)](https://travis-ci.org/keras-rl/keras-rl)
 [![Documentation](https://readthedocs.org/projects/keras-rl/badge/)](http://keras-rl.readthedocs.io/)
-[![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/matthiasplappert/keras-rl/blob/master/LICENSE)
+[![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/keras-rl/keras-rl/blob/master/LICENSE)
 [![Join the chat at https://gitter.im/keras-rl/Lobby](https://badges.gitter.im/keras-rl/Lobby.svg)](https://gitter.im/keras-rl/Lobby)
 
 
@@ -12,6 +12,16 @@
     <td><img src="/assets/pendulum.gif?raw=true" width="200"></td>
   </tr>
 </table>
+
+## News
+
+**03/20/2018** - Travis build is functional, Keras v2.1.5 and gym v0.10.3 are now supported
+
+**03/13/2018** - More maintainers from [Sicara](http://www.sicara.com) have joined this repo to help Matthias. The roadmap for the next few weeks is the following:
+- ~~Fix Travis build and update for Keras v2.1.5~~
+- Add documentation
+- Review issues and PR
+- Add state-of-the-art algorithms (A3C, DDPG)
 
 ## What is it?
 `keras-rl` implements some state-of-the art deep reinforcement learning algorithms in Python and seamlessly integrates with the deep learning library [Keras](http://keras.io). Just like Keras, it works with either [Theano](http://deeplearning.net/software/theano/) or [TensorFlow](https://www.tensorflow.org/), which means that you can train your algorithm efficiently either on CPU or GPU.
@@ -24,7 +34,7 @@ In a nutshell: `keras-rl` makes it really easy to run state-of-the-art deep rein
 ## What is included?
 As of today, the following algorithms have been implemented:
 
-- Deep Q Learning (DQN) [[1]](http://arxiv.org/abs/1312.5602), [[2]](http://home.uchicago.edu/~arij/journalclub/papers/2015_Mnih_et_al.pdf)
+- Deep Q Learning (DQN) [[1]](http://arxiv.org/abs/1312.5602), [[2]](https://www.nature.com/articles/nature14236)
 - Double DQN [[3]](http://arxiv.org/abs/1509.06461)
 - Deep Deterministic Policy Gradient (DDPG) [[4]](http://arxiv.org/abs/1509.02971)
 - Continuous DQN (CDQN or NAF) [[6]](http://arxiv.org/abs/1603.00748)
@@ -32,7 +42,7 @@ As of today, the following algorithms have been implemented:
 - Dueling network DQN (Dueling DQN) [[9]](https://arxiv.org/abs/1511.06581)
 - Deep SARSA [[10]](http://people.inf.elte.hu/lorincz/Files/RL_2006/SuttonBook.pdf)
 
-You can find more information on each agent in the [wiki](https://github.com/matthiasplappert/keras-rl/wiki/Agent-Overview).
+You can find more information on each agent in the [doc](http://keras-rl.readthedocs.io/en/latest/agents/overview/).
 
 I'm currently working on the following algorithms, which can be found on the `experimental` branch:
 
@@ -96,7 +106,7 @@ You can ask questions and join the development discussion:
 - On the [Keras-RL Google group](https://groups.google.com/forum/#!forum/keras-rl-users).
 - On the [Keras-RL Gitter channel](https://gitter.im/keras-rl/Lobby).
 
-You can also post **bug reports and feature requests** (only!) in [Github issues](https://github.com/matthiasplappert/keras-rl/issues).
+You can also post **bug reports and feature requests** (only!) in [Github issues](https://github.com/keras-rl/keras-rl/issues).
 
 ## Running the Tests
 To run the tests locally, you'll first have to install the following dependencies:
@@ -121,7 +131,7 @@ If you use `keras-rl` in your research, you can cite it as follows:
     year = {2016},
     publisher = {GitHub},
     journal = {GitHub repository},
-    howpublished = {\url{https://github.com/matthiasplappert/keras-rl}},
+    howpublished = {\url{https://github.com/keras-rl/keras-rl}},
 }
 ```
 

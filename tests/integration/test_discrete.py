@@ -2,14 +2,14 @@ import random
 
 import numpy as np
 from numpy.testing import assert_allclose
-from gym.envs.debugging.two_round_deterministic_reward import TwoRoundDeterministicRewardEnv
 
 from keras.models import Sequential
-from keras.layers import Dense, Activation, Flatten
+from keras.layers import Dense, Activation
 from keras.optimizers import Adam
 from rl.agents import DQNAgent, CEMAgent, SARSAAgent
 from rl.policy import EpsGreedyQPolicy
 from rl.memory import SequentialMemory, EpisodeParameterMemory
+from utils.gym.envs import TwoRoundDeterministicRewardEnv
 
 
 def test_dqn():

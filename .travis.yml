@@ -36,7 +36,7 @@ install:
   # Useful for debugging any issues with conda
   - conda info -a
 
-  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy scipy matplotlib pandas pytest h5py
+  - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy matplotlib pandas pytest h5py
   - source activate test-environment
   - pip install pytest-xdist
   # See https://github.com/pytest-dev/pytest-cov/issues/124 for details
@@ -45,6 +45,7 @@ install:
   # Bleeding-edge: pip install git+https://github.com/Theano/Theano.git
   - pip install "theano<1.0"
   - pip install gym
+  - pip install scipy
   # Bleeding-edge: pip install git+https://github.com/fchollet/keras.git;
   - pip install "keras>=2.0.7";
   - python setup.py install

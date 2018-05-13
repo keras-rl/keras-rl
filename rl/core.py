@@ -5,7 +5,13 @@ from copy import deepcopy
 import numpy as np
 from keras.callbacks import History
 
-from rl.callbacks import TestLogger, TrainEpisodeLogger, TrainIntervalLogger, Visualizer, CallbackList
+from rl.callbacks import (
+    CallbackList,
+    TestLogger,
+    TrainEpisodeLogger,
+    TrainIntervalLogger,
+    Visualizer
+)
 
 
 class Agent(object):
@@ -38,6 +44,9 @@ class Agent(object):
 
     def get_config(self):
         """Configuration of the agent for serialization.
+
+        # Returns
+            Dictionnary with agent configuration
         """
         return {}
 
@@ -105,8 +114,8 @@ class Agent(object):
         self._on_train_begin()
         callbacks.on_train_begin()
 
-        episode = 0
-        self.step = 0
+        episode = np.int16(0)
+        self.step = np.int16(0)
         observation = None
         episode_reward = None
         episode_step = None
@@ -115,8 +124,8 @@ class Agent(object):
             while self.step < nb_steps:
                 if observation is None:  # start of a new episode
                     callbacks.on_episode_begin(episode)
-                    episode_step = 0
-                    episode_reward = 0.
+                    episode_step = np.int16(0)
+                    episode_reward = np.float32(0)
 
                     # Obtain the initial observation by resetting the environment.
                     self.reset_states()
@@ -160,7 +169,7 @@ class Agent(object):
                 action = self.forward(observation)
                 if self.processor is not None:
                     action = self.processor.process_action(action)
-                reward = 0.
+                reward = np.float32(0)
                 accumulated_info = {}
                 done = False
                 for _ in range(action_repetition):
@@ -230,7 +239,33 @@ class Agent(object):
 
     def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
              nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1):
-        """Callback that is called before training begins."
+        """Callback that is called before training begins.
+
+        # Arguments
+            env: (`Env` instance): Environment that the agent interacts with. See [Env](#env) for details.
+            nb_episodes (integer): Number of episodes to perform.
+            action_repetition (integer): Number of times the agent repeats the same action without
+                observing the environment again. Setting this to a value > 1 can be useful
+                if a single action only has a very small effect on the environment.
+            callbacks (list of `keras.callbacks.Callback` or `rl.callbacks.Callback` instances):
+                List of callbacks to apply during training. See [callbacks](/callbacks) for details.
+            verbose (integer): 0 for no logging, 1 for interval logging (compare `log_interval`), 2 for episode logging
+            visualize (boolean): If `True`, the environment is visualized during training. However,
+                this is likely going to slow down training significantly and is thus intended to be
+                a debugging instrument.
+            nb_max_start_steps (integer): Number of maximum steps that the agent performs at the beginning
+                of each episode using `start_step_policy`. Notice that this is an upper limit since
+                the exact number of steps to be performed is sampled uniformly from [0, max_start_steps]
+                at the beginning of each episode.
+            start_step_policy (`lambda observation: action`): The policy
+                to follow if `nb_max_start_steps` > 0. If set to `None`, a random action is performed.
+            log_interval (integer): If `verbose` = 1, the number of steps that are considered to be an interval.
+            nb_max_episode_steps (integer): Number of steps per episode that the agent performs before
+                automatically resetting the environment. Set to `None` if each episode should run
+                (potentially indefinitely) until the environment signals a terminal state.
+
+        # Returns
+            A `keras.callbacks.History` instance that recorded the entire training process.
         """
         if not self.compiled:
             raise RuntimeError('Your tried to test your agent but it hasn\'t been compiled yet. Please call `compile()` before `test()`.')
@@ -385,6 +420,9 @@ class Agent(object):
         # Argument
             reward (float): The observed reward after executing the action returned by `forward`.
             terminal (boolean): `True` if the new state of the environment is terminal.
+
+        # Returns
+            List of metrics values
         """
         raise NotImplementedError()
 
@@ -417,9 +455,12 @@ class Agent(object):
     @property
     def layers(self):
         """Returns all layers of the underlying model(s).
-        
+
         If the concrete implementation uses multiple internal models,
         this method returns them in a concatenated list.
+
+        # Returns
+            A list of the model's layers
         """
         raise NotImplementedError()
 
@@ -427,6 +468,9 @@ class Agent(object):
     def metrics_names(self):
         """The human-readable names of the agent's metrics. Must return as many names as there
         are metrics (see also `compile`).
+
+        # Returns
+            A list of metric's names (string)
         """
         return []
 
@@ -484,28 +528,58 @@ class Processor(object):
     def process_observation(self, observation):
         """Processes the observation as obtained from the environment for use in an agent and
         returns it.
+
+        # Arguments
+            observation (object): An observation as obtained by the environment
+
+        # Returns
+            Observation obtained by the environment processed
         """
         return observation
 
     def process_reward(self, reward):
         """Processes the reward as obtained from the environment for use in an agent and
         returns it.
+
+        # Arguments
+            reward (float): A reward as obtained by the environment
+
+        # Returns
+            Reward obtained by the environment processed
         """
         return reward
 
     def process_info(self, info):
         """Processes the info as obtained from the environment for use in an agent and
         returns it.
+
+        # Arguments
+            info (dict): An info as obtained by the environment
+
+        # Returns
+            Info obtained by the environment processed
         """
         return info
 
     def process_action(self, action):
         """Processes an action predicted by an agent but before execution in an environment.
+
+        # Arguments
+            action (int): Action given to the environment
+
+        # Returns
+            Processed action given to the environment
         """
         return action
 
     def process_state_batch(self, batch):
         """Processes an entire batch of states and returns it.
+
+        # Arguments
+            batch (list): List of states
+
+        # Returns
+            Processed list of states
         """
         return batch
 
@@ -535,6 +609,15 @@ class Env(object):
     same API that OpenAI Gym uses so that integrating with it is trivial. In contrast to the
     OpenAI Gym implementation, this class only defines the abstract methods without any actual
     implementation.
+
+    To implement your own environment, you need to define the following methods:
+
+    - `step`
+    - `reset`
+    - `render`
+    - `close`
+
+    Refer to the [Gym documentation](https://gym.openai.com/docs/#environments).
     """
     reward_range = (-np.inf, np.inf)
     action_space = None
@@ -558,7 +641,7 @@ class Env(object):
     def reset(self):
         """
         Resets the state of the environment and returns an initial observation.
-        
+
         # Returns
             observation (object): The initial observation of the space. Initial reward is assumed to be 0.
         """
@@ -567,8 +650,8 @@ class Env(object):
     def render(self, mode='human', close=False):
         """Renders the environment.
         The set of supported modes varies per environment. (And some
-        environments do not support rendering at all.) 
-        
+        environments do not support rendering at all.)
+
         # Arguments
             mode (str): The mode to render with.
             close (bool): Close all open renderings.
@@ -584,7 +667,7 @@ class Env(object):
 
     def seed(self, seed=None):
         """Sets the seed for this env's random number generator(s).
-        
+
         # Returns
             Returns the list of seeds used in this env's random number generators
         """
@@ -609,6 +692,8 @@ class Env(object):
 class Space(object):
     """Abstract model for a space that is used for the state and action spaces. This class has the
     exact same API that OpenAI Gym uses so that integrating with it is trivial.
+
+    Please refer to [Gym Documentation](https://gym.openai.com/docs/#spaces)
     """
 
     def sample(self, seed=None):

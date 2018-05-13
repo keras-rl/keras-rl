@@ -87,7 +87,18 @@ class AbstractDQNAgent(Agent):
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
 class DQNAgent(AbstractDQNAgent):
-    """Write me
+    """
+    # Arguments 
+        model__: A Keras model. 
+        policy__: A Keras-rl policy that are defined in [policy](https://github.com/keras-rl/keras-rl/blob/master/rl/policy.py). 
+        test_policy__: A Keras-rl policy. 
+        enable_double_dqn__: A boolean which enable target network as a second network proposed by van Hasselt et al. to decrease overfitting. 
+        enable_dueling_dqn__: A boolean which enable dueling architecture proposed by Mnih et al. 
+        dueling_type__: If `enable_dueling_dqn` is set to `True`, a type of dueling architecture must be chosen which calculate Q(s,a) from V(s) and A(s,a) differently. Note that `avg` is recommanded in the [paper](https://arxiv.org/abs/1511.06581). 
+            `avg`: Q(s,a;theta) = V(s;theta) + (A(s,a;theta)-Avg_a(A(s,a;theta))) 
+            `max`: Q(s,a;theta) = V(s;theta) + (A(s,a;theta)-max_a(A(s,a;theta))) 
+            `naive`: Q(s,a;theta) = V(s;theta) + A(s,a;theta) 
+ 
     """
     def __init__(self, model, policy=None, test_policy=None, enable_double_dqn=True, enable_dueling_network=False,
                  dueling_type='avg', *args, **kwargs):
@@ -180,7 +191,7 @@ class DQNAgent(AbstractDQNAgent):
         y_pred = self.model.output
         y_true = Input(name='y_true', shape=(self.nb_actions,))
         mask = Input(name='mask', shape=(self.nb_actions,))
-        loss_out = Lambda(clipped_masked_error, output_shape=(1,), name='loss')([y_pred, y_true, mask])
+        loss_out = Lambda(clipped_masked_error, output_shape=(1,), name='loss')([y_true, y_pred, mask])
         ins = [self.model.input] if type(self.model.input) is not list else self.model.input
         trainable_model = Model(inputs=ins + [y_true, mask], outputs=[loss_out, y_pred])
         assert len(trainable_model.output_names) == 2
@@ -635,8 +646,6 @@ class NAFAgent(AbstractDQNAgent):
         # Select an action.
         state = self.memory.get_recent_state(observation)
         action = self.select_action(state)
-        if self.processor is not None:
-            action = self.processor.process_action(action)
 
         # Book-keeping.
         self.recent_observation = observation

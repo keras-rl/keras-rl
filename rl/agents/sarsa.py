@@ -191,7 +191,7 @@ class SARSAAgent(Agent):
                 ins.update({'y_true': targets, 'mask': masks})            
             else: 
                 ins += [targets, masks]
-            metrics = self.trainable_model.train_on_batch(ins + [targets, masks], [dummy_targets, targets])
+            metrics = self.trainable_model.train_on_batch(ins, [dummy_targets, targets])
             metrics = [metric for idx, metric in enumerate(metrics) if idx not in (1, 2)]  # throw away individual losses
             metrics += self.policy.metrics
             if self.processor is not None:

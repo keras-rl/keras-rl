@@ -1,5 +1,6 @@
 from __future__ import division
 import warnings
+from collections import deque
 
 import keras.backend as K
 from keras.models import Model
@@ -101,7 +102,7 @@ class DQNAgent(AbstractDQNAgent):
  
     """
     def __init__(self, model, policy=None, test_policy=None, enable_double_dqn=True, enable_dueling_network=False,
-                 dueling_type='avg', *args, **kwargs):
+                 dueling_type='avg', avg_dqn=1, *args, **kwargs):
         super(DQNAgent, self).__init__(*args, **kwargs)
 
         # Validate (important) input.
@@ -114,6 +115,9 @@ class DQNAgent(AbstractDQNAgent):
         self.enable_double_dqn = enable_double_dqn
         self.enable_dueling_network = enable_dueling_network
         self.dueling_type = dueling_type
+        self.avg_dqn = avg_dqn
+        self.target_model_list = deque([], self.avg_dqn)
+
         if self.enable_dueling_network:
             # get the second last layer of the model, abandon the last layer
             layer = model.layers[-2]
@@ -171,6 +175,7 @@ class DQNAgent(AbstractDQNAgent):
         self.target_model = clone_model(self.model, self.custom_model_objects)
         self.target_model.compile(optimizer='sgd', loss='mse')
         self.model.compile(optimizer='sgd', loss='mse')
+        self.target_model_list.append(self.target_model)
 
         # Compile model.
         if self.target_model_update < 1.:
@@ -221,6 +226,15 @@ class DQNAgent(AbstractDQNAgent):
 
     def update_target_model_hard(self):
         self.target_model.set_weights(self.model.get_weights())
+
+        # add in new target model into list for use in AverageDQN
+        if len(self.target_model_list) >= self.avg_dqn:
+            self.target_model_list.rotate(-1)
+            self.target_model_list[-1].set_weights(self.model.get_weights())
+        else:
+            tmp_model = clone_model(self.model, self.custom_model_objects)
+            tmp_model.compile(optimizer='sgd', loss='mse')
+            self.target_model_list.append(tmp_model)
 
     def forward(self, observation):
         # Select an action.
@@ -288,7 +302,8 @@ class DQNAgent(AbstractDQNAgent):
 
                 # Now, estimate Q values using the target network but select the values with the
                 # highest Q value wrt to the online model (as computed above).
-                target_q_values = self.target_model.predict_on_batch(state1_batch)
+                target_q_list = [avg_model.predict_on_batch(state1_batch) for avg_model in self.target_model_list]
+                target_q_values = np.median(target_q_list, 0)
                 assert target_q_values.shape == (self.batch_size, self.nb_actions)
                 q_batch = target_q_values[range(self.batch_size), actions]
             else:

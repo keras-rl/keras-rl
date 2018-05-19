@@ -87,6 +87,7 @@ class AbstractDQNAgent(Agent):
 # An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
+# https://arxiv.org/pdf/1611.01929.pdf
 class DQNAgent(AbstractDQNAgent):
     """
     # Arguments 
@@ -164,6 +165,7 @@ class DQNAgent(AbstractDQNAgent):
         config['model'] = get_object_config(self.model)
         config['policy'] = get_object_config(self.policy)
         config['test_policy'] = get_object_config(self.test_policy)
+        config['average_dqn'] = self.avg_dqn
         if self.compiled:
             config['target_model'] = get_object_config(self.target_model)
         return config

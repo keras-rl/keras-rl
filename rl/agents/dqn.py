@@ -87,6 +87,7 @@ class AbstractDQNAgent(Agent):
 # An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
+# Added average DQN
 # https://arxiv.org/pdf/1611.01929.pdf
 class DQNAgent(AbstractDQNAgent):
     """

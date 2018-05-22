@@ -8,7 +8,6 @@ setup(name='keras-rl',
       author='Matthias Plappert',
       author_email='matthiasplappert@me.com',
       url='https://github.com/keras-rl/keras-rl',
-      download_url='https://github.com/keras-rl/keras-rl/archive/v0.4.0.tar.gz',
       license='MIT',
       install_requires=['keras>=2.0.7'],
       extras_require={

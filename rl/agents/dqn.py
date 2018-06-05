@@ -8,6 +8,7 @@ from rl.core import Agent
 from rl.policy import EpsGreedyQPolicy, GreedyQPolicy
 from rl.util import *
 from rl.memory import PrioritizedMemory
+from rl.layers import *
 
 def mean_q(y_true, y_pred):
     return K.mean(K.max(y_pred, axis=-1))
@@ -17,7 +18,7 @@ class AbstractDQNAgent(Agent):
     """
     def __init__(self, nb_actions, memory, gamma=.99, batch_size=32, nb_steps_warmup=1000,
                  train_interval=1, memory_interval=1, target_model_update=10000,
-                 delta_range=None, delta_clip=np.inf, custom_model_objects={}, **kwargs):
+                 delta_range=None, delta_clip=np.inf, custom_model_objects={"NoisyNetDense":NoisyNetDense}, **kwargs):
         super(AbstractDQNAgent, self).__init__(**kwargs)
 
         # Soft vs hard target model updates.

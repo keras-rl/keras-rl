@@ -119,7 +119,7 @@ class TestLogger(Callback):
 
 
 class TrainEpisodeLogger(Callback):
-    def __init__(self):
+    def __init__(self, filepath=None):
         # Some algorithms compute multiple episodes at once since they are multi-threaded.
         # We therefore use a dictionary that is indexed by the episode to separate episodes
         # from each other.
@@ -129,17 +129,20 @@ class TrainEpisodeLogger(Callback):
         self.actions = {}
         self.metrics = {}
         self.step = 0
+        self.filepath = filepath
 
     def on_train_begin(self, logs):
         """ Print training values at beginning of training """
         self.train_start = timeit.default_timer()
         self.metrics_names = self.model.metrics_names
         print('Training for {} steps ...'.format(self.params['nb_steps']))
-        
+
     def on_train_end(self, logs):
         """ Print training time at end of training """
         duration = timeit.default_timer() - self.train_start
         print('done, took {:.3f} seconds'.format(duration))
+        with open(self.filepath,'a') as f:
+            f.write("WALL CLOCK TIME: " + str(duration))
 
     def on_episode_begin(self, episode, logs):
         """ Reset environment variables at beginning of each episode """
@@ -169,7 +172,7 @@ class TrainEpisodeLogger(Callback):
                 except Warning:
                     value = '--'
                     metrics_template += '{}: {}'
-                metrics_variables += [name, value]          
+                metrics_variables += [name, value]
         metrics_text = metrics_template.format(*metrics_variables)
 
         nb_step_digits = str(int(np.ceil(np.log10(self.params['nb_steps']))) + 1)
@@ -195,12 +198,18 @@ class TrainEpisodeLogger(Callback):
         }
         print(template.format(**variables))
 
-        # Free up resources.
-        del self.episode_start[episode]
-        del self.observations[episode]
-        del self.rewards[episode]
-        del self.actions[episode]
-        del self.metrics[episode]
+        try:
+            with open(self.filepath, 'a') as f:
+                line = [str(variables[key]) + "," for key in sorted(variables.keys())]
+                f.write(str(line).replace(',','').replace('[','').replace(']','').strip())
+                f.write('\n')
+        finally:
+            # Free up resources.
+            del self.episode_start[episode]
+            del self.observations[episode]
+            del self.rewards[episode]
+            del self.actions[episode]
+            del self.metrics[episode]
 
     def on_step_end(self, step, logs):
         """ Update statistics of episode after each step """
@@ -250,7 +259,7 @@ class TrainIntervalLogger(Callback):
                     assert means.shape == (len(self.metrics_names),)
                     for name, mean in zip(self.metrics_names, means):
                         formatted_metrics += ' - {}: {:.3f}'.format(name, mean)
-                
+
                 formatted_infos = ''
                 if len(self.infos) > 0:
                     infos = np.array(self.infos)
@@ -310,7 +319,7 @@ class FileLogger(Callback):
         self.starts[episode] = timeit.default_timer()
 
     def on_episode_end(self, episode, logs):
-        """ Compute and print metrics at the end of each episode """ 
+        """ Compute and print metrics at the end of each episode """
         duration = timeit.default_timer() - self.starts[episode]
 
         metrics = self.metrics[episode]
@@ -384,4 +393,5 @@ class ModelIntervalCheckpoint(Callback):
         filepath = self.filepath.format(step=self.total_steps, **logs)
         if self.verbose > 0:
             print('Step {}: saving model to {}'.format(self.total_steps, filepath))
+            
         self.model.save_weights(filepath, overwrite=True)

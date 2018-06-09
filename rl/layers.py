@@ -24,11 +24,12 @@ class NoisyNetDense(Layer):
         self.bias_regularizer = regularizers.get(bias_regularizer) if kernel_constraint is not None else None
 
     def build(self, input_shape):
-        #See section 3.2 of Fortunato et al.
         self.input_dim = input_shape[-1]
 
-        self.sigma_initializer = initializers.Constant(value=.5/self.input_dim**(1/2))
-        self.mu_initializer = initializers.RandomUniform(minval=(-1/self.input_dim**(1/2)), maxval=(1/(self.input_dim**(1/2))))
+        #See section 3.2 of Fortunato et al.
+        sqr_inputs = self.input_dim**(1/2)
+        self.sigma_initializer = initializers.Constant(value=.5/sqr_inputs)
+        self.mu_initializer = initializers.RandomUniform(minval=(-1/sqr_inputs), maxval=(1/sqr_inputs))
 
 
         self.mu_weight = self.add_weight(shape=(self.input_dim, self.units),
@@ -55,38 +56,24 @@ class NoisyNetDense(Layer):
                                         constraint=self.bias_constraint,
                                         regularizer=self.bias_regularizer)
 
-        #The random noise elements that drive exploration
-        self.epsilon_weight = K.zeros(shape=(self.input_dim,self.units))
-        self.epsilon_bias = K.zeros(shape=(self.units,))
-        self.inject_noise()
-
         super(NoisyNetDense, self).build(input_shape=input_shape)
 
     def call(self, x):
         #sample from noise distribution
-        self.inject_noise()
+        e_i = K.random_normal((self.input_dim, self.units))
+        e_j = K.random_normal((self.units,))
+
+        #We use the factorized Gaussian noise variant from Section 3 of Fortunato et al.
+        eW = K.sign(e_i)*(K.sqrt(K.abs(e_i))) * K.sign(e_j)*(K.sqrt(K.abs(e_j)))
+        eB = K.sign(e_j)*(K.abs(e_j)**(1/2))
+
         #See section 3 of Fortunato et al.
-        noise_injected_weights = K.dot( x, self.mu_weight + (self.sigma_weight * self.epsilon_weight))
-        noise_injected_bias = self.mu_bias + (self.sigma_bias * self.epsilon_bias)
+        noise_injected_weights = K.dot(x, self.mu_weight + (self.sigma_weight * eW))
+        noise_injected_bias = self.mu_bias + (self.sigma_bias * eB)
         output = K.bias_add(noise_injected_weights, noise_injected_bias)
         if self.activation != None:
             output = self.activation(output)
         return output
-
-    def inject_noise(self):
-        e_i = np.random.normal(0,1,(self.input_dim, self.units))
-        e_j = np.random.normal(0,1,(self.units,))
-
-        #We use the factorized Gaussian noise variant from Section 3 of Fortunato et al.
-        eW = np.sign(e_i)*(abs(e_i)**(1/2)) * np.sign(e_j)*(abs(e_j)**(1/2))
-        eB = np.sign(e_j)*(abs(e_j)**(1/2))
-
-        K.set_value(self.epsilon_weight, eW)
-        K.set_value(self.epsilon_bias, eB)
-
-    def remove_noise(self):
-        K.set_value(self.epsilon_weights, np.zeros(shape=(self.input_dim, self.units)))
-        K.set_value(self.epsilon_bias, np.zeros(shape=self.units,))
 
     def compute_output_shape(self, input_shape):
         output_shape = list(input_shape)

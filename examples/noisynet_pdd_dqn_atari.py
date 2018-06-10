@@ -3,26 +3,26 @@ import argparse
 from PIL import Image
 import numpy as np
 import gym
-import sys
-sys.path.append('../')
 from keras.models import Model
 from keras.layers import Flatten, Convolution2D, Input
 from keras.optimizers import Adam
 import keras.backend as K
 from rl.agents.dqn import DQNAgent
 from rl.policy import GreedyQPolicy
-from rl.memory import PrioritizedMemory
+from rl.memory import PrioritizedMemory #,Sequential
 from rl.core import Processor
 from rl.callbacks import TrainEpisodeLogger, ModelIntervalCheckpoint
 from rl.layers import NoisyNetDense
 
-
+#We downsize the atari frame to 84 x 84 and feed the model 4 frames at a time for
+#a sense of direction and speed.
 INPUT_SHAPE = (84, 84)
 WINDOW_LENGTH = 4
 
+#Standard Atari processing
 class AtariProcessor(Processor):
     def process_observation(self, observation):
-        assert observation.ndim == 3  # (height, width, channel)
+        assert observation.ndim == 3
         img = Image.fromarray(observation)
         img = img.resize(INPUT_SHAPE).convert('L')  # resize and convert to grayscale
         processed_observation = np.array(img)
@@ -30,9 +30,6 @@ class AtariProcessor(Processor):
         return processed_observation.astype('uint8')  # saves storage in experience memory
 
     def process_state_batch(self, batch):
-        # We could perform this processing step in `process_observation`. In this case, however,
-        # we would need to store a `float32` array instead, which is 4x more memory intensive than
-        # an `uint8` array. This matters if we store 1M observations.
         processed_batch = batch.astype('float32') / 255.
         return processed_batch
 
@@ -52,7 +49,7 @@ env.seed(123)
 nb_actions = env.action_space.n
 print("NUMBER OF ACTIONS: " + str(nb_actions))
 
-# Next, we build our model. We use the same model that was described by Mnih et al. (2015).
+#Standard DQN model architecture, but swapping the Dense classifier layers for the rl.layers.NoisyNetDense version.
 input_shape = (WINDOW_LENGTH, INPUT_SHAPE[0], INPUT_SHAPE[1])
 frame = Input(shape=(input_shape))
 cv1 = Convolution2D(32, kernel_size=(8,8), strides=4, activation='relu', data_format='channels_first')(frame)
@@ -64,25 +61,30 @@ buttons = NoisyNetDense(nb_actions, activation='linear')(dense)
 model = Model(inputs=frame,outputs=buttons)
 print(model.summary())
 
-
+#You can use any Memory you want.
 memory = PrioritizedMemory(limit=1000000, alpha=.6, start_beta=.4, end_beta=1., steps_annealed=10000000, window_length=WINDOW_LENGTH)
 
 processor = AtariProcessor()
 
+#This is the important difference. Rather than using an E Greedy approach, where
+#we keep the network consistent but randomize the way we interpret its predictions,
+#in NoisyNet we are adding noise to the network and simply choosing the best value.
 policy = GreedyQPolicy()
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
                processor=processor, enable_double_dqn=True, enable_dueling_network=True, nb_steps_warmup=50000, gamma=.99, target_model_update=10000,
                train_interval=4, delta_clip=1.)
 
-dqn.compile(Adam(lr=.00025/4), metrics=['mae'])
+#Prioritized Memories typically use lower learning rates
+lr = .00025
+if type(memory) == PrioritizedMemory:
+    lr /= 4
+dqn.compile(Adam(lr=lr), metrics=['mae'])
 
 if args.mode == 'train':
-    # Okay, now it's time to learn something! We capture the interrupt exception so that training
-    # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
-    weights_filename = 'noisynet_pdd_dqn_v3_{}_weights.h5f'.format(args.env_name)
-    checkpoint_weights_filename = 'noisynet_pdd_dqn_v3_' + args.env_name + '_weights_{step}.h5f'
-    log_filename = 'noisynet_pdd_dqn_v3_REWARD_DATA.txt'
+    weights_filename = 'noisynet_pdd_dqn_{}_weights.h5f'.format(args.env_name)
+    checkpoint_weights_filename = 'noisynet_pdd_dqn_' + args.env_name + '_weights_{step}.h5f'
+    log_filename = 'noisynet_pdd_dqn_' + args.env_name + '_REWARD_DATA.txt'
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=500000)]
     callbacks += [TrainEpisodeLogger(log_filename)]
     dqn.fit(env, callbacks=callbacks, nb_steps=10000000, verbose=0, nb_max_episode_steps=20000)
@@ -91,7 +93,7 @@ if args.mode == 'train':
     dqn.save_weights(weights_filename, overwrite=True)
 
 elif args.mode == 'test':
-    weights_filename = 'noiseynet_pdd_dqn_v3_{}_weights.h5f'.format(args.env_name)
+    weights_filename = 'noiseynet_pdd_dqn_{}_weights.h5f'.format(args.env_name)
     if args.weights:
         weights_filename = args.weights
     dqn.load_weights(weights_filename)

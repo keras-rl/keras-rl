@@ -15,6 +15,21 @@ def clone_model(model, custom_objects={}):
     clone.set_weights(model.get_weights())
     return clone
 
+def clone_model_customize(model, class_name=None, config=None, weights=None, custom_objects={}):
+    # Requires Keras 1.0.7 since get_config has breaking changes.
+    if class_name is None:
+        class_name = model.__class__.__name__
+    if config is None:
+        config = model.get_config()
+    if weights is None:
+        weights = model.get_weights()
+    config = {
+        'class_name': class_name,
+        'config': config,
+    }
+    clone = model_from_config(config, custom_objects=custom_objects)
+    clone.set_weights(weights)
+    return clone
 
 def clone_optimizer(optimizer):
     if type(optimizer) is str:

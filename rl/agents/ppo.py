@@ -9,9 +9,11 @@ from keras.layers import Lambda
 
 from rl.core import Agent
 from rl.memory import FixedBuffer
-from rl.util import clone_optimizer, clone_model, GeneralizedAdvantageEstimator, state_windowing
+from rl.util import clone_optimizer, GeneralizedAdvantageEstimator, state_windowing, clone_model_customize
 
 import keras.backend as K
+
+import keras
 
 EpisodeMemory = namedtuple('EpisodeMemory', 'state,windowed_state,action,reward,advantage')
 
@@ -151,7 +153,16 @@ class PPOAgent(Agent):
         # Actor is the ephemeral network that is directly trained,
         # While target_network is the actual actor network and is updated with the weight of actor
         # after each round of training
-        self.target_actor = clone_model(self.actor, self.custom_model_objects)
+
+        # Ugly workaround for Keras not exporting 'tensor' parameter in Input Layer.
+        fixed_config = self.actor.get_config()
+        for i, layer in enumerate(self.actor.layers):
+            if isinstance(layer, keras.engine.topology.InputLayer) and not layer.is_placeholder:
+                input_tensor = layer.outbound_nodes[0].input_tensors[0]
+                fixed_config['layers'][i]['config']['input_tensor'] = input_tensor
+        # End workaround
+
+        self.target_actor = clone_model_customize(self.actor, config=fixed_config, custom_objects=self.custom_model_objects)
         self.target_actor.set_weights(self.actor.get_weights())
         self.target_actor.name += '_copy'
         for layer in self.target_actor.layers:
@@ -177,7 +188,7 @@ class PPOAgent(Agent):
             return K.minimum(prob_ratio * advantage, K.clip(prob_ratio, 1-self.epsilon, 1+self.epsilon) * advantage)
         loss_out = Lambda(clipped_loss, name='loss')([log_prob_theta, log_prob_thetaold, advantage])
         trainable_model = Model(inputs=[action, state, advantage] +
-                                       self._get_actor_dummy_inputs(target=True) +
+                                       #self._get_actor_dummy_inputs(target=True) +
                                        self._get_actor_dummy_inputs(target=False),
                                 outputs=loss_out)
         losses = [ lambda sample_out, network_out: network_out ]

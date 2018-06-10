@@ -15,7 +15,14 @@ import keras.backend as K
 
 import keras
 
-EpisodeMemory = namedtuple('EpisodeMemory', 'state,windowed_state,action,reward,advantage')
+#EpisodeMemory = namedtuple('EpisodeMemory', 'state,windowed_state,action,reward,advantage')
+class EpisodeMemory:
+    def __init__(self, state, windowed_state, action, reward, advantage):
+        self.state = state
+        self.windowed_state = windowed_state
+        self.action = action
+        self.reward = reward
+        self.advantage = advantage
 
 class PPOAgent(Agent):
     """

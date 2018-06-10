@@ -113,7 +113,7 @@ class IndependentGaussianProcess(ProbabilityDistribution):
         mu, log_sigma = x
         assert mu.shape == (self.n,)
         assert log_sigma.shape == (self.n,)
-        return np.random.normal(mu, np.exp(log_sigma))
+        return np.random.normal(mu, np.exp(np.nan_to_num(log_sigma)))
 
     def sample_dim(self):
         return (self.n,)

@@ -182,7 +182,7 @@ class PPOAgent(Agent):
         actor_input_shape = self.actor.inputs[self.actor_input_index]._keras_shape[1:]
         window_len = actor_input_shape[0]
         assert window_len == self.memory.window_length
-        action = Input(name='action', shape=(window_len,) + self.sampler.sample_dim())
+        action = Input(name='action', shape=self.sampler.sample_dim()) #(window_len,) +
         state = Input(name='state', shape=actor_input_shape)
         advantage = Input(name='advantage', shape=(1,))
         actor_out = self.actor(self._get_replaced_actor_input_list(state))

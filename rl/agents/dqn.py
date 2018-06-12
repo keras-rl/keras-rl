@@ -105,9 +105,10 @@ class DQNAgent(AbstractDQNAgent):
         target_model_update__: How often to update the target model. Longer intervals stabilize training.
         train_interval__: The integer number of steps between each learning process.
         delta_clip__: A component of the huber loss.
+        n_step__: exponent for multi-step learning. Larger values extend the future reward approximations further into the future.
     """
     def __init__(self, model, policy=None, test_policy=None, enable_double_dqn=True, enable_dueling_network=False,
-                 dueling_type='avg', *args, **kwargs):
+                 dueling_type='avg', n_step=1, *args, **kwargs):
         super(DQNAgent, self).__init__(*args, **kwargs)
 
 
@@ -147,6 +148,7 @@ class DQNAgent(AbstractDQNAgent):
 
             model = Model(inputs=model.input, outputs=outputlayer)
 
+        self.n_step = n_step
         # Related objects.
         self.model = model
         if policy is None:
@@ -340,11 +342,12 @@ class DQNAgent(AbstractDQNAgent):
 
             # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target targets accordingly,
             # but only for the affected output units (as given by action_batch).
-            discounted_reward_batch = self.gamma * q_batch
+            discounted_reward_batch = (self.gamma **(self.n_step)) * q_batch
             # Set discounted reward to zero for all states that were terminal.
             discounted_reward_batch *= terminal1_batch
             assert discounted_reward_batch.shape == reward_batch.shape
-            Rs = reward_batch + discounted_reward_batch
+            #Putting together the multi-step target
+            Rs = (reward_batch **(self.n_step)) + discounted_reward_batch
 
             for idx, (target, mask, R, action) in enumerate(zip(targets, masks, Rs, action_batch)):
                 target[action] = R  # update action with estimated accumulated reward

@@ -3,6 +3,8 @@ import argparse
 from PIL import Image
 import numpy as np
 import gym
+import sys
+sys.path.append('..')
 from keras.models import Model
 from keras.layers import Flatten, Convolution2D, Input
 from keras.optimizers import Adam
@@ -73,7 +75,7 @@ policy = GreedyQPolicy()
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
                processor=processor, enable_double_dqn=True, enable_dueling_network=True, nb_steps_warmup=50000, gamma=.99, target_model_update=10000,
-               train_interval=4, delta_clip=1.)
+               train_interval=4, delta_clip=1., n_step=3)
 
 #Prioritized Memories typically use lower learning rates
 lr = .00025

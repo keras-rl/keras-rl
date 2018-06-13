@@ -2,9 +2,8 @@ from __future__ import absolute_import
 from collections import deque, namedtuple
 import warnings
 import random
-
 import numpy as np
-
+from rl.util import SumSegmentTree, MinSegmentTree
 
 # This is to be understood as a transition: Given `state0`, performing `action`
 # yields `reward` and results in `state1`, which might be `terminal`.
@@ -13,12 +12,10 @@ Experience = namedtuple('Experience', 'state0, action, reward, state1, terminal1
 
 def sample_batch_indexes(low, high, size):
     """Return a sample of (size) unique elements between low and high
-
         # Argument
             low (int): The minimum value for our samples
             high (int): The maximum value for our samples
             size (int): The number of samples to pick
-
         # Returns
             A list of samples of length size, with values between low and high
         """
@@ -54,10 +51,8 @@ class RingBuffer(object):
 
     def __getitem__(self, idx):
         """Return element of buffer at specific index
-
         # Argument
             idx (int): Index wanted
-
         # Returns
             The element of buffer at given index
         """
@@ -67,7 +62,6 @@ class RingBuffer(object):
 
     def append(self, v):
         """Append an element to the buffer
-
         # Argument
             v (object): Element to append
         """
@@ -85,10 +79,8 @@ class RingBuffer(object):
 
 def zeroed_observation(observation):
     """Return an array of zeros with same shape as given observation
-
     # Argument
         observation (list): List of observation
-    
     # Return
         A np.ndarray of zeros with observation.shape
     """
@@ -120,10 +112,8 @@ class Memory(object):
 
     def get_recent_state(self, current_observation):
         """Return list of last observations
-
         # Argument
             current_observation (object): Last observation
-
         # Returns
             A list of the last observations
         """
@@ -146,7 +136,6 @@ class Memory(object):
 
     def get_config(self):
         """Return configuration (window_length, ignore_episode_boundaries) for Memory
-        
         # Return
             A dict with keys window_length and ignore_episode_boundaries
         """
@@ -159,7 +148,7 @@ class Memory(object):
 class SequentialMemory(Memory):
     def __init__(self, limit, **kwargs):
         super(SequentialMemory, self).__init__(**kwargs)
-        
+
         self.limit = limit
 
         # Do not use deque to implement the memory. This data structure may seem convenient but
@@ -171,7 +160,6 @@ class SequentialMemory(Memory):
 
     def sample(self, batch_size, batch_idxs=None):
         """Return a randomized batch of experiences
-
         # Argument
             batch_size (int): Size of the all batch
             batch_idxs (int): Indexes to extract
@@ -241,15 +229,14 @@ class SequentialMemory(Memory):
 
     def append(self, observation, action, reward, terminal, training=True):
         """Append an observation to the memory
-
         # Argument
             observation (dict): Observation returned by environment
             action (int): Action taken to obtain this observation
             reward (float): Reward obtained by taking this action
             terminal (boolean): Is the state terminal
-        """ 
+        """
         super(SequentialMemory, self).append(observation, action, reward, terminal, training=training)
-        
+
         # This needs to be understood as follows: in `observation`, take `action`, obtain `reward`
         # and weather the next state is `terminal` or not.
         if training:
@@ -261,7 +248,6 @@ class SequentialMemory(Memory):
     @property
     def nb_entries(self):
         """Return number of observations
-
         # Returns
             Number of observations
         """
@@ -269,13 +255,13 @@ class SequentialMemory(Memory):
 
     def get_config(self):
         """Return configurations of SequentialMemory
-
         # Returns
             Dict of config
         """
         config = super(SequentialMemory, self).get_config()
         config['limit'] = self.limit
         return config
+
 
 
 class EpisodeParameterMemory(Memory):
@@ -289,7 +275,6 @@ class EpisodeParameterMemory(Memory):
 
     def sample(self, batch_size, batch_idxs=None):
         """Return a randomized batch of params and rewards
-
         # Argument
             batch_size (int): Size of the all batch
             batch_idxs (int): Indexes to extract
@@ -309,7 +294,6 @@ class EpisodeParameterMemory(Memory):
 
     def append(self, observation, action, reward, terminal, training=True):
         """Append a reward to the memory
-
         # Argument
             observation (dict): Observation returned by environment
             action (int): Action taken to obtain this observation
@@ -322,7 +306,6 @@ class EpisodeParameterMemory(Memory):
 
     def finalize_episode(self, params):
         """Append an observation to the memory
-
         # Argument
             observation (dict): Observation returned by environment
             action (int): Action taken to obtain this observation
@@ -337,7 +320,6 @@ class EpisodeParameterMemory(Memory):
     @property
     def nb_entries(self):
         """Return number of episode rewards
-
         # Returns
             Number of episode rewards
         """
@@ -345,10 +327,166 @@ class EpisodeParameterMemory(Memory):
 
     def get_config(self):
         """Return configurations of SequentialMemory
-
         # Returns
             Dict of config
         """
         config = super(SequentialMemory, self).get_config()
         config['limit'] = self.limit
         return config
+
+
+class PrioritizedMemory(Memory):
+    def __init__(self, limit, alpha=.4, start_beta=1., end_beta=1., steps_annealed=1, **kwargs):
+        super(PrioritizedMemory, self).__init__(**kwargs)
+
+        #The capacity of the replay buffer
+        self.limit = limit
+
+        #Transitions are stored in individual RingBuffers, similar to the SequentialMemory.
+        #This does complicate things a bit relative to the OpenAI baseline implementation.
+        self.actions = RingBuffer(limit)
+        self.rewards = RingBuffer(limit)
+        self.terminals = RingBuffer(limit)
+        self.observations = RingBuffer(limit)
+
+        assert alpha >= 0
+        #how aggressively to sample based on TD error
+        self.alpha = alpha
+        #how aggressively to compensate for that sampling. This value is typically annealed
+        #to stabilize training as the model converges (beta of 1.0 fully compensates for TD-prioritized sampling).
+        self.start_beta = start_beta
+        self.end_beta = end_beta
+        self.steps_annealed = steps_annealed
+
+        #SegmentTrees need a leaf count that is a power of 2
+        tree_capacity = 1
+        while tree_capacity < self.limit:
+            tree_capacity *= 2
+
+        #Create SegmentTrees with this capacity
+        self.sum_tree = SumSegmentTree(tree_capacity)
+        self.min_tree = MinSegmentTree(tree_capacity)
+        self.max_priority = 1.
+
+        #wrapping index for interacting with the trees
+        self.next_index = 0
+
+    def append(self, observation, action, reward, terminal, training=True):\
+        #super() call adds to the deques that hold the most recent info, which is fed to the agent
+        #on agent.forward()
+        super(PrioritizedMemory, self).append(observation, action, reward, terminal, training=training)
+        if training:
+            self.observations.append(observation)
+            self.actions.append(action)
+            self.rewards.append(reward)
+            self.terminals.append(terminal)
+            #The priority of each new transition is set to the maximum
+            self.sum_tree[self.next_index] = self.max_priority ** self.alpha
+            self.min_tree[self.next_index] = self.max_priority ** self.alpha
+
+            #shift tree pointer index to keep it in sync with RingBuffers
+            self.next_index = (self.next_index + 1) % self.limit
+
+    def _sample_proportional(self, batch_size):
+        #outputs a list of idxs to sample, based on their priorities.
+        idxs = list()
+
+        for _ in range(batch_size):
+            mass = random.random() * self.sum_tree.sum(0, self.limit - 1)
+            idx = self.sum_tree.find_prefixsum_idx(mass)
+            idxs.append(idx)
+
+        return idxs
+
+    def sample(self, batch_size, beta=1.):
+        idxs = self._sample_proportional(batch_size)
+
+        #importance sampling weights are a stability measure
+        importance_weights = list()
+
+        #The lowest-priority experience defines the maximum importance sampling weight
+        prob_min = self.min_tree.min() / self.sum_tree.sum()
+        max_importance_weight = (prob_min * self.nb_entries)  ** (-beta)
+        obs_t, act_t, rews, obs_t1, dones = [], [], [], [], []
+
+        experiences = list()
+        for idx in idxs:
+            while idx < self.window_length + 1:
+                idx += 1
+
+            terminal0 = self.terminals[idx - 2]
+            while terminal0:
+                # Skip this transition because the environment was reset here. Select a new, random
+                # transition and use this instead. This may cause the batch to contain the same
+                # transition twice.
+                idx = sample_batch_indexes(self.window_length + 1, self.nb_entries, size=1)[0]
+                terminal0 = self.terminals[idx - 2]
+
+            assert self.window_length + 1 <= idx < self.nb_entries
+
+            #probability of sampling transition is the priority of the transition over the sum of all priorities
+            prob_sample = self.sum_tree[idx] / self.sum_tree.sum()
+            importance_weight = (prob_sample * self.nb_entries) ** (-beta)
+            #normalize weights according to the maximum value
+            importance_weights.append(importance_weight/max_importance_weight)
+
+            # Code for assembling stacks of observations and dealing with episode boundaries is borrowed from
+            # SequentialMemory
+            state0 = [self.observations[idx - 1]]
+            for offset in range(0, self.window_length - 1):
+                current_idx = idx - 2 - offset
+                assert current_idx >= 1
+                current_terminal = self.terminals[current_idx - 1]
+                if current_terminal and not self.ignore_episode_boundaries:
+                    # The previously handled observation was terminal, don't add the current one.
+                    # Otherwise we would leak into a different episode.
+                    break
+                state0.insert(0, self.observations[current_idx])
+            while len(state0) < self.window_length:
+                state0.insert(0, zeroed_observation(state0[0]))
+            action = self.actions[idx - 1]
+            reward = self.rewards[idx - 1]
+            terminal1 = self.terminals[idx - 1]
+            state1 = [np.copy(x) for x in state0[1:]]
+            state1.append(self.observations[idx])
+
+            assert len(state0) == self.window_length
+            assert len(state1) == len(state0)
+            experiences.append(Experience(state0=state0, action=action, reward=reward,
+                                          state1=state1, terminal1=terminal1))
+        assert len(experiences) == batch_size
+
+        # Return a tuple whre the first batch_size items are the transititions
+        # while -2 is the importance weights of those transitions and -1 is
+        # the idxs of the buffer (so that we can update priorities later)
+        return tuple(list(experiences)+ [importance_weights, idxs])
+
+    def update_priorities(self, idxs, priorities):
+        #adjust priorities based on new TD error
+        for i, idx in enumerate(idxs):
+            assert 0 <= idx < self.limit
+            priority = priorities[i] ** self.alpha
+            self.sum_tree[idx] = priority
+            self.min_tree[idx] = priority
+            self.max_priority = max(self.max_priority, priority)
+
+    def calculate_beta(self, current_step):
+        a = float(self.end_beta - self.start_beta) / float(self.steps_annealed)
+        b = float(self.start_beta)
+        current_beta = min(self.end_beta, a * float(current_step) + b)
+        return current_beta
+
+    def get_config(self):
+        config = super(PrioritizedMemory, self).get_config()
+        config['alpha'] = self.alpha
+        config['start_beta'] = self.start_beta
+        config['end_beta'] = self.end_beta
+        config['beta_steps_annealed'] = self.steps_annealed
+
+    @property
+    def nb_entries(self):
+        """Return number of observations
+        # Returns
+            Number of observations
+        """
+        return len(self.observations)

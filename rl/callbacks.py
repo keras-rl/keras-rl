@@ -141,8 +141,9 @@ class TrainEpisodeLogger(Callback):
         """ Print training time at end of training """
         duration = timeit.default_timer() - self.train_start
         print('done, took {:.3f} seconds'.format(duration))
-        with open(self.filepath,'a') as f:
-            f.write("WALL CLOCK TIME: " + str(duration))
+        if self.filepath != None:
+            with open(self.filepath,'a') as f:
+                f.write("WALL CLOCK TIME: " + str(duration))
 
     def on_episode_begin(self, episode, logs):
         """ Reset environment variables at beginning of each episode """
@@ -199,10 +200,11 @@ class TrainEpisodeLogger(Callback):
         print(template.format(**variables))
 
         try:
-            with open(self.filepath, 'a') as f:
-                line = [str(variables[key]) + "," for key in sorted(variables.keys())]
-                f.write(str(line).replace(',','').replace('[','').replace(']','').strip())
-                f.write('\n')
+            if self.filepath != None:
+                with open(self.filepath, 'a') as f:
+                    line = [str(variables[key]) + "," for key in sorted(variables.keys())]
+                    f.write(str(line).replace(',','').replace('[','').replace(']','').strip())
+                    f.write('\n')
         finally:
             # Free up resources.
             del self.episode_start[episode]

@@ -3,8 +3,6 @@ import argparse
 from PIL import Image
 import numpy as np
 import gym
-import sys
-sys.path.append('..')
 from keras.models import Model
 from keras.layers import Flatten, Convolution2D, Input
 from keras.optimizers import Adam

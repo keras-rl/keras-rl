@@ -1,11 +1,11 @@
 sudo: required
-dist: trusty
+dist: xenial
 language: python
 matrix:
     include:
-        - python: 3.5
+        - python: 3.6
           env: KERAS_BACKEND=theano
-        - python: 3.5
+        - python: 3.6
           env: KERAS_BACKEND=tensorflow
         - python: 2.7
           env: KERAS_BACKEND=theano
@@ -15,11 +15,11 @@ matrix:
           env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8
         - python: 2.7
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
-        - python: 3.5
+        - python: 3.6
           env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
         - python: 2.7
           env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
-        - python: 3.5
+        - python: 3.6
           env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
 install:
   # Adopted from https://github.com/fchollet/keras/blob/master/.travis.yml.
@@ -37,7 +37,6 @@ install:
   - conda info -a
 
   - conda create -q -n test-environment python=$TRAVIS_PYTHON_VERSION numpy matplotlib pandas pytest h5py
-  - conda upgrade --all
   - source activate test-environment
   - pip install pytest-xdist
   # See https://github.com/pytest-dev/pytest-cov/issues/124 for details

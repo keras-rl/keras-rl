@@ -3,7 +3,7 @@ import operator
 from keras.models import model_from_config, Sequential, Model, model_from_config
 import keras.optimizers as optimizers
 import keras.backend as K
-
+import time
 
 def clone_model(model, custom_objects={}):
     # Requires Keras 1.0.7 since get_config has breaking changes.
@@ -247,3 +247,74 @@ class MinSegmentTree(SegmentTree):
         """Returns min(arr[start], ...,  arr[end])"""
 
         return super(MinSegmentTree, self).reduce(start, end)
+
+def record_demo_data(env_name, max_steps, frame_delay=0.03, env_seed=123, data_filepath='expert_demo_data.npy',**kwargs):
+    """
+    Basic script for recording your own demonstration gameplay in a gym environment. Modified
+    gym keyboard agent.
+
+    **kwargs are arguments for render function, which can vary by environment type. (For
+    example, Box2D envs require mode = 'human').
+    """
+    import gym
+    env = gym.make(env_name)
+    np.random.seed(env_seed)
+    env.seed(env_seed)
+    nb_actions = env.action_space.n
+
+    action = 0
+    human_wants_restart = False
+    human_sets_pause = False
+
+    def key_press(key, mod):
+        nonlocal action, human_sets_pause, human_wants_restart
+        if key==0xff0d: human_wants_restart = True
+        if key==32: human_sets_pause = not human_sets_pause
+        a = int( key - ord('0') )
+        if a <= 0 or a >= nb_actions: return
+        action = a
+
+    def key_release(key, mod):
+        nonlocal action
+        a = int( key - ord('0') )
+        if a <= 0 or a >= nb_actions: return
+        if action == a:
+            action = 0
+
+    env.render(**kwargs)
+    env.unwrapped.viewer.window.on_key_press = key_press
+    env.unwrapped.viewer.window.on_key_release = key_release
+
+    print("ACTIONS={}".format(nb_actions))
+    print("Press keys 1 2 3 ... to take actions 1 2 3 ...")
+    print("No keys pressed is taking action 0")
+
+    transitions = []
+    obser = env.reset()
+    total_reward = 0
+    total_timesteps = 0
+
+    while total_timesteps < max_steps:
+        if total_timesteps % 100 == 0:
+            print("Steps Elapsed: " + str(total_timesteps))
+        act = action
+        obs, r, done, info = env.step(act)
+        transitions.append([obs, act, r, done])
+        total_timesteps += 1
+        env.render(**kwargs)
+        if done:
+            env.reset()
+        if human_wants_restart:
+                transitions = []
+                total_timesteps = 0
+        while human_sets_pause:
+            env.render(**kwargs)
+            time.sleep(0.1)
+        #Gym runs the environments fast by default. Tweak the frame_delay parameter to adjust play speed.
+        time.sleep(frame_delay)
+
+    data_matrix = np.array(transitions)
+    np.save(data_filepath, data_matrix)
+
+def load_demo_data_from_file(data_filepath='expert_demo_data.npy'):
+    return np.load(data_filepath)

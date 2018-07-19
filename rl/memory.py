@@ -490,3 +490,210 @@ class PrioritizedMemory(Memory):
             Number of observations
         """
         return len(self.observations)
+
+class PartitionedRingBuffer(object):
+    """
+    Ring Buffer with a section that can be sampled from but never overwritten.
+    """
+    def __init__(self, maxlen):
+        self.maxlen = maxlen
+        self.length = 0
+        self.data = [None for _ in range(maxlen)]
+        self.permanent_idx = 0
+        self.next_idx = 0
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= self.length:
+            raise KeyError()
+        return self.data[idx % self.maxlen]
+
+    def append(self, v):
+        if self.length < self.maxlen:
+            self.length += 1
+        self.data[(self.permanent_idx + self.next_idx)] = v
+        self.next_idx = (self.next_idx + 1) % (self.maxlen - self.permanent_idx)
+
+    def load(self, load_data):
+        assert len(load_data) < self.maxlen, "Must leave space to write new data."
+        for idx, data in enumerate(load_data):
+            self.length += 1
+            self.data[idx] = data
+            self.permanent_idx += 1
+
+
+class PartitionedMemory(Memory):
+    def __init__(self, limit, pre_load_data, alpha=.4, start_beta=1., end_beta=1., steps_annealed=1, **kwargs):
+        super(PartitionedMemory, self).__init__(**kwargs)
+
+        #The capacity of the replay buffer
+        self.limit = limit
+
+        #Transitions are stored in individual PartitionedRingBuffers.
+        self.actions = PartitionedRingBuffer(limit)
+        self.rewards = PartitionedRingBuffer(limit)
+        self.terminals = PartitionedRingBuffer(limit)
+        self.observations = PartitionedRingBuffer(limit)
+
+        assert alpha >= 0
+        #how aggressively to sample based on TD error
+        self.alpha = alpha
+        #how aggressively to compensate for that sampling.
+        self.start_beta = start_beta
+        self.end_beta = end_beta
+        self.steps_annealed = steps_annealed
+
+        #SegmentTrees need a leaf count that is a power of 2
+        tree_capacity = 1
+        while tree_capacity < self.limit:
+            tree_capacity *= 2
+
+        #Create SegmentTrees with this capacity
+        self.sum_tree = SumSegmentTree(tree_capacity)
+        self.min_tree = MinSegmentTree(tree_capacity)
+        self.max_priority = 1.
+
+        #unpack the expert transitions (assumes order recorded by the rl.utils.record_demo_data() method)
+        demo_obs, demo_acts, demo_rews, demo_ts = [], [], [], []
+        self.pre_load_data = pre_load_data
+        for demo in self.pre_load_data:
+            demo_obs.append(demo[0])
+            demo_acts.append(demo[1])
+            demo_rews.append(demo[2])
+            demo_ts.append(demo[3])
+
+        #pre-load the demonstration data
+        self.observations.load(demo_obs)
+        self.actions.load(demo_acts)
+        self.rewards.load(demo_rews)
+        self.terminals.load(demo_ts)
+
+        self.permanent_idx = self.observations.permanent_idx
+        assert self.permanent_idx == self.rewards.permanent_idx
+
+        self.next_index = 0
+
+        for idx in range(self.permanent_idx):
+            self.sum_tree[idx] = (self.max_priority ** self.alpha)
+            self.min_tree[idx] = (self.max_priority ** self.alpha)
+
+    def append(self, observation, action, reward, terminal, training=True):
+        #super() call adds to the deques that hold the most recent info, which is fed to the agent
+        #on agent.forward()
+        super(PartitionedMemory, self).append(observation, action, reward, terminal, training=training)
+        if training:
+            self.observations.append(observation)
+            self.actions.append(action)
+            self.rewards.append(reward)
+            self.terminals.append(terminal)
+            #The priority of each new transition is set to the maximum
+            self.sum_tree[self.next_index + self.permanent_idx] = self.max_priority ** self.alpha
+            self.min_tree[self.next_index + self.permanent_idx] = self.max_priority ** self.alpha
+            #shift tree pointer index to keep it in sync with RingBuffers
+            self.next_index = ((self.next_index + 1) % (self.limit - self.permanent_idx))
+
+    def _sample_proportional(self, batch_size):
+        #outputs a list of idxs to sample, based on their priorities.
+        idxs = list()
+
+        for _ in range(batch_size):
+            mass = random.random() * self.sum_tree.sum(0, self.limit - 1)
+            idx = self.sum_tree.find_prefixsum_idx(mass)
+            idxs.append(idx)
+
+        return idxs
+
+    def sample(self, batch_size, beta=1.):
+        idxs = self._sample_proportional(batch_size)
+
+        #importance sampling weights are a stability measure
+        importance_weights = list()
+
+        #The lowest-priority experience defines the maximum importance sampling weight
+        prob_min = self.min_tree.min() / self.sum_tree.sum()
+        max_importance_weight = (prob_min * self.nb_entries)  ** (-beta)
+        obs_t, act_t, rews, obs_t1, dones = [], [], [], [], []
+
+        experiences = list()
+        for idx in idxs:
+            while idx < self.window_length + 1:
+                idx += 1
+
+            terminal0 = self.terminals[idx - 2]
+            while terminal0:
+                # Skip this transition because the environment was reset here. Select a new, random
+                # transition and use this instead. This may cause the batch to contain the same
+                # transition twice.
+                idx = sample_batch_indexes(self.window_length + 1, self.nb_entries, size=1)[0]
+                terminal0 = self.terminals[idx - 2]
+
+            assert self.window_length + 1 <= idx < self.nb_entries
+
+            #probability of sampling transition is the priority of the transition over the sum of all priorities
+            prob_sample = self.sum_tree[idx] / self.sum_tree.sum()
+            importance_weight = (prob_sample * self.nb_entries) ** (-beta)
+            #normalize weights according to the maximum value
+            importance_weights.append(importance_weight/max_importance_weight)
+
+            state0 = [self.observations[idx - 1]]
+            for offset in range(0, self.window_length - 1):
+                current_idx = idx - 2 - offset
+                assert current_idx >= 1
+                current_terminal = self.terminals[current_idx - 1]
+                if current_terminal and not self.ignore_episode_boundaries:
+                    # The previously handled observation was terminal, don't add the current one.
+                    # Otherwise we would leak into a different episode.
+                    break
+                state0.insert(0, self.observations[current_idx])
+            while len(state0) < self.window_length:
+                state0.insert(0, zeroed_observation(state0[0]))
+            action = self.actions[idx - 1]
+            reward = self.rewards[idx - 1]
+            terminal1 = self.terminals[idx - 1]
+            state1 = [np.copy(x) for x in state0[1:]]
+            state1.append(self.observations[idx])
+
+            assert len(state0) == self.window_length
+            assert len(state1) == len(state0)
+            experiences.append(Experience(state0=state0, action=action, reward=reward,
+                                          state1=state1, terminal1=terminal1))
+        assert len(experiences) == batch_size
+
+        return tuple(list(experiences)+ [importance_weights, idxs])
+
+    def update_priorities(self, idxs, priorities):
+        #adjust priorities based on new TD error
+        for i, idx in enumerate(idxs):
+            assert 0 <= idx < self.limit
+            #expert transition priorities receive an extra boost
+            if idx < self.permanent_idx:
+                priority = (priorities[i] ** self.alpha) + .999
+            else:
+                priority = (priorities[i] ** self.alpha)
+            self.sum_tree[idx] = priority
+            self.min_tree[idx] = priority
+            self.max_priority = max(self.max_priority, priority)
+
+    def calculate_beta(self, current_step):
+        a = float(self.end_beta - self.start_beta) / float(self.steps_annealed)
+        b = float(self.start_beta)
+        current_beta = min(self.end_beta, a * float(current_step) + b)
+        return current_beta
+
+    def get_config(self):
+        config = super(PrioritizedMemory, self).get_config()
+        config['alpha'] = self.alpha
+        config['start_beta'] = self.start_beta
+        config['end_beta'] = self.end_beta
+        config['beta_steps_annealed'] = self.steps_annealed
+        config['pre_load_data'] = self.pre_load_data
+
+    @property
+    def nb_entries(self):
+        """Return number of observations
+        # Returns
+            Number of observations
+        """
+        return len(self.observations)

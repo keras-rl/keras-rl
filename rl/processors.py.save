@@ -44,29 +44,25 @@ class MultiInputProcessor(Processor):
         """Handles dict-like observations"""
         names = state_batch[0][0].keys()
         ordered_dict = dict()
-        # print('state batch shape', state_batch.shape)
-        # print(state_batch[0][13])
-        # for state in state_batch[0]: print('\n state shape:', state.shape)
+        print('state batch shape', state_batch.shape)
+        print(state_batch[0][14]['boat'])
+        for state in state_batch[0]: print('\n state shape:', state.shape)
         for key in names: 
             # order = np.zeros((len(state_batch), 
             #                   state_batch[0][0][key].shape[0], 
             #                   state_batch[0][0][key].shape[1], 
             #                   state_batch[0][0][key].shape[2]))
             dim = len(state_batch[0][0][key].shape)
-            # order_dim = (len(state_batch),)
-            order_dim = state_batch.shape
+            order_dim = (len(state_batch),)
             for dim_count in range(dim): order_dim = order_dim + (state_batch[0][0][key].shape[dim_count],)
             order = np.zeros(order_dim)
 
 
-            # missinglayer=0 
-            for idx_state in range(len(state_batch)): 
-                for idx_window in range(state_batch.shape[1]): 
-                    for i in range(order.shape[2]): 
-                        # print(idx_state, idx_window, i)
-                        # print(state_batch[idx_state][idx_window][key][i])
-                        assert len(state_batch[idx_state][idx_window]) == self.nb_inputs
-                        order[idx_state, idx_window, i] = state_batch[idx_state][idx_window][key][i][0]
+            missinglayer=0 
+            for j in range(len(state_batch)): 
+                for i in range(order.shape[1]): 
+                    assert len(state_batch[j][missinglayer]) == self.nb_inputs
+                    order[j, i] = state_batch[j][missinglayer][key][i][0]
             ordered_dict[key] = order
         return ordered_dict
 

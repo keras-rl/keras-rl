@@ -1,4 +1,4 @@
-# This code is inspired from OpenAI's implementation of vec_env
+# This code is inspired from OpenAI baseline's implementation of vec_env
 
 from abc import ABC, abstractmethod
 

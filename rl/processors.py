@@ -1,6 +1,6 @@
 
 
-
+import sys
 import numpy as np
 
 from rl.core import Processor
@@ -28,8 +28,11 @@ class MultiInputProcessor(Processor):
     def process_state_batch(self, state_batch):
         input_batches = [[] for x in range(self.nb_inputs)]
         if hasattr(state_batch, 'shape'): 
+            print(type(state_batch[0][0]), state_batch[0].shape)
+            if isinstance(state_batch[0][0], np.ndarray): print(state_batch[0][0])
             if state_batch.shape >= (1,1):
-                if isinstance(state_batch[0][0], dict): return self.handle_dict(state_batch) 
+                if isinstance(state_batch[0][0], dict): return self.handle_dict(state_batch, warmup=True) 
+                if isinstance(state_batch[0][0][0], dict): return self.handle_dict(state_batch) 
         for state in state_batch:
             processed_state = [[] for x in range(self.nb_inputs)]
             for observation in state:
@@ -40,7 +43,7 @@ class MultiInputProcessor(Processor):
                 input_batches[idx].append(s)
         return [np.array(x) for x in input_batches]
 
-    def handle_dict(self,state_batch):
+    def handle_dict(self,state_batch, warmup=False):
         """Handles dict-like observations"""
         names = state_batch[0][0].keys()
         ordered_dict = dict()

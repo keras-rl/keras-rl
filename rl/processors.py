@@ -28,11 +28,12 @@ class MultiInputProcessor(Processor):
     def process_state_batch(self, state_batch):
         input_batches = [[] for x in range(self.nb_inputs)]
         if hasattr(state_batch, 'shape'): 
-            print(type(state_batch[0][0]), state_batch[0].shape)
-            if isinstance(state_batch[0][0], np.ndarray): print(state_batch[0][0])
+            print(type(state_batch[0][0]), state_batch.shape)
+            if isinstance(state_batch[0][0], np.ndarray): 
+                a = state_batch[0][0].item()
             if state_batch.shape >= (1,1):
-                if isinstance(state_batch[0][0], dict): return self.handle_dict(state_batch, warmup=True) 
-                if isinstance(state_batch[0][0][0], dict): return self.handle_dict(state_batch) 
+                if isinstance(state_batch[0][0], dict): return self.handle_dict(state_batch) 
+                if isinstance(state_batch[0][0].item(), dict): return self.handle_dict(state_batch) 
         for state in state_batch:
             processed_state = [[] for x in range(self.nb_inputs)]
             for observation in state:
@@ -45,32 +46,23 @@ class MultiInputProcessor(Processor):
 
     def handle_dict(self,state_batch, warmup=False):
         """Handles dict-like observations"""
+
+        # if warmup: 
         names = state_batch[0][0].keys()
         ordered_dict = dict()
-        # print('state batch shape', state_batch.shape)
-        # print(state_batch[0][13])
-        # for state in state_batch[0]: print('\n state shape:', state.shape)
         for key in names: 
-            # order = np.zeros((len(state_batch), 
-            #                   state_batch[0][0][key].shape[0], 
-            #                   state_batch[0][0][key].shape[1], 
-            #                   state_batch[0][0][key].shape[2]))
             dim = len(state_batch[0][0][key].shape)
-            # order_dim = (len(state_batch),)
             order_dim = state_batch.shape
             for dim_count in range(dim): order_dim = order_dim + (state_batch[0][0][key].shape[dim_count],)
             order = np.zeros(order_dim)
 
-
-            # missinglayer=0 
             for idx_state in range(len(state_batch)): 
                 for idx_window in range(state_batch.shape[1]): 
                     for i in range(order.shape[2]): 
-                        # print(idx_state, idx_window, i)
-                        # print(state_batch[idx_state][idx_window][key][i])
                         assert len(state_batch[idx_state][idx_window]) == self.nb_inputs
                         order[idx_state, idx_window, i] = state_batch[idx_state][idx_window][key][i][0]
             ordered_dict[key] = order
+
         return ordered_dict
 
 class WhiteningNormalizerProcessor(Processor):

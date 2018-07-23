@@ -29,9 +29,11 @@ class MultiInputProcessor(Processor):
         input_batches = [[] for x in range(self.nb_inputs)]
         if hasattr(state_batch, 'shape'): 
             if state_batch.shape >= (1,1):
-                if isinstance(state_batch[0][0], dict): return self.handle_dict(state_batch) 
+                if isinstance(state_batch[0][0], dict): 
+                    return self.handle_dict(state_batch) 
                 if state_batch[0][0].ndim == 0: 
-                    if isinstance(state_batch[0][0].item(), dict): return self.handle_dict(state_batch) 
+                    if isinstance(state_batch[0][0].item(), dict): 
+                        return self.handle_dict(state_batch) 
         for state in state_batch:
             processed_state = [[] for x in range(self.nb_inputs)]
             for observation in state:
@@ -45,17 +47,18 @@ class MultiInputProcessor(Processor):
     def handle_dict(self,state_batch, warmup=False):
         """Handles dict-like observations"""
 
-        # if not isinstance(state_batch[0][0], dict) and isinstance(state_batch[0][0].item(), dict): 
         for i in range(state_batch.shape[0]): 
             for j in range(state_batch.shape[1]): 
-                if isinstance(state_batch[i][j], np.ndarray): state_batch[i][j] = state_batch[i][j].item()
+                if isinstance(state_batch[i][j], np.ndarray): 
+                    state_batch[i][j] = state_batch[i][j].item()
 
         names = state_batch[0][0].keys()
         ordered_dict = dict()
         for key in names: 
             dim = len(state_batch[0][0][key].shape)
             order_dim = state_batch.shape
-            for dim_count in range(dim): order_dim = order_dim + (state_batch[0][0][key].shape[dim_count],)
+            for dim_count in range(dim): 
+                order_dim = order_dim + (state_batch[0][0][key].shape[dim_count],)
             order = np.zeros(order_dim)
 
             for idx_state in range(len(state_batch)): 

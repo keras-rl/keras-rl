@@ -192,9 +192,6 @@ class TrainEpisodeLogger(Callback):
         }
         print(template.format(**variables))
 
-        # with open('log.dat', 'a') as f: 
-        #     f.write('\n{episode_reward:6.3f} {reward_mean:6.3f} {reward_min:6.3f} {reward_max:6.3f} {action_mean:7.3f} {action_min:7.3f} {action_max:7.3f}'.format(**variables))
-
         # Free up resources.
         del self.episode_start[episode]
         del self.observations[episode]

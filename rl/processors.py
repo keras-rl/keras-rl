@@ -41,13 +41,12 @@ class MultiInputProcessor(Processor):
                 input_batches[idx].append(s)
         return [np.array(x) for x in input_batches]
 
-    def handle_dict(self,state_batch, warmup=False):
+    def handle_dict(self,state_batch):
         """Handles dict-like observations"""
-
-        for i in range(state_batch.shape[0]): 
-            for j in range(state_batch.shape[1]): 
-                if isinstance(state_batch[i][j], np.ndarray): 
-                    state_batch[i][j] = state_batch[i][j].item()
+        # for i in range(state_batch.shape[0]): 
+        #     for j in range(state_batch.shape[1]): 
+        #         if isinstance(state_batch[i][j], np.ndarray): 
+        #             state_batch[i][j] = state_batch[i][j].item()
 
         names = state_batch[0][0].keys()
         ordered_dict = dict()

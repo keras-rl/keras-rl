@@ -321,7 +321,7 @@ class DQNAgent(AbstractDQNAgent):
             # Finally, perform a single update on the entire batch. We use a dummy target since
             # the actual loss is computed in a Lambda layer that needs more complex input. However,
             # it is still useful to know the actual target to compute metrics properly.
-            ins = [state0_batch] if type(self.model.input) is not list else state0_batch
+            ins = [state0_batch] if type(self.model.input) is  list else state0_batch
             if isinstance(ins, dict): 
                 ins.update({'y_true': targets, 'mask': masks})
             else: 

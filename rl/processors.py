@@ -61,7 +61,7 @@ class MultiInputProcessor(Processor):
                 for idx_window in range(state_batch.shape[1]): 
                     for i in range(order.shape[2]): 
                         assert len(state_batch[idx_state][idx_window]) == self.nb_inputs
-                        order[idx_state, idx_window, i] = state_batch[idx_state][idx_window][key][i][0]
+                        order[idx_state, idx_window, i] = state_batch[idx_state][idx_window][key][i]
             ordered_dict[key] = order
 
         return ordered_dict

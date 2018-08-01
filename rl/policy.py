@@ -117,6 +117,26 @@ class LinearAnnealedPolicy(Policy):
         config['inner_policy'] = get_object_config(self.inner_policy)
         return config
 
+class SoftmaxPolicy(Policy):
+    """ Implement softmax policy for multinimial distribution
+
+    Simple Policy
+
+    - takes action according to the pobability distribution
+
+    """
+    def select_action(self, probs):
+        """Return the selected action
+
+        # Arguments
+            probs (np.ndarray) : Probabilty for each action
+        
+        # Returns
+            action
+
+        """
+        action = np.random.choice(range(nb_actions), p=probs)
+        return action
 
 class EpsGreedyQPolicy(Policy):
     """Implement the epsilon greedy policy

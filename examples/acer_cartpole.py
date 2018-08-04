@@ -2,6 +2,7 @@ import numpy as np
 import gym
 import copy
 
+from keras import backend as K
 from keras.models import Sequential, Model
 from keras.layers import Dense, Activation, Flatten, Input, Concatenate
 from keras.optimizers import Adam
@@ -19,23 +20,21 @@ env.seed(123)
 nb_actions = env.action_space.n
 obs_shape = env.observation_space.shape
 
-# Defining Model
-inputs = Input(shape=obs_shape, name='inputs')
+# sess = tf.Session()
+# K.set_session(sess)
 
+# Defining Model
+inputs = Input(shape=(obs_shape,), name='inputs')
 x = Dense(32, activation='relu')(inputs)
-x = Dense(32, activation='relu')(x)
+x = Dense(16, activation='relu')(x)
 
 # Actor and Critic Model
 actor_output = Dense(nb_actions, activation='softmax')(x)
-critic_output = Dense(nb_actions)(x)
+critic_output = Dense(nb_actions, activation='linear')(x)
 
-actor = Model(inputs=[inputs], outputs=actor_output)
-critic = Model(inputs=[inputs], outputs=critic_output)
+model = Model(inputs=[inputs], outputs=[critic_output, actor_output])
 
-avg_actor_model = copy.deepcopy(actor)
-avg_critic_model = copy.deepcopy(critic)
-
-agent = ACERAgent(actor, critic, avg_actor_model, avg_critic_model)
+agent = ACERAgent(model, nb_actions)
 
 # TODO : Check the implementation of Episodic Memory
 memory = EpisodeMemory(env, nsteps=20)
@@ -47,3 +46,4 @@ agent = ACERAgent()
 agent.fit()
 
 # TODO : Save weights and do a simple test
+# TODO : Add tensorflow optimizer

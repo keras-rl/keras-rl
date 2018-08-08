@@ -27,7 +27,7 @@ class MultiInputProcessor(Processor):
         if hasattr(state_batch, 'shape'):
             if state_batch.shape >= (1,1):
                 if isinstance(state_batch[0][0], dict):
-                    return self.handle_dict(state_batch) 
+                    return self.handle_dict(state_batch)
                 if state_batch[0][0].ndim == 0:
                     if isinstance(state_batch[0][0].item(), dict):
                         return self.handle_dict(state_batch) 
@@ -43,7 +43,7 @@ class MultiInputProcessor(Processor):
 
     def handle_dict(self,state_batch):
         """Handles dict-like observations"""
-        
+
         names = state_batch[0][0].keys()
         ordered_dict = dict()
         for key in names:

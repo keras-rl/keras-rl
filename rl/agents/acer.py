@@ -80,22 +80,24 @@ class ACERAgent(Agent):
         self.nb_warmup_steps = 40
         # Model        
 
-        self.model, _ , _ = self.make_model(self.nsteps, model_fn)
+        self.model, _, _ = self.make_model(self.nsteps, model_fn)
+        self.average_model, _, _ = self.make_model(self.nsteps, model_fn)
         self.step_model, self.step_model_input, self.step_model_output = self.make_model(1, model_fn, 'step_input')
         self.step_fn = self.make_step_function()
         self.update_step_model_weights()
+        self.update_average_model_weights()
 
         self.nbatch = self.nenvs * self.nsteps
         self.trajectory = []
+        self.trust_region = True
         
         self.t_start = 0
 
         self.terminal = False
-
         self.compiled = False
         self.reset_states()
 
-@property
+    @property
     def uses_learning_phase(self):
         return self.model.uses_learning_phase
 
@@ -118,12 +120,13 @@ class ACERAgent(Agent):
         print (K.backend())
         inp = self.model.input
         Q, mus = self.model(inp)
+        _, avg_mus = self.average_model(inp)
 
         old_mus = K.placeholder(shape=(self.nbatch, self.nb_actions))
         A = K.placeholder(shape=[self.nbatch], dtype='int32')
         R = K.placeholder(shape=[self.nbatch])
         D = K.placeholder(shape=[self.nbatch])
-        rho = mus/old_mus
+        rho = mus/(old_mus + self.eps)
 
         V = K.mean(mus*Q, axis=1, keepdims=False)
 
@@ -152,17 +155,24 @@ class ACERAgent(Agent):
 
         # Add Entropy
         entropy = -K.mean(K.sum(K.log(mus)*mus, axis=1))
+        kl = K.sum(-avg_mus * (K.log(mus + self.eps) - K.log(avg_mus+ self.eps)), axis=-1)
 
         loss_policy -= self.entropy_weight*entropy
         loss_value = 0.5 * K.mean(K.square(K.stop_gradient(Qret) - Q_i))
-
+        if self.trust_region:
+            g = K.gradients(loss_policy * self.nsteps * self.nenvs, mus)
+            k = - avg_mus / (mus + self.eps)
+            k_dot_g = K.sum(k*g, axis=-1)
+            k_dot_k = K.sum(k*k, axis=-1)
+            coeffs = K.relu((k_dot_g - self.trust_region_thresold)/k_dot_k)
+            trust_err = K.mean(K.stop_gradient(coeffs) * kl)
+            loss_policy += trust_err
+        
         total_loss = loss_policy + self.value_weight*loss_value
 
         inputs = [inp]
         inputs = inputs + [old_mus, A, R, D]
-        # metrics = returns(R)
         metrics = K.mean(f_i * R)
-
         # Add trust region
 
         updates = self.optimizer.get_updates(total_loss, self.model.trainable_weights)
@@ -175,7 +185,7 @@ class ACERAgent(Agent):
             if self.uses_learning_phase:
                 inputs += [K.learning_phase()]
             self.train_fn = K.function(inputs, [metrics], updates=updates)
-        print ('Agent Compiled')
+        # print ('Agent Compiled')
         self.compiled = True
 
     def make_model(self, nsteps, model_fn, name=None):
@@ -187,14 +197,22 @@ class ACERAgent(Agent):
             return model_fn(inp, name)
 
     def make_step_function(self):
-        # inp = self.step_model.input
-        # out = self.step_model(inp)
         return K.function(inputs=self.step_model_input, outputs=self.step_model_output)
 
     def update_step_model_weights(self):
         self.step_model.set_weights(self.model.get_weights())
 
-    
+    def update_average_model_weights(self):
+        model_weights = self.model.get_weights()
+        average_model_weights = self.average_model.get_weights()
+        assert len(model_weights) == len(average_model_weights)
+        weights = []
+        for i in range(len(model_weights)):
+            w = model_weights[i] * (1 -self.trust_region_decay) +\
+                average_model_weights[i] * self.trust_region_decay
+            weights.append(w)
+        self.average_model.set_weights(weights)
+
     def forward(self, observation):
         # Select an action.
         state = np.asarray([observation], dtype=np.float32)
@@ -279,5 +297,6 @@ class ACERAgent(Agent):
                 D.append(self.trajectory[i].done)
             self.train_fn([obs, old_mus, A, R, D])
             self.update_step_model_weights()
+            self.update_average_model_weights()
             self.trajectory = []
         return metrics

@@ -95,10 +95,10 @@ def zeroed_observation(observation):
     """
     if hasattr(observation, 'shape'):
         return np.zeros(observation.shape)
-    if isinstance(observation, dict): 
+    if isinstance(observation, dict):
         keys = observation.keys()
         obs = dict()
-        for key in keys: 
+        for key in keys:
             obs[key] = np.zeros(observation[key].shape)
         return obs
     elif hasattr(observation, '__iter__'):

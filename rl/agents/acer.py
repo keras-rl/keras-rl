@@ -120,8 +120,8 @@ class ACERAgent(Agent):
 
         self.model.metrics_names = ['Avg_Rewards']
 
-        print ('Compiling the Agent')
-        print (K.backend())
+        # print ('Compiling the Agent')
+        # print (K.backend())
         inp = self.model.input
         Q, mus = self.model(inp)
         _, avg_mus = self.average_model(inp)

@@ -30,7 +30,7 @@ class MultiInputProcessor(Processor):
                     return self.handle_dict(state_batch)
                 if state_batch[0][0].ndim == 0:
                     if isinstance(state_batch[0][0].item(), dict):
-                        return self.handle_dict(state_batch) 
+                        return self.handle_dict(state_batch)
         for state in state_batch:
             processed_state = [[] for x in range(self.nb_inputs)]
             for observation in state:

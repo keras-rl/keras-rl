@@ -125,7 +125,7 @@ class SoftmaxPolicy(Policy):
     - takes action according to the pobability distribution
 
     """
-    def select_action(self, probs):
+    def select_action(self, nb_actions, probs):
         """Return the selected action
 
         # Arguments

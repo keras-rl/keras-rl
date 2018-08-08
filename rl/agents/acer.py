@@ -9,10 +9,10 @@ import keras.optimizers as optimizers
 
 from rl.core import Agent
 from rl.util import *
-from time import time
+from time import time, sleep
 
 # TODO : Add different warnings and exceptions
-
+# TODO : change episodic memory implementation
 Transition = namedtuple('Transition', ('state', 'action', 'reward', 'done', 'mus'))
 
 def returns(R):
@@ -50,36 +50,41 @@ def get_by_index(x, idx, shape=None):
     return y
 
 class ACERAgent(Agent):
-    def __init__(self, model_fn, nb_actions, obs_shape, policy, gamma=0.99, nenvs=1, memory_interval=1,
-                 on_policy=False, replay_ratio = 4, num_process=1, replay_start=200, nb_warmup_steps = 40,
-                 trace_decay=1, trace_max=10, trust_region=True, trust_region_decay=0.99, 
-                 trust_region_thresold = 1., nsteps = 20, eps= 1e-5,
-                 entropy_weight = 1e-4, value_weight = 0.5,max_gradient_norm = 40, **kwargs):
+    def __init__(self, memory, model_fn, nb_actions, obs_shape, policy, gamma=0.99, nenvs=1, memory_interval=1,
+                 batch_size = 4, on_policy=False, replay_ratio = 4, replay_start=2000, max_gradient_norm = 40,
+                 nb_warmup_steps = 40, trace_decay=1, trace_max=10, trust_region=True, trust_region_decay=0.99, 
+                 trust_region_thresold = 1., nsteps = 20, eps= 1e-5, entropy_weight = 1e-4, value_weight = 0.5,
+                 **kwargs):
         super(ACERAgent, self).__init__(**kwargs)         
 
-        # Parameters
+        # Parameters        
         self.nb_actions = nb_actions
         self.obs_shape = obs_shape
-        self.gamma = gamma
         self.policy = policy
+        self.gamma = gamma
+        self.nenvs = nenvs
+        self.nsteps = nsteps
+        self.memory_interval = memory_interval
+        self.batch_size = batch_size
         self.on_policy = on_policy
         self.replay_ratio = replay_ratio
         self.replay_start = replay_start
-        self.num_process = num_process
+        self.nb_warmup_steps = nb_warmup_steps
+
+        # ACER specific parameters
+        self.max_gradient_norm = max_gradient_norm
+        self.trust_region = trust_region
         self.trace_max = trace_max
         self.trace_decay = trace_decay
         self.trust_region_decay = trust_region_decay
         self.trust_region_thresold = trust_region_thresold
         self.entropy_weight = entropy_weight
         self.value_weight = value_weight
-        self.max_gradient_norm = max_gradient_norm
-        self.nsteps = nsteps
-        self.nenvs = nenvs
         self.eps = eps
-        self.memory_interval = memory_interval
-        self.nb_warmup_steps = 40
-        # Model        
 
+        # Model
+        self.memory = memory
+        self.model_fn = model_fn
         self.model, _, _ = self.make_model(self.nsteps, model_fn)
         self.average_model, _, _ = self.make_model(self.nsteps, model_fn)
         self.step_model, self.step_model_input, self.step_model_output = self.make_model(1, model_fn, 'step_input')
@@ -89,10 +94,9 @@ class ACERAgent(Agent):
 
         self.nbatch = self.nenvs * self.nsteps
         self.trajectory = []
-        self.trust_region = True
         
+        # State
         self.t_start = 0
-
         self.terminal = False
         self.compiled = False
         self.reset_states()
@@ -155,10 +159,11 @@ class ACERAgent(Agent):
 
         # Add Entropy
         entropy = -K.mean(K.sum(K.log(mus)*mus, axis=1))
-        kl = K.sum(-avg_mus * (K.log(mus + self.eps) - K.log(avg_mus+ self.eps)), axis=-1)
 
-        loss_policy -= self.entropy_weight*entropy
-        loss_value = 0.5 * K.mean(K.square(K.stop_gradient(Qret) - Q_i))
+        # Define KL divergence
+        kl = K.sum(-avg_mus * (K.log(mus + self.eps) - K.log(avg_mus+ self.eps)), axis=1)
+        
+        # Add trust region
         if self.trust_region:
             g = K.gradients(loss_policy * self.nsteps * self.nenvs, mus)
             k = - avg_mus / (mus + self.eps)
@@ -167,24 +172,27 @@ class ACERAgent(Agent):
             coeffs = K.relu((k_dot_g - self.trust_region_thresold)/k_dot_k)
             trust_err = K.mean(K.stop_gradient(coeffs) * kl)
             loss_policy += trust_err
+
+
+        loss_policy -= self.entropy_weight*entropy
+        loss_value = 0.5 * K.mean(K.square(K.stop_gradient(Qret) - Q_i))
         
         total_loss = loss_policy + self.value_weight*loss_value
 
         inputs = [inp]
         inputs = inputs + [old_mus, A, R, D]
-        metrics = K.mean(f_i * R)
-        # Add trust region
+        # metrics = K.mean(f_i * R)
 
         updates = self.optimizer.get_updates(total_loss, self.model.trainable_weights)
 
         # Finally, combine it all into a callable function.
         if K.backend() == 'tensorflow':
             self.train_fn = K.function(inputs + [K.learning_phase()],
-                                       [metrics], updates=updates)
+                                       [total_loss], updates=updates)
         else:
             if self.uses_learning_phase:
                 inputs += [K.learning_phase()]
-            self.train_fn = K.function(inputs, [metrics], updates=updates)
+            self.train_fn = K.function(inputs, [total_loss], updates=updates)
         # print ('Agent Compiled')
         self.compiled = True
 
@@ -246,6 +254,8 @@ class ACERAgent(Agent):
         self.recent_observation = None
         if self.compiled:
             self.model.reset_states()
+            self.average_model.reset_states()
+            self.step_model.reset_states()
 
     @property
     def layers(self):
@@ -259,8 +269,6 @@ class ACERAgent(Agent):
         return names
 
     def backward(self, reward, terminal=False):
-
-
         metrics = [np.nan for _ in self.metrics_names]
 
         if not self.training:
@@ -282,21 +290,43 @@ class ACERAgent(Agent):
             self.terminal = True
         
         # Use this for learning from experience replay
-        can_train_either = self.step > self.nb_warmup_steps
+        can_learn_from_memory = self.step > self.replay_start and (not self.on_policy)
 
         if self.t_start % self.nsteps == 0:
-            assert len(self.trajectory) == self.nsteps
-            obs, old_mus, A, R, D = [], [], [], [], []
-            for i in range(len(self.trajectory)):
-                action = self.trajectory[i].action
-                obs.append(self.trajectory[i].state)
-                # TODO : Add off policy
-                old_mus.append(self.trajectory[i].mus)
-                A.append(action)
-                R.append(self.trajectory[i].reward)
-                D.append(self.trajectory[i].done)
-            self.train_fn([obs, old_mus, A, R, D])
-            self.update_step_model_weights()
-            self.update_average_model_weights()
-            self.trajectory = []
+            self.memory.put(self.trajectory)
+            # Learn on_policy
+            self.learn_from_trajectory()
+            if can_learn_from_memory:
+                # Learn off policy
+                self.learn_from_memory()
+                # sleep(10)
+
         return metrics
+
+    def learn_from_trajectory(self, trajectory=None): 
+        # If trajectory is None, we will learn from recent experience
+        # Else we will learn from the memory batch       
+        if trajectory is None:
+            trajectory = self.trajectory
+            self.trajectory = []
+        
+        assert len(trajectory) == self.nsteps
+        obs, old_mus, A, R, D = [], [], [], [], []
+        for i in range(len(trajectory)):
+            action = trajectory[i].action
+            obs.append(trajectory[i].state)
+            old_mus.append(trajectory[i].mus)
+            A.append(action)
+            R.append(trajectory[i].reward)
+            D.append(trajectory[i].done)
+        self.train_fn([obs, old_mus, A, R, D])
+        self.update_step_model_weights()
+        self.update_average_model_weights()
+        self.trajectory = []        
+
+    def learn_from_memory(self):
+        n = np.random.poisson(self.replay_ratio)
+        for _ in range(n):
+            batch = self.memory.get(self.batch_size)
+            for trajectory in batch:
+                self.learn_from_trajectory(trajectory)

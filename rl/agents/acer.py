@@ -109,7 +109,7 @@ class ACERAgent(Agent):
 
         if type(optimizer) in (list, tuple):
             if len(optimizer) >= 2:
-                raise ValueError('More than one optimizers provided. Please only provide a single optimizer.')            
+                raise ValueError('More than one optimizers provided. Please only provide a single optimizer.')
         else:
             self.optimizer = optimizer
         if type(optimizer) is str:
@@ -135,6 +135,7 @@ class ACERAgent(Agent):
         V = K.mean(mus*Q, axis=1, keepdims=False)
 
         Q_i = get_by_index(Q, A)
+        # Note shape is sent to deal with the no shape error in keras (theano)
         rho_i = get_by_index(rho, A, shape=(self.nbatch, self.nb_actions))
 
         Qret = q_retrace(R, D, Q_i, V, rho_i, self.gamma)
@@ -172,7 +173,6 @@ class ACERAgent(Agent):
             coeffs = K.relu((k_dot_g - self.trust_region_thresold)/k_dot_k)
             trust_err = K.mean(K.stop_gradient(coeffs) * kl)
             loss_policy += trust_err
-
 
         loss_policy -= self.entropy_weight*entropy
         loss_value = 0.5 * K.mean(K.square(K.stop_gradient(Qret) - Q_i))
@@ -322,7 +322,6 @@ class ACERAgent(Agent):
         self.train_fn([obs, old_mus, A, R, D])
         self.update_step_model_weights()
         self.update_average_model_weights()
-        self.trajectory = []        
 
     def learn_from_memory(self):
         n = np.random.poisson(self.replay_ratio)

@@ -1,3 +1,6 @@
+import os
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"] = ""
 import numpy as np
 import gym
 import copy
@@ -9,6 +12,7 @@ from keras.optimizers import Adam
 
 from rl.agents import ACERAgent
 from rl.episode_memory import EpisodeMemory
+from rl.policy import SoftmaxPolicy
 
 ENV_NAME = 'CartPole-v0'
 
@@ -25,29 +29,26 @@ nsteps = 20
 # K.set_session(sess)
 
 # Defining Model
-shape = (nenvs * nsteps,) + obs_shape
-inp = K.placeholder(shape=shape)
-inputs = Input(tensor=inp, name='inputs')
-x = Dense(32, activation='relu')(inputs)
-x = Dense(16, activation='relu')(x)
 
-# Actor and Critic Model
-actor_output = Dense(nb_actions, activation='softmax')(x)
-critic_output = Dense(nb_actions, activation='linear')(x)
+def model_fn(inp, name='inputs'):
+	inps = Input(tensor=inp, name=name)
+	x = Dense(32, activation='relu')(inps)
+	x = Dense(16, activation='relu')(x)
 
-model = Model(inputs=[inputs], outputs=[critic_output, actor_output])
+	# Actor and Critic Model
+	actor_output = Dense(nb_actions, activation='softmax')(x)
+	critic_output = Dense(nb_actions, activation='linear')(x)
 
-print(K.backend())
-agent = ACERAgent(model, nb_actions, nenvs=nenvs)
+	inputs = [inps]
+	outputs = [critic_output, actor_output]
+	model = Model(inputs=inputs, outputs=outputs)
+	return model, inputs, outputs
+
+policy = SoftmaxPolicy()
+agent = ACERAgent(model_fn, nb_actions, obs_shape, policy=policy, nenvs=nenvs)
 
 # TODO : Check the implementation of Episodic Memory
 # memory = EpisodeMemory(env, nsteps=20)
-
 agent.compile('sgd')
-# TODO : Add the arguements
 
-# TODO : Add the arguements
-# agent.fit(env, 20)
-
-# TODO : Save weights and do a simple test
-# TODO : Add tensorflow optimizer
+agent.fit(env, 1000000)

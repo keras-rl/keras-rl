@@ -130,6 +130,8 @@ class DQNAgent(AbstractDQNAgent):
             # y[:,0] represents V(s;theta)
             # y[:,1:] represents A(s,a;theta)
             y = Dense(nb_action + 1, activation='linear')(layer.output)
+            if type(layer) == NoisyNetDense:
+                y = NoisyNetDense(nb_action + 1, activation='linear')(layer.output)
             # caculate the Q(s,a;theta)
             # dueling_type == 'avg'
             # Q(s,a;theta) = V(s;theta) + (A(s,a;theta)-Avg_a(A(s,a;theta)))
@@ -655,6 +657,9 @@ class DQfDAgent(AbstractDQNAgent):
             layer = model.layers[-2]
             nb_action = model.output._keras_shape[-1]
             y = Dense(nb_action + 1, activation='linear')(layer.output)
+            #preserve use of noisy nets.
+            if type(layer) == NoisyNetDense:
+                y = NoisyNetDense(nb_action + 1, activation='linear')(layer.output)
             # options for dual-stream merger
             if self.dueling_type == 'avg':
                 outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.mean(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
@@ -711,11 +716,11 @@ class DQfDAgent(AbstractDQNAgent):
             j_n *= importance_weights
             j_n = K.sum(j_n, axis=-1)
             #Large margin supervised classification loss
-            Q_a = y_true * agent_actions
-            Q_ae = y_true * mask
-            j_e = huber_loss(Q_a + l, Q_ae, self.delta_clip)
+            Q_a = y_pred * agent_actions
+            Q_ae = y_pred * mask
+            j_e =  lam_2 * K.square(Q_a + l - Q_ae)
             j_e = K.sum(j_e, axis=-1)
-            # in Keras, j_l2 from the paper is implemented as a part of the network itself (using regularizers.l2 with a value of 1e-4)
+            # in Keras, j_l2 from the paper is implemented as a part of the network itself (using regularizers.l2)
             return j_dq + j_n + j_e
 
         y_pred = self.model.output
@@ -884,13 +889,13 @@ class DQfDAgent(AbstractDQNAgent):
             for i, idx in enumerate(pr_idxs):
                 if idx < self.memory.permanent_idx:
                     #this is an expert demonstration
+                    #and enable supervised loss for this action
+                    lam_2[i,:] = self.lam_2
                     for j in range(expert_actions.shape[1]):
                         if expert_actions[i,j] == 1:
                             if agent_actions[i,j] != 1:
                                 #if agent and expert had different predictions, increase l
                                 l[i,j] = self.large_margin
-                                #and enable supervised loss for this action
-                                lam_2[i,j] = self.lam_2
                 else:
                     #we revert non-expert transitions back to the action that is stored in the replay buffer.
                     #action choices are typically static in DQNs (off-policy), but DQfD complicates things by comparing the

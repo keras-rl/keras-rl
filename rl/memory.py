@@ -334,6 +334,39 @@ class EpisodeParameterMemory(Memory):
         config['limit'] = self.limit
         return config
 
+class PartitionedRingBuffer(object):
+    """
+    Buffer with a section that can be sampled from but never overwritten.
+    Used for demonstration data (DQfD). Can be used without a partition,
+    where it would function as a fixed-idxs variant of RingBuffer.
+    """
+    def __init__(self, maxlen):
+        self.maxlen = maxlen
+        self.length = 0
+        self.data = [None for _ in range(maxlen)]
+        self.permanent_idx = 0
+        self.next_idx = 0
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, idx):
+        if idx < 0 or idx >= self.length:
+            raise KeyError()
+        return self.data[idx % self.maxlen]
+
+    def append(self, v):
+        if self.length < self.maxlen:
+            self.length += 1
+        self.data[(self.permanent_idx + self.next_idx)] = v
+        self.next_idx = (self.next_idx + 1) % (self.maxlen - self.permanent_idx)
+
+    def load(self, load_data):
+        assert len(load_data) < self.maxlen, "Must leave space to write new data."
+        for idx, data in enumerate(load_data):
+            self.length += 1
+            self.data[idx] = data
+            self.permanent_idx += 1
 
 class PrioritizedMemory(Memory):
     def __init__(self, limit, alpha=.4, start_beta=1., end_beta=1., steps_annealed=1, **kwargs):
@@ -343,11 +376,10 @@ class PrioritizedMemory(Memory):
         self.limit = limit
 
         #Transitions are stored in individual RingBuffers, similar to the SequentialMemory.
-        #This does complicate things a bit relative to the OpenAI baseline implementation.
-        self.actions = RingBuffer(limit)
-        self.rewards = RingBuffer(limit)
-        self.terminals = RingBuffer(limit)
-        self.observations = RingBuffer(limit)
+        self.actions = PartitionedRingBuffer(limit)
+        self.rewards = PartitionedRingBuffer(limit)
+        self.terminals = PartitionedRingBuffer(limit)
+        self.observations = PartitionedRingBuffer(limit)
 
         assert alpha >= 0
         #how aggressively to sample based on TD error
@@ -490,38 +522,6 @@ class PrioritizedMemory(Memory):
             Number of observations
         """
         return len(self.observations)
-
-class PartitionedRingBuffer(object):
-    """
-    Ring Buffer with a section that can be sampled from but never overwritten.
-    """
-    def __init__(self, maxlen):
-        self.maxlen = maxlen
-        self.length = 0
-        self.data = [None for _ in range(maxlen)]
-        self.permanent_idx = 0
-        self.next_idx = 0
-
-    def __len__(self):
-        return self.length
-
-    def __getitem__(self, idx):
-        if idx < 0 or idx >= self.length:
-            raise KeyError()
-        return self.data[idx % self.maxlen]
-
-    def append(self, v):
-        if self.length < self.maxlen:
-            self.length += 1
-        self.data[(self.permanent_idx + self.next_idx)] = v
-        self.next_idx = (self.next_idx + 1) % (self.maxlen - self.permanent_idx)
-
-    def load(self, load_data):
-        assert len(load_data) < self.maxlen, "Must leave space to write new data."
-        for idx, data in enumerate(load_data):
-            self.length += 1
-            self.data[idx] = data
-            self.permanent_idx += 1
 
 
 class PartitionedMemory(Memory):

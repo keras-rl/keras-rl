@@ -61,7 +61,6 @@ class RingBuffer(object):
         """
         if idx < 0 or idx >= self.length():
             raise KeyError()
-        # return self.data[(self.start + idx) % self.maxlen]
         return self.data[idx]
 
     def append(self, v):

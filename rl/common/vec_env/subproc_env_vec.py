@@ -1,7 +1,7 @@
 import numpy as np
 from multiprocessing import Process, Pipe
 from rl.common.vec_env import VecEnv, CloudpickleWrapper
-
+from rl.common.tile_images import tile_images
 
 def worker(remote, parent_remote, env_fn_wrapper):
     parent_remote.close()

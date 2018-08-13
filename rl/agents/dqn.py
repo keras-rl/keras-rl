@@ -105,7 +105,6 @@ class DQNAgent(AbstractDQNAgent):
         target_model_update__: How often to update the target model. Longer intervals stabilize training.
         train_interval__: The integer number of steps between each learning process.
         delta_clip__: A component of the huber loss.
-        n_step__: exponent for multi-step learning. Larger values extend the future reward approximations further into the future.
     """
     def __init__(self, model, policy=None, test_policy=None, enable_double_dqn=True, enable_dueling_network=False,
                  dueling_type='avg', *args, **kwargs):
@@ -728,7 +727,7 @@ class DQfDAgent(AbstractDQNAgent):
         mask = Input(name='mask', shape=(self.nb_actions,))
         importance_weights = Input(name='importance_weights',shape=(self.nb_actions,))
         agent_actions = Input(name='agent_actions',shape=(self.nb_actions,))
-        l = Input(name='large-margin-classification',shape=(self.nb_actions,))
+        l = Input(name='large-margin',shape=(self.nb_actions,))
         lam_2 = Input(name='lam_2',shape=(self.nb_actions,))
         loss_out = Lambda(dqfd_error, output_shape=(1,), name='loss')([y_true, y_true_n, y_pred, importance_weights, agent_actions, l, lam_2, mask])
         ins = [self.model.input] if type(self.model.input) is not list else self.model.input
@@ -838,7 +837,6 @@ class DQfDAgent(AbstractDQNAgent):
                 assert q_values.shape == (self.batch_size, self.nb_actions)
                 actions = np.argmax(q_values, axis=1)
                 assert actions.shape == (self.batch_size,)
-
                 # Now, estimate Q values using the target network but select the values with the
                 # highest Q value wrt to the online model (as computed above).
                 target_q_values = self.target_model.predict_on_batch(state1_batch)
@@ -912,14 +910,13 @@ class DQfDAgent(AbstractDQNAgent):
 
             for i, idx in enumerate(idxs):
                 if idx < self.memory.permanent_idx:
-                    #this is an expert demonstration
-                    #and enable supervised loss for this action
-                    for j in range(expert_actions.shape[1]):
-                        if expert_actions[i,j] == 1:
-                            if agent_actions[i,j] != 1:
+                    #this is an expert demonstration, enable supervised loss for this action
+                    lam_2[i,:] = self.lam_2
+                    for j in range(agent_actions.shape[1]):
+                        if agent_actions[i,j] == 1:
+                            if expert_actions[i,j] != 1:
                                 #if agent and expert had different predictions, increase l
                                 l[i,j] = self.large_margin
-                                lam_2[i,j] = self.lam_2
 
             ins = [state0_batch] if type(self.model.input) is not list else state0_batch
             metrics = self.trainable_model.train_on_batch(ins + [targets, targets_n, importance_weights, agent_actions, l, lam_2, masks], [dummy_targets, targets])

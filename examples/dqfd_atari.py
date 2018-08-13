@@ -36,7 +36,7 @@ class AtariDQfDProcessor(Processor):
 
     def process_reward(self, reward):
         return np.clip(reward, -1., 1.)
-        #return np.sign(reward) * np.log(1 + abs(reward)) #(used in paper)
+        #return np.sign(reward) * np.log(1 + abs(reward)) (used in paper)
 
     def process_demo_data(self, demo_data):
         #Important addition from dqn example
@@ -79,7 +79,7 @@ policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., valu
 
 dqfd = DQfDAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
                processor=processor, enable_double_dqn=True, enable_dueling_network=True, gamma=.99, target_model_update=10000,
-               train_interval=4, delta_clip=1., pretraining_steps=750000)
+               train_interval=4, delta_clip=1., pretraining_steps=750000, n_step=10)
 
 lr = .00025/4
 dqfd.compile(Adam(lr=lr), metrics=['mae'])
@@ -90,7 +90,7 @@ if args.mode == 'train':
     log_filename = 'dqfd_' + args.env_name + '_REWARD_DATA.txt'
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=500000)]
     callbacks += [TrainEpisodeLogger(log_filename)]
-    dqfd.fit(env, callbacks=callbacks, nb_steps=10000000, verbose=0, nb_max_episode_steps=20000)
+    dqfd.fit(env, callbacks=callbacks, nb_steps=10000000, verbose=0, nb_max_episode_steps=200000)
     dqfd.save_weights(weights_filename, overwrite=True)
 
 elif args.mode == 'test':
@@ -98,4 +98,4 @@ elif args.mode == 'test':
     if args.weights:
         weights_filename = args.weights
     dqfd.load_weights(weights_filename)
-    dqfd.test(env, nb_episodes=10, visualize=True, nb_max_start_steps=80)
+    dqfd.test(env, nb_episodes=10, visualize=True, nb_max_start_steps=30)

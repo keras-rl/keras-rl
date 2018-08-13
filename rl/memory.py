@@ -351,7 +351,7 @@ class PartitionedRingBuffer(object):
         return self.length
 
     def __getitem__(self, idx):
-        if idx < 0 or idx >= self.length:
+        if idx < 0:
             raise KeyError()
         return self.data[idx % self.maxlen]
 
@@ -594,7 +594,7 @@ class PartitionedMemory(Memory):
             #shift tree pointer index to keep it in sync with RingBuffers
             self.next_index = ((self.next_index + 1) % (self.limit - self.permanent_idx))
 
-    def _sample_proportional(self, batch_size):
+    def sample_proportional(self, batch_size):
         #outputs a list of idxs to sample, based on their priorities.
         idxs = list()
 
@@ -605,9 +605,7 @@ class PartitionedMemory(Memory):
 
         return idxs
 
-    def sample(self, batch_size, beta=1.):
-        idxs = self._sample_proportional(batch_size)
-
+    def sample(self, idxs, batch_size, beta=1., nstep=1, gamma=1):
         #importance sampling weights are a stability measure
         importance_weights = list()
 
@@ -620,13 +618,16 @@ class PartitionedMemory(Memory):
         for idx in idxs:
             while idx < self.window_length + 1:
                 idx += 1
-
+            while idx + nstep > self.nb_entries and self.nb_entries < self.limit:
+                # We are fine with nstep spilling back to the beginning of the buffer
+                # once it has been filled.
+                idx -= 1
             terminal0 = self.terminals[idx - 2]
             while terminal0:
                 # Skip this transition because the environment was reset here. Select a new, random
                 # transition and use this instead. This may cause the batch to contain the same
                 # transition twice.
-                idx = sample_batch_indexes(self.window_length + 1, self.nb_entries, size=1)[0]
+                idx = sample_batch_indexes(self.window_length + 1, self.nb_entries - nstep, size=1)[0]
                 terminal0 = self.terminals[idx - 2]
 
             assert self.window_length + 1 <= idx < self.nb_entries
@@ -637,6 +638,7 @@ class PartitionedMemory(Memory):
             #normalize weights according to the maximum value
             importance_weights.append(importance_weight/max_importance_weight)
 
+            #assemble the initial state from the ringbuffer.
             state0 = [self.observations[idx - 1]]
             for offset in range(0, self.window_length - 1):
                 current_idx = idx - 2 - offset
@@ -649,11 +651,32 @@ class PartitionedMemory(Memory):
                 state0.insert(0, self.observations[current_idx])
             while len(state0) < self.window_length:
                 state0.insert(0, zeroed_observation(state0[0]))
+
             action = self.actions[idx - 1]
-            reward = self.rewards[idx - 1]
-            terminal1 = self.terminals[idx - 1]
-            state1 = [np.copy(x) for x in state0[1:]]
-            state1.append(self.observations[idx])
+            # N-step TD
+            reward = 0
+            nstep = nstep
+            for i in range(nstep):
+                reward += (gamma**i) * self.rewards[idx + i - 1]
+                if self.terminals[idx + i - 1]:
+                    #episode terminated before length of n-step rollout.
+                    nstep = i
+                    break
+
+            terminal1 = self.terminals[idx + nstep - 1]
+
+            state1 = [self.observations[idx + nstep - 1]]
+            for offset in range(0, self.window_length - 1):
+                current_idx = idx + nstep - 1 - offset
+                assert current_idx >= 1
+                current_terminal = self.terminals[current_idx - 1]
+                if current_terminal and not self.ignore_episode_boundaries:
+                    # The previously handled observation was terminal, don't add the current one.
+                    # Otherwise we would leak into a different episode.
+                    break
+                state1.insert(0, self.observations[current_idx])
+            while len(state1) < self.window_length:
+                state1.insert(0, zeroed_observation(state0[0]))
 
             assert len(state0) == self.window_length
             assert len(state1) == len(state0)

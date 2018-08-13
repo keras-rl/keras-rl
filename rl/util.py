@@ -248,13 +248,10 @@ class MinSegmentTree(SegmentTree):
 
         return super(MinSegmentTree, self).reduce(start, end)
 
-def record_demo_data(env_name, max_steps, frame_delay=0.03, env_seed=123, data_filepath='expert_demo_data.npy',**kwargs):
+def record_demo_data(env_name, max_steps, frame_delay=0.03, env_seed=123, data_filepath='expert_demo_data.npy'):
     """
     Basic script for recording your own demonstration gameplay in a gym environment. Modified
-    gym keyboard agent.
-
-    **kwargs are arguments for render function, which can vary by environment type. (For
-    example, Box2D envs require mode = 'human').
+    from gym keyboard agent.
     """
     import gym
     env = gym.make(env_name)
@@ -281,7 +278,7 @@ def record_demo_data(env_name, max_steps, frame_delay=0.03, env_seed=123, data_f
         if action == a:
             action = 0
 
-    env.render(**kwargs)
+    env.render(mode='human')
     env.unwrapped.viewer.window.on_key_press = key_press
     env.unwrapped.viewer.window.on_key_release = key_release
 
@@ -295,20 +292,20 @@ def record_demo_data(env_name, max_steps, frame_delay=0.03, env_seed=123, data_f
     total_timesteps = 0
 
     while total_timesteps < max_steps:
-        if total_timesteps % 100 == 0:
+        if total_timesteps % 1000 == 0:
             print("Steps Elapsed: " + str(total_timesteps))
         act = action
         obs, r, done, info = env.step(act)
         transitions.append([obs, act, r, done])
         total_timesteps += 1
-        env.render(**kwargs)
+        env.render(mode='human')
         if done:
             env.reset()
         if human_wants_restart:
                 transitions = []
                 total_timesteps = 0
         while human_sets_pause:
-            env.render(**kwargs)
+            env.render(mode='human')
             time.sleep(0.1)
         #Gym runs the environments fast by default. Tweak the frame_delay parameter to adjust play speed.
         time.sleep(frame_delay)

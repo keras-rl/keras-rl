@@ -108,7 +108,7 @@ class DQNAgent(AbstractDQNAgent):
         n_step__: exponent for multi-step learning. Larger values extend the future reward approximations further into the future.
     """
     def __init__(self, model, policy=None, test_policy=None, enable_double_dqn=True, enable_dueling_network=False,
-                 dueling_type='avg', n_step=1, *args, **kwargs):
+                 dueling_type='avg', *args, **kwargs):
         super(DQNAgent, self).__init__(*args, **kwargs)
 
 
@@ -150,7 +150,6 @@ class DQNAgent(AbstractDQNAgent):
 
             model = Model(inputs=model.input, outputs=outputlayer)
 
-        self.n_step = n_step
         # Related objects.
         self.model = model
         if policy is None:
@@ -344,12 +343,12 @@ class DQNAgent(AbstractDQNAgent):
 
             # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target targets accordingly,
             # but only for the affected output units (as given by action_batch).
-            discounted_reward_batch = (self.gamma **(self.n_step)) * q_batch
+            discounted_reward_batch = self.gamma * q_batch
             # Set discounted reward to zero for all states that were terminal.
             discounted_reward_batch *= terminal1_batch
             assert discounted_reward_batch.shape == reward_batch.shape
             #Putting together the multi-step target
-            Rs = (reward_batch **(self.n_step)) + discounted_reward_batch
+            Rs = reward_batch + discounted_reward_batch
 
             for idx, (target, mask, R, action) in enumerate(zip(targets, masks, Rs, action_batch)):
                 target[action] = R  # update action with estimated accumulated reward
@@ -793,7 +792,9 @@ class DQfDAgent(AbstractDQNAgent):
             # Calculations for current beta value based on a linear schedule.
             current_beta = self.memory.calculate_beta(self.step)
             # Sample from the memory.
-            experiences = self.memory.sample(self.batch_size, current_beta)
+            idxs = self.memory.sample_proportional(self.batch_size)
+            experiences_n = self.memory.sample(idxs, self.batch_size, current_beta, self.n_step, self.gamma)
+            experiences = self.memory.sample(idxs, self.batch_size, current_beta)
 
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             state0_batch = []
@@ -802,8 +803,6 @@ class DQfDAgent(AbstractDQNAgent):
             terminal1_batch = []
             state1_batch = []
             importance_weights = []
-            # We will be updating the idxs of the priority tree with new priorities
-            pr_idxs = []
             for e in experiences[:-2]: # Prioritized Replay returns Experience tuple + weights and idxs.
                 state0_batch.append(e.state0)
                 state1_batch.append(e.state1)
@@ -811,14 +810,25 @@ class DQfDAgent(AbstractDQNAgent):
                 action_batch.append(e.action)
                 terminal1_batch.append(0. if e.terminal1 else 1.)
             importance_weights = experiences[-2]
-            pr_idxs = experiences[-1]
+
+            state_batch_n = []
+            reward_batch_n = []
+            terminal_batch_n = []
+            for e in experiences_n[:-2]:
+                state_batch_n.append(e.state1)
+                reward_batch_n.append(e.reward)
+                terminal_batch_n.append(0. if e.terminal1 else 1.)
 
             # Prepare and validate parameters.
             state0_batch = self.process_state_batch(state0_batch)
             state1_batch = self.process_state_batch(state1_batch)
+            state_batch_n = self.process_state_batch(state_batch_n)
             terminal1_batch = np.array(terminal1_batch)
+            terminal_batch_n = np.array(terminal_batch_n)
             reward_batch = np.array(reward_batch)
+            reward_batch_n = np.array(reward_batch_n)
             assert reward_batch.shape == (self.batch_size,)
+            assert reward_batch_n.shape == (self.batch_size,)
             assert terminal1_batch.shape == reward_batch.shape
             assert len(action_batch) == len(reward_batch)
 
@@ -834,20 +844,35 @@ class DQfDAgent(AbstractDQNAgent):
                 target_q_values = self.target_model.predict_on_batch(state1_batch)
                 assert target_q_values.shape == (self.batch_size, self.nb_actions)
                 q_batch = target_q_values[range(self.batch_size), actions]
+
+                # Repeat this process for the n-step state.
+                q_values_n = self.model.predict_on_batch(state_batch_n)
+                assert q_values_n.shape == (self.batch_size, self.nb_actions)
+                actions_n = np.argmax(q_values_n, axis=1)
+                assert actions_n.shape == (self.batch_size,)
+                target_q_values_n = self.target_model.predict_on_batch(state_batch_n)
+                assert target_q_values_n.shape == (self.batch_size, self.nb_actions)
+                q_batch_n = target_q_values_n[range(self.batch_size), actions_n]
+
             else:
                 target_q_values = self.target_model.predict_on_batch(state1_batch)
                 assert target_q_values.shape == (self.batch_size, self.nb_actions)
                 q_batch = np.max(target_q_values, axis=1).flatten()
+                # Repeat this process for the n-step state.
+                target_q_values_n = self.target_model.predict_on_batch(state_batch_n)
+                assert target_q_values_n.shape == (self.batch_size, self.nb_actions)
+                q_batch_n = np.max(target_q_values_n, axis=1).flatten()
             assert q_batch.shape == (self.batch_size,)
+            assert q_batch_n.shape == (self.batch_size,)
 
             #Multi-step loss targets
             targets_n = np.zeros((self.batch_size, self.nb_actions))
             masks = np.zeros((self.batch_size, self.nb_actions))
             dummy_targets_n = np.zeros((self.batch_size,))
-            discounted_reward_batch_n = (self.gamma **(self.n_step)) * q_batch
-            discounted_reward_batch_n *= terminal1_batch
-            assert discounted_reward_batch_n.shape == reward_batch.shape
-            Rs_n = (reward_batch **(self.n_step)) + discounted_reward_batch_n
+            discounted_reward_batch_n = (self.gamma**self.n_step) * q_batch_n
+            discounted_reward_batch_n *= terminal_batch_n
+            assert discounted_reward_batch_n.shape == reward_batch_n.shape
+            Rs_n = reward_batch_n + discounted_reward_batch_n
             for idx, (target, mask, R, action) in enumerate(zip(targets_n, masks, Rs_n, action_batch)):
                 target[action] = R  # update action with estimated accumulated reward
                 dummy_targets_n[idx] = R
@@ -860,7 +885,7 @@ class DQfDAgent(AbstractDQNAgent):
             discounted_reward_batch = (self.gamma) * q_batch
             discounted_reward_batch *= terminal1_batch
             assert discounted_reward_batch.shape == reward_batch.shape
-            Rs = (reward_batch) + discounted_reward_batch
+            Rs = reward_batch + discounted_reward_batch
             for idx, (target, mask, R, action) in enumerate(zip(targets, masks, Rs, action_batch)):
                 target[action] = R  # update action with estimated accumulated reward
                 dummy_targets[idx] = R
@@ -877,7 +902,6 @@ class DQfDAgent(AbstractDQNAgent):
             y_pred = self.model.predict_on_batch(state0_batch)
             agent_actions = np.argmax(y_pred, axis=1)
             assert agent_actions.shape == (self.batch_size,)
-
             #one-hot encode actions, gives the shape needed to pass into the model
             agent_actions = np.eye(self.nb_actions)[agent_actions]
             expert_actions = masks
@@ -886,33 +910,28 @@ class DQfDAgent(AbstractDQNAgent):
             #lambda_2 is used to eliminate supervised loss for self-generated transitions
             lam_2 = np.zeros_like(expert_actions, dtype='float32')
 
-            for i, idx in enumerate(pr_idxs):
+            for i, idx in enumerate(idxs):
                 if idx < self.memory.permanent_idx:
                     #this is an expert demonstration
                     #and enable supervised loss for this action
-                    lam_2[i,:] = self.lam_2
                     for j in range(expert_actions.shape[1]):
                         if expert_actions[i,j] == 1:
                             if agent_actions[i,j] != 1:
                                 #if agent and expert had different predictions, increase l
                                 l[i,j] = self.large_margin
-                else:
-                    #we revert non-expert transitions back to the action that is stored in the replay buffer.
-                    #action choices are typically static in DQNs (off-policy), but DQfD complicates things by comparing the
-                    #choices of the agent to its expert demonstrations.
-                    agent_actions[i,:] = masks[i,:]
+                                lam_2[i,j] = self.lam_2
 
             ins = [state0_batch] if type(self.model.input) is not list else state0_batch
             metrics = self.trainable_model.train_on_batch(ins + [targets, targets_n, importance_weights, agent_actions, l, lam_2, masks], [dummy_targets, targets])
 
-            assert len(pr_idxs) == self.batch_size
+            assert len(idxs) == self.batch_size
             #Calculate new priorities.
             y_true = targets
             #Proportional method. Priorities are the abs TD error with a small positive constant to keep them from being 0.
             #Boost for expert transitions is handled in memory.PartitionedMemory.update_priorities
             new_priorities = (abs(np.sum(y_true - y_pred, axis=-1))) + .001
             assert len(new_priorities) == self.batch_size
-            self.memory.update_priorities(pr_idxs, new_priorities)
+            self.memory.update_priorities(idxs, new_priorities)
 
             metrics = [metric for idx, metric in enumerate(metrics) if idx not in (1, 2)]  # throw away individual losses
             metrics += self.policy.metrics

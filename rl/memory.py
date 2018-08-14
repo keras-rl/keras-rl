@@ -595,7 +595,13 @@ class PartitionedMemory(Memory):
             self.next_index = ((self.next_index + 1) % (self.limit - self.permanent_idx))
 
     def sample_proportional(self, batch_size):
-        #outputs a list of idxs to sample, based on their priorities.
+        """
+        Outputs a list of idxs to sample, based on their priorities.
+
+        This function is public in this memory (vs. private in Sequential and
+        Prioritized), because DQfD needs to be able to sample the same idxs
+        twice (single step and n-step).
+        """
         idxs = list()
 
         for _ in range(batch_size):
@@ -606,6 +612,11 @@ class PartitionedMemory(Memory):
         return idxs
 
     def sample(self, idxs, batch_size, beta=1., nstep=1, gamma=1):
+        """
+        Gathers transition data from the ring buffers. The PartitionedMemory
+        separates generating the idxs and returning their transitions, allowing
+        this method to be called multiple times with the same idxs.
+        """
         #importance sampling weights are a stability measure
         importance_weights = list()
 
@@ -665,6 +676,7 @@ class PartitionedMemory(Memory):
 
             terminal1 = self.terminals[idx + nstep - 1]
 
+            # We assemble the second state in a similar way.
             state1 = [self.observations[idx + nstep - 1]]
             for offset in range(0, self.window_length - 1):
                 current_idx = idx + nstep - 1 - offset

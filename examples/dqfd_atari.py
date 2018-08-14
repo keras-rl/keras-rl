@@ -13,7 +13,7 @@ from rl.policy import LinearAnnealedPolicy, EpsGreedyQPolicy
 from rl.memory import PartitionedMemory
 from rl.core import Processor
 from rl.callbacks import TrainEpisodeLogger, ModelIntervalCheckpoint
-from rl.util import load_demo_data_from_file
+from rl.util import load_demo_data_from_file, record_demo_data
 
 #We downsize the atari frame to 84 x 84 and feed the model 4 frames at a time for
 #a sense of direction and speed.
@@ -39,7 +39,7 @@ class AtariDQfDProcessor(Processor):
         #return np.sign(reward) * np.log(1 + abs(reward)) (used in paper)
 
     def process_demo_data(self, demo_data):
-        #Important addition from dqn example
+        #Important addition from dqn example.
         for step in demo_data:
             step[0] = self.process_observation(step[0])
             step[2] = self.process_reward(step[2])
@@ -71,7 +71,9 @@ model = Model(inputs=frame,outputs=buttons)
 print(model.summary())
 
 processor = AtariDQfDProcessor()
-expert_demo_data = processor.process_demo_data(load_demo_data_from_file('gopher_expert_5k.npy'))
+# record_demo_data('GopherDeterministic-v4', steps=50000, data_filepath='gopher_expert.npy', frame_delay=0.03)
+# Load and process the demonstration data.
+expert_demo_data = processor.process_demo_data(load_demo_data_from_file('gopher_expert.npy'))
 memory = PartitionedMemory(limit=1000000, pre_load_data=expert_demo_data, alpha=.4, start_beta=.6, end_beta=.6, window_length=WINDOW_LENGTH)
 
 policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.01, value_test=.05,
@@ -87,7 +89,7 @@ dqfd.compile(Adam(lr=lr), metrics=['mae'])
 if args.mode == 'train':
     weights_filename = 'dqfd_{}_weights.h5f'.format(args.env_name)
     checkpoint_weights_filename = 'dqfd_' + args.env_name + '_weights_{step}.h5f'
-    log_filename = 'dqfd_' + args.env_name + '_REWARD_DATA.txt'
+    log_filename = 'dqfd_' + args.env_name + '_REWARD_DATA.txt' #uses TrainEpisodeLogger csv (optional)
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=500000)]
     callbacks += [TrainEpisodeLogger(log_filename)]
     dqfd.fit(env, callbacks=callbacks, nb_steps=10000000, verbose=0, nb_max_episode_steps=200000)

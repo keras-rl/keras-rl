@@ -248,7 +248,7 @@ class MinSegmentTree(SegmentTree):
 
         return super(MinSegmentTree, self).reduce(start, end)
 
-def record_demo_data(env_name, max_steps, frame_delay=0.03, env_seed=123, data_filepath='expert_demo_data.npy'):
+def record_demo_data(env_name, steps, frame_delay=0.03, env_seed=123, data_filepath='expert_demo_data.npy'):
     """
     Basic script for recording your own demonstration gameplay in a gym environment. Modified
     from gym keyboard agent.
@@ -291,7 +291,7 @@ def record_demo_data(env_name, max_steps, frame_delay=0.03, env_seed=123, data_f
     total_reward = 0
     total_timesteps = 0
 
-    while total_timesteps < max_steps:
+    while total_timesteps < steps:
         if total_timesteps % 1000 == 0:
             print("Steps Elapsed: " + str(total_timesteps))
         act = action

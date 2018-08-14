@@ -810,6 +810,12 @@ class DQfDAgent(AbstractDQNAgent):
                 terminal1_batch.append(0. if e.terminal1 else 1.)
             importance_weights = experiences[-2]
 
+            # Get n-step versions. The state batch is the observation n steps
+            # after the state0 batch (or the first terminal state, whichever is first).
+            # The reward batch is the sum of discounted rewards between state0 and
+            # the state in the state_batch_n. Terminal batch is used to eliminate
+            # the target network's q values when the discounted rewards already extend
+            # to the end of the episode.
             state_batch_n = []
             reward_batch_n = []
             terminal_batch_n = []
@@ -908,6 +914,8 @@ class DQfDAgent(AbstractDQNAgent):
             #lambda_2 is used to eliminate supervised loss for self-generated transitions
             lam_2 = np.zeros_like(expert_actions, dtype='float32')
 
+            # Here we are building the large margin term, which is a matrix
+            # with a postiive entry where the agent and expert actions differ
             for i, idx in enumerate(idxs):
                 if idx < self.memory.permanent_idx:
                     #this is an expert demonstration, enable supervised loss for this action

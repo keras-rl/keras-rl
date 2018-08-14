@@ -56,7 +56,7 @@ cd keras-rl
 python setup.py install
 ```
 
-## Examples
+## Examples
 
 If you want to run the examples, you'll also have to install:
 - **gym** by OpenAI: [Installation instruction](https://github.com/openai/gym#installation)

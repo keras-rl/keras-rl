@@ -4,7 +4,7 @@ import warnings
 import timeit
 import json
 from tempfile import mkdtemp
-
+import os
 import numpy as np
 
 from keras import __version__ as KERAS_VERSION
@@ -135,6 +135,11 @@ class TrainEpisodeLogger(Callback):
         """ Print training values at beginning of training """
         self.train_start = timeit.default_timer()
         self.metrics_names = self.model.metrics_names
+        if self.filepath != None:
+            if os.path.exists(self.filepath):
+                #write over an older version (from a previous run)
+                f = open(self.filepath, 'w')
+                f.close()
         print('Training for {} steps ...'.format(self.params['nb_steps']))
 
     def on_train_end(self, logs):
@@ -395,5 +400,5 @@ class ModelIntervalCheckpoint(Callback):
         filepath = self.filepath.format(step=self.total_steps, **logs)
         if self.verbose > 0:
             print('Step {}: saving model to {}'.format(self.total_steps, filepath))
-            
+
         self.model.save_weights(filepath, overwrite=True)

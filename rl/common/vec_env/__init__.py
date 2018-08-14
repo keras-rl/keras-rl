@@ -1,3 +1,5 @@
+# Inspired from VecEnv from OpenAI Baselines
+
 class VecEnv(object):
     """
     An abstract asynchronous, vectorized environment.

@@ -1,3 +1,5 @@
+# Inspired from OpenAI Baselines
+
 import numpy as np
 from multiprocessing import Process, Pipe
 from rl.common.vec_env import VecEnv, CloudpickleWrapper
@@ -82,15 +84,4 @@ class SubprocVecEnv(VecEnv):
         self.closed = True
 
     def render(self, mode='human'):
-        for pipe in self.remotes:
-            pipe.send(('render', None))
-        imgs = [pipe.recv() for pipe in self.remotes]
-        bigimg = tile_images(imgs)
-        if mode == 'human':
-            import cv2
-            cv2.imshow('vecenv', bigimg[:,:,::-1])
-            cv2.waitKey(1)
-        elif mode == 'rgb_array':
-            return bigimg
-        else:
-            raise NotImplementedError
+        raise ValueError('Render is not implemented for Synchronous Environment')

@@ -25,6 +25,9 @@ def worker(remote, parent_remote, env_fn_wrapper):
             break
         elif cmd == 'get_spaces':
             remote.send((env.observation_space, env.action_space))
+        elif cmd == 'seed':
+            val = env.seed(data)
+            remote.send(val)
         else:
             raise NotImplementedError
 
@@ -85,3 +88,9 @@ class SubprocVecEnv(VecEnv):
 
     def render(self, mode='human'):
         raise NotImplementedError('Render is not implemented for Synchronous Environment')
+
+    def seed(self, i):
+        rank = i
+        for remote in self.remotes:
+            remote.send(('seed', rank))
+            rank += 1

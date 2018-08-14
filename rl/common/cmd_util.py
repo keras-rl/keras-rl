@@ -1,3 +1,5 @@
+# Inspired from OpenAI Baselines
+
 import gym
 from rl.common.vec_env.subproc_env_vec import SubprocVecEnv
 from rl.common import set_global_seeds

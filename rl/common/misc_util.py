@@ -1,3 +1,5 @@
+# Inspired from OpenAI Baselines
+
 import gym
 import numpy as np
 import random

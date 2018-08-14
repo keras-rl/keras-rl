@@ -84,4 +84,4 @@ class SubprocVecEnv(VecEnv):
         self.closed = True
 
     def render(self, mode='human'):
-        raise ValueError('Render is not implemented for Synchronous Environment')
+        raise NotImplementedError('Render is not implemented for Synchronous Environment')

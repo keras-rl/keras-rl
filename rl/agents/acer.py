@@ -19,7 +19,14 @@ def returns(R):
     assert (len(K.int_shape(R))==1)
     return K.mean(R, axis=0, keepdims=False)
 
-def q_retrace(R, D, q_i, v, rho_i, gamma):
+def convert_q_retrace_to_batch(val, nenvs, nsteps):
+    qret = []
+    for j in range(nenvs):
+        for i in range(nsteps):
+            qret.append(val[j][i])
+    return qret
+
+def q_retrace(R, D, q_i, v, rho_i, gamma, nenvs, nsteps):
     """
     Calculates q_retrace targets
     :param R: Rewards
@@ -32,14 +39,26 @@ def q_retrace(R, D, q_i, v, rho_i, gamma):
     assert (len(K.int_shape(R)) == 1)
     assert (len(K.int_shape(D)) == 1)
     rho_bar = K.clip(rho_i,min_value=0, max_value=1.0)
-    qrets = []
-    qret = v[-1] * (1 - D[-1])
-    l = K.int_shape(R)[0]
-    for i in reversed(range(l)):
-        qret = R[i] + gamma * qret * (1 - D[i])
-        qrets.append(qret)
-        qret = (rho_bar[i] * (qret - q_i[i])) + v[i]
-    return qrets
+
+    _R = K.reshape(R, shape=(nenvs, nsteps))
+    _D = K.reshape(D, shape=(nenvs, nsteps))
+    _q_i = K.reshape(q_i, shape=(nenvs, nsteps))
+    _v = K.reshape(v, shape=(nenvs, nsteps))
+    _rho_bar = K.reshape(rho_bar, shape=(nenvs, nsteps))
+
+    # qrets = np.zeros((nenvs, nsteps))
+    qrets = [[] for _ in range(nenvs)]
+
+    for j in range(nenvs):
+        qret = _v[j,-1] * (1 - _D[j,-1])
+        q = []
+        for i in reversed(range(nsteps)):
+            qret = _R[j][i] + gamma * qret * (1 - _D[j][i])
+            q.append(qret)
+            qret = (_rho_bar[j][i] * (qret - _q_i[j][i])) + _v[j][i]
+        qrets[j] = q
+    # print(len(qrets), len(qrets[0]))
+    return convert_q_retrace_to_batch(qrets, nenvs, nsteps)
 
 def get_by_index(x, idx, shape=None):
     if shape is None:
@@ -73,7 +92,7 @@ class ACERAgent(Agent):
 
         # ACER specific parameters
         self.max_gradient_norm = max_gradient_norm
-        self.trust_region = trust_region
+        self.trust_region = False
         self.trace_max = trace_max
         self.trace_decay = trace_decay
         self.trust_region_decay = trust_region_decay
@@ -93,7 +112,7 @@ class ACERAgent(Agent):
         self.update_average_model_weights()
 
         self.nbatch = self.nenvs * self.nsteps
-        self.trajectory = []
+        self.trajectory = [[] for _ in range(self.nenvs)]
         
         # State
         self.t_start = 0
@@ -132,13 +151,18 @@ class ACERAgent(Agent):
         D = K.placeholder(shape=[self.nbatch])
         rho = mus/(old_mus + self.eps)
 
-        V = K.mean(mus*Q, axis=1, keepdims=False)
+        V = K.mean(mus*Q, axis=-1, keepdims=False)
 
         Q_i = get_by_index(Q, A)
         # Note shape is sent to deal with the no shape error in keras (theano)
         rho_i = get_by_index(rho, A, shape=(self.nbatch, self.nb_actions))
 
-        Qret = q_retrace(R, D, Q_i, V, rho_i, self.gamma)
+        Qret = q_retrace(R, D, Q_i, V, rho_i, self.gamma, self.nenvs, self.nsteps)
+        assert len(Qret) == self.nbatch
+        # print(K.int_shape(Qret))
+        # sleep(10)
+        # Qret = K.reshape(Qret, shape=[self.nbatch])
+
         f_i = get_by_index(mus, A)
         # print ('Qret and f_i calculated')
 
@@ -223,14 +247,22 @@ class ACERAgent(Agent):
 
     def forward(self, observation):
         # Select an action.
-        state = np.asarray([observation], dtype=np.float32)
+        if (len(self.obs_shape) + 1) == len(observation.shape):
+            state = np.asarray(observation, dtype=np.float32)
+        elif (len(self.obs_shape)) == len(observation.shape):
+            state = np.asarray([observation], dtype=np.float32)
+        else:
+            raise ValueError('The dimention of state is inconsistent with the input dimention')
         _, mus = self.step_fn([state])
         self.recent_observation = observation
         # To deal with error : ValueError: probabilities do not sum to 1
-        self.recent_mus = mus[0]/sum(mus[0])
-        action = self.policy.select_action(self.nb_actions, self.recent_mus)
-        self.recent_action = action
-        return action
+        # Note the axis is 1
+        self.recent_mus = mus / np.sum(mus, axis=1, keepdims=True)
+        self.recent_action = []
+        for i in range(len(self.recent_mus)):
+            action = self.policy.select_action(self.nb_actions, self.recent_mus[i])
+            self.recent_action.append(action)
+        return self.recent_action
 
     @property
     def metrics_names(self):
@@ -274,20 +306,14 @@ class ACERAgent(Agent):
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
-            self.trajectory = []
+            self.trajectory = [[] for _ in range(self.nenvs)]
             return metrics
 
         if self.step % self.memory_interval == 0 or self.terminal:
-            if self.terminal:
-                self.terminal = False
-                return metrics
-            else:
-                self.trajectory.append(Transition(self.recent_observation, self.recent_action,
-                                       reward, terminal, self.recent_mus))
-                self.t_start = self.t_start + 1
-
-        if terminal:
-            self.terminal = True
+            for i in range(self.nenvs):
+                self.trajectory[i].append(Transition(self.recent_observation[i], self.recent_action[i],
+                                       reward[i], terminal[i], self.recent_mus[i]))
+            self.t_start = self.t_start + 1
         
         # Use this for learning from experience replay
         can_learn_from_memory = self.step > self.replay_start and (not self.on_policy)
@@ -308,17 +334,40 @@ class ACERAgent(Agent):
         # Else we will learn from the memory batch       
         if trajectory is None:
             trajectory = self.trajectory
-            self.trajectory = []
+            self.trajectory = [[] for _ in range(self.nenvs)]
         
-        assert len(trajectory) == self.nsteps
+        assert len(trajectory) == self.nenvs
         obs, old_mus, A, R, D = [], [], [], [], []
-        for i in range(len(trajectory)):
-            action = trajectory[i].action
-            obs.append(trajectory[i].state)
-            old_mus.append(trajectory[i].mus)
-            A.append(action)
-            R.append(trajectory[i].reward)
-            D.append(trajectory[i].done)
+        for traj in trajectory:
+            obs_t, old_mus_t, A_t, R_t, D_t = [], [], [], [], []
+            for i in range(len(traj)):
+                action = traj[i].action
+                obs_t.append(traj[i].state)
+                old_mus_t.append(traj[i].mus)
+                A_t.append(action)
+                R_t.append(traj[i].reward)
+                D_t.append(traj[i].done)
+            obs.append(obs_t)
+            old_mus.append(old_mus_t)
+            A.append(A_t)
+            R.append(R_t)
+            D.append(D_t)
+        
+        # Convert the list to numpy array
+        obs = np.asarray(obs)
+        old_mus = np.asarray(old_mus)
+        A = np.asarray(A, dtype=np.uint8)
+        R = np.asarray(R)
+        D = np.asarray(D)
+
+        # Reshape for suitable inputs
+        obs = np.reshape(obs, newshape=(self.nbatch,) + self.obs_shape)
+        old_mus = np.reshape(old_mus, newshape=(self.nbatch, self.nb_actions))
+        A = np.reshape(A, newshape=[self.nbatch])
+        R = np.reshape(R, newshape=[self.nbatch])
+        D = np.reshape(D, newshape=[self.nbatch])
+        # print obs.shape, old_mus.shape, A.shape, R.shape, D.shape
+        # Training in the model
         self.train_fn([obs, old_mus, A, R, D])
         self.update_step_model_weights()
         self.update_average_model_weights()

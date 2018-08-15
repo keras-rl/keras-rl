@@ -1,3 +1,6 @@
+# This memory specifically written for ACER agent.
+# For Sequential memory please visit memory.py in the rl folder.
+
 from collections import deque, namedtuple
 import numpy as np
 
@@ -17,7 +20,6 @@ class EpisodeMemory(object):
         assert l>batch_size, "Not enough experience stored. Store more samples"
         idx_batch = np.random.choice(len(self.memory), batch_size)
         batch = [val for i, val in enumerate(self.memory) if i in idx_batch] 
-        # batch = self.memory(random.randrange(batch_size))
         return batch
         
     def length(self):

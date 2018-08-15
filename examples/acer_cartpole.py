@@ -18,7 +18,7 @@ from keras.layers import Dense, Activation, Input, ReLU
 from keras.optimizers import Adam, SGD
 
 from rl.agents import ACERAgent
-from rl.episode_memory import EpisodeMemory
+from rl.agents.acer.episode_memory import EpisodeMemory
 from rl.policy import SoftmaxPolicy
 from rl.common.cmd_util import make_gym_env
 

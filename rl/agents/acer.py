@@ -56,7 +56,7 @@ def q_retrace(R, D, q_i, v, rho_i, gamma, nenvs, nsteps):
             qret = _R[j][i] + gamma * qret * (1 - _D[j][i])
             q.append(qret)
             qret = (_rho_bar[j][i] * (qret - _q_i[j][i])) + _v[j][i]
-        qrets[j] = q
+        qrets[j] = q[::-1]
     # print(len(qrets), len(qrets[0]))
     return convert_q_retrace_to_batch(qrets, nenvs, nsteps)
 
@@ -72,7 +72,7 @@ class ACERAgent(Agent):
     def __init__(self, memory, model_fn, nb_actions, obs_shape, policy, gamma=0.99, nenvs=1, memory_interval=1,
                  batch_size = 4, on_policy=False, replay_ratio = 4, replay_start=2000, max_gradient_norm = 40,
                  nb_warmup_steps = 40, trace_decay=1, trace_max=10, trust_region=True, trust_region_decay=0.99, 
-                 trust_region_thresold = 1., nsteps = 20, eps= 1e-5, entropy_weight = 1e-4, value_weight = 0.5,
+                 trust_region_thresold = 1., nsteps = 20, eps= 1e-5, entropy_weight = 1e-3, value_weight = 0.5,
                  **kwargs):
         super(ACERAgent, self).__init__(**kwargs)         
 
@@ -92,7 +92,7 @@ class ACERAgent(Agent):
 
         # ACER specific parameters
         self.max_gradient_norm = max_gradient_norm
-        self.trust_region = False
+        self.trust_region = trust_region
         self.trace_max = trace_max
         self.trace_decay = trace_decay
         self.trust_region_decay = trust_region_decay
@@ -154,14 +154,12 @@ class ACERAgent(Agent):
         V = K.mean(mus*Q, axis=-1, keepdims=False)
 
         Q_i = get_by_index(Q, A)
+
         # Note shape is sent to deal with the no shape error in keras (theano)
         rho_i = get_by_index(rho, A, shape=(self.nbatch, self.nb_actions))
 
         Qret = q_retrace(R, D, Q_i, V, rho_i, self.gamma, self.nenvs, self.nsteps)
         assert len(Qret) == self.nbatch
-        # print(K.int_shape(Qret))
-        # sleep(10)
-        # Qret = K.reshape(Qret, shape=[self.nbatch])
 
         f_i = get_by_index(mus, A)
         # print ('Qret and f_i calculated')
@@ -170,14 +168,14 @@ class ACERAgent(Agent):
         adv = Qret - V
         logf = K.log(f_i + self.eps)
         gain_f = logf * K.stop_gradient(adv * K.clip(rho_i, min_value=0, max_value=self.trace_max))
-        loss_f = -K.mean(gain_f)
+        loss_f = -K.sum(gain_f)
         # print ('Loss f calculated')
 
         # Bias correction for the truncation
         adv_bc = Q - K.reshape(V, (self.nbatch, 1))
         logf_bc = K.log(mus + self.eps)
-        gain_bc = K.sum(logf_bc * K.stop_gradient(adv_bc * K.relu(1. - self.trace_max / (rho + self.eps)) * mus), axis=1)
-        loss_bc = -K.mean(gain_bc)
+        gain_bc = K.sum(logf_bc * K.stop_gradient(adv_bc * K.relu(1. - self.trace_max / (rho + self.eps)) * mus), axis=-1)
+        loss_bc = -K.sum(gain_bc)
 
         loss_policy = loss_bc + loss_f
         # print ('policy loss calculated')
@@ -194,11 +192,14 @@ class ACERAgent(Agent):
             k = - avg_mus / (mus + self.eps)
             k_dot_g = K.sum(k*g, axis=-1)
             k_dot_k = K.sum(k*k, axis=-1)
-            coeffs = K.relu((k_dot_g - self.trust_region_thresold)/k_dot_k)
+            coeffs = K.relu((k_dot_g - self.trust_region_thresold)/(k_dot_k + self.eps))
             trust_err = K.mean(K.stop_gradient(coeffs) * kl)
             loss_policy += trust_err
 
         loss_policy -= self.entropy_weight*entropy
+        # print len(Qret)
+        # print Qret
+        # print (K.int_shape(Q_i), len(Qret))
         loss_value = 0.5 * K.mean(K.square(K.stop_gradient(Qret) - Q_i))
         
         total_loss = loss_policy + self.value_weight*loss_value
@@ -257,7 +258,7 @@ class ACERAgent(Agent):
         self.recent_observation = observation
         # To deal with error : ValueError: probabilities do not sum to 1
         # Note the axis is 1
-        self.recent_mus = mus / np.sum(mus, axis=1, keepdims=True)
+        self.recent_mus = mus
         self.recent_action = []
         for i in range(len(self.recent_mus)):
             action = self.policy.select_action(self.nb_actions, self.recent_mus[i])

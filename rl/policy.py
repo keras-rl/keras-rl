@@ -135,6 +135,10 @@ class SoftmaxPolicy(Policy):
             action
 
         """
+        # To remove the error related to sum not equal to 1
+        probs = probs/sum(probs)
+        if np.isnan(np.array(probs)).any():
+            print ('NaN found')
         action = np.random.choice(range(nb_actions), p=probs)
         return action
 

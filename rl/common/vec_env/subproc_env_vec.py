@@ -1,3 +1,5 @@
+# Inspired from OpenAI Baselines
+
 import numpy as np
 from multiprocessing import Process, Pipe
 from rl.common.vec_env import VecEnv, CloudpickleWrapper
@@ -23,6 +25,9 @@ def worker(remote, parent_remote, env_fn_wrapper):
             break
         elif cmd == 'get_spaces':
             remote.send((env.observation_space, env.action_space))
+        elif cmd == 'seed':
+            val = env.seed(data)
+            remote.send(val)
         else:
             raise NotImplementedError
 
@@ -82,15 +87,10 @@ class SubprocVecEnv(VecEnv):
         self.closed = True
 
     def render(self, mode='human'):
-        for pipe in self.remotes:
-            pipe.send(('render', None))
-        imgs = [pipe.recv() for pipe in self.remotes]
-        bigimg = tile_images(imgs)
-        if mode == 'human':
-            import cv2
-            cv2.imshow('vecenv', bigimg[:,:,::-1])
-            cv2.waitKey(1)
-        elif mode == 'rgb_array':
-            return bigimg
-        else:
-            raise NotImplementedError
+        raise NotImplementedError('Render is not implemented for Synchronous Environment')
+
+    def seed(self, i):
+        rank = i
+        for remote in self.remotes:
+            remote.send(('seed', rank))
+            rank += 1

@@ -1,3 +1,5 @@
+# Inspired from VecEnv from OpenAI Baselines
+
 class VecEnv(object):
     """
     An abstract asynchronous, vectorized environment.
@@ -52,35 +54,15 @@ class VecEnv(object):
     def render(self, mode='human'):
         logger.warn('Render not defined for %s'%self)
 
+    def seed(self, i):
+        raise NotImplementedError()
+
     @property
     def unwrapped(self):
         if isinstance(self, VecEnvWrapper):
             return self.venv.unwrapped
         else:
             return self
-
-class VecEnvWrapper(VecEnv):
-    def __init__(self, venv, observation_space=None, action_space=None):
-        self.venv = venv
-        VecEnv.__init__(self, 
-            num_envs=venv.num_envs,
-            observation_space=observation_space or venv.observation_space, 
-            action_space=action_space or venv.action_space)
-
-    def step_async(self, actions):
-        self.venv.step_async(actions)
-
-    def reset(self):
-        pass
-
-    def step_wait(self):
-        pass
-
-    def close(self):
-        return self.venv.close()
-
-    def render(self):
-        self.venv.render()
 
 class CloudpickleWrapper(object):
     """

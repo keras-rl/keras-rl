@@ -270,7 +270,7 @@ class ACERAgent(Agent):
             _, mus = self.test_fn([state])
             self.recent_observation = observation
             self.recent_mus = mus[0]
-            self.recent_action = self.policy.select_action(self.nb_actions, self.recent_mus)
+            self.recent_action = self.policy.select_action(self.nb_actions, self.recent_mus, testing=True)
             return self.recent_action
         else:
             _, mus = self.step_fn([state])

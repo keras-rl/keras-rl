@@ -1,5 +1,4 @@
 from __future__ import division
-import warnings
 from collections import namedtuple
 import os
 
@@ -9,7 +8,6 @@ import keras.optimizers as optimizers
 
 from rl.core import Agent
 from rl.util import *
-from time import time, sleep
 
 # TODO : Add different warnings and exceptions
 # TODO : change episodic memory implementation
@@ -71,12 +69,12 @@ def get_by_index(x, idx, shape=None):
 class ACERAgent(Agent):
     def __init__(self, memory, model_fn, nb_actions, obs_shape, policy, gamma=0.99, nenvs=1, memory_interval=1,
                  batch_size = 4, on_policy=False, replay_ratio = 4, replay_start=2000, max_gradient_norm = 40,
-                 nb_warmup_steps = 40, trace_decay=1, trace_max=10, trust_region=True, trust_region_decay=0.99, 
+                 nb_warmup_steps = 40, trace_decay=1, trace_max=10, trust_region=True, trust_region_decay=0.99,
                  trust_region_thresold = 1., nsteps = 20, eps= 1e-5, entropy_weight = 1e-3, value_weight = 0.5,
                  **kwargs):
         super(ACERAgent, self).__init__(**kwargs)         
 
-        # Parameters        
+        # Parameters
         self.nb_actions = nb_actions
         self.obs_shape = obs_shape
         self.policy = policy
@@ -291,11 +289,6 @@ class ACERAgent(Agent):
     # We do not need this function. However, for generality we will define it.
     def update_target_models_hard(self):
         pass
-
-    @property
-    def metrics_names(self):
-        names = self.model.metrics_names[:]
-        return names
 
     def load_weights(self, filepath):
         filename, extension = os.path.splitext(filepath)

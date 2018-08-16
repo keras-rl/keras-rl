@@ -29,7 +29,7 @@ from rl.callbacks import FileLogger, ModelIntervalCheckpoint
 ENV_NAME = 'CartPole-v1'
 
 # Define the number or environments and steps
-nenvs = 2
+nenvs = 4
 nsteps = 50
 
 # make_gym_env : Makes synchronous environments
@@ -86,7 +86,7 @@ opt = Adam(lr=0.00005, clipvalue=10.)
 # Currently compile do not support metrics.
 agent.compile(opt)
 
-mode = 'test'
+mode = 'train'
 if mode == 'train':
     # Okay, now it's time to learn something! We capture the interrupt exception so that training
     # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
@@ -94,8 +94,8 @@ if mode == 'train':
     checkpoint_weights_filename = 'acer_' + ENV_NAME + '_weights_{step}.h5f'
     log_filename = 'acer_{}_log.json'.format(ENV_NAME)
     callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=1000)]
-    callbacks += [FileLogger(log_filename, interval=100)]
-    agent.fit(env, callbacks=callbacks, nb_steps=10000, log_interval=1000)
+    callbacks += [FileLogger(log_filename, interval=5000)]
+    agent.fit(env, callbacks=callbacks, nb_steps=50000, log_interval=10000)
 
     # After training is done, we save the final weights one more time.
     agent.save_weights(weights_filename, overwrite=True)
@@ -109,5 +109,5 @@ elif mode == 'test':
     #     weights_filename = args.weights
     agent.load_weights(weights_filename)
     env = gym.make(ENV_NAME)
-    agent.test(env, nb_episodes=10, visualize=True)
+    agent.test(env, nb_episodes=10, visualize=False)
 # print (abc.losses)

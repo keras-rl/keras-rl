@@ -118,7 +118,6 @@ class ACERAgent(Agent):
         
         # State
         self.t_start = 0
-        self.terminal = False
         self.compiled = False
         self.reset_states()
 
@@ -239,6 +238,11 @@ class ACERAgent(Agent):
     def update_step_model_weights(self):
         self.step_model.set_weights(self.model.get_weights())
 
+    def update_test_model_weights(self):
+        if not self.test_model:
+            raise ValueError('Test model not defined')
+        self.test_model.set_weights(self.model.get_weights())
+
     def update_average_model_weights(self):
         model_weights = self.model.get_weights()
         average_model_weights = self.average_model.get_weights()
@@ -259,10 +263,12 @@ class ACERAgent(Agent):
         elif (len(self.obs_shape)) == len(observation.shape):
             # This is for testing the game
             self.testing = True
-            if self.testing:
+            if not self.test_model:
                 self.test_model, inp, out = self.make_model(nsteps=1, model_fn=self.model_fn, nenvs=1, name='test_input')
                 self.test_fn = self.make_function(inp, out)
                 self.testing = 'True'
+                self.update_test_model_weights()
+
             state = np.asarray([observation], dtype=np.float32)
         else:
             raise ValueError('The dimention of state is inconsistent with the input dimention')
@@ -295,6 +301,8 @@ class ACERAgent(Agent):
         filename, extension = os.path.splitext(filepath)
         model_filepath = filename + '_acer_model' + extension
         self.model.load_weights(model_filepath)
+        self.update_step_model_weights()
+        self.update_average_model_weights()
         self.update_target_models_hard()
 
     def save_weights(self, filepath, overwrite=False):
@@ -310,6 +318,8 @@ class ACERAgent(Agent):
             self.model.reset_states()
             self.average_model.reset_states()
             self.step_model.reset_states()
+            if self.testing:
+                self.test_model.reset_states()
 
     @property
     def layers(self):
@@ -331,7 +341,7 @@ class ACERAgent(Agent):
             self.trajectory = [[] for _ in range(self.nenvs)]
             return metrics
 
-        if self.step % self.memory_interval == 0 or self.terminal:
+        if self.step % self.memory_interval == 0:
             for i in range(self.nenvs):
                 self.trajectory[i].append(Transition(self.recent_observation[i], self.recent_action[i],
                                        reward[i], terminal[i], self.recent_mus[i]))

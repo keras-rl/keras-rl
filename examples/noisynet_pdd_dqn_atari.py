@@ -77,7 +77,7 @@ dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
 
 #Prioritized Memories typically use lower learning rates
 lr = .00025
-if type(memory) == PrioritizedMemory:
+if isinstance(memory, PrioritizedMemory):
     lr /= 4
 dqn.compile(Adam(lr=lr), metrics=['mae'])
 

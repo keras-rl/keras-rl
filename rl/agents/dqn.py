@@ -129,7 +129,7 @@ class DQNAgent(AbstractDQNAgent):
             # y[:,0] represents V(s;theta)
             # y[:,1:] represents A(s,a;theta)
             y = Dense(nb_action + 1, activation='linear')(layer.output)
-            if type(layer) == NoisyNetDense:
+            if isinstance(layer, NoisyNetDense):
                 y = NoisyNetDense(nb_action + 1, activation='linear')(layer.output)
             # caculate the Q(s,a;theta)
             # dueling_type == 'avg'
@@ -656,7 +656,7 @@ class DQfDAgent(AbstractDQNAgent):
             nb_action = model.output._keras_shape[-1]
             y = Dense(nb_action + 1, activation='linear')(layer.output)
             #preserve use of noisy nets.
-            if type(layer) == NoisyNetDense:
+            if isinstance(layer, NoisyNetDense):
                 y = NoisyNetDense(nb_action + 1, activation='linear')(layer.output)
             # options for dual-stream merger
             if self.dueling_type == 'avg':
@@ -792,8 +792,8 @@ class DQfDAgent(AbstractDQNAgent):
             current_beta = self.memory.calculate_beta(self.step)
             # Sample from the memory.
             idxs = self.memory.sample_proportional(self.batch_size)
-            experiences_n = self.memory.sample(idxs, self.batch_size, current_beta, self.n_step, self.gamma)
-            experiences = self.memory.sample(idxs, self.batch_size, current_beta)
+            experiences_n = self.memory.sample_by_idxs(idxs, self.batch_size, current_beta, self.n_step, self.gamma)
+            experiences = self.memory.sample_by_idxs(idxs, self.batch_size, current_beta)
 
             # Start by extracting the necessary parameters (we use a vectorized implementation).
             state0_batch = []
@@ -949,7 +949,7 @@ class DQfDAgent(AbstractDQNAgent):
         return metrics
 
     def get_config(self):
-        config = super(DQNAgent, self).get_config()
+        config = super(DQfDAgent, self).get_config()
         config['enable_double_dqn'] = self.enable_double_dqn
         config['dueling_type'] = self.dueling_type
         config['enable_dueling_network'] = self.enable_dueling_network

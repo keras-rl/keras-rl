@@ -611,7 +611,7 @@ class PartitionedMemory(Memory):
 
         return idxs
 
-    def sample(self, idxs, batch_size, beta=1., nstep=1, gamma=1):
+    def sample_by_idxs(self, idxs, batch_size, beta=1., nstep=1, gamma=1):
         """
         Gathers transition data from the ring buffers. The PartitionedMemory
         separates generating the idxs and returning their transitions, allowing
@@ -718,7 +718,7 @@ class PartitionedMemory(Memory):
         return current_beta
 
     def get_config(self):
-        config = super(PrioritizedMemory, self).get_config()
+        config = super(PartitionedMemory, self).get_config()
         config['alpha'] = self.alpha
         config['start_beta'] = self.start_beta
         config['end_beta'] = self.end_beta

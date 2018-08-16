@@ -111,7 +111,7 @@ class NAFLayer(Layer):
     """
     def __init__(self, nb_actions, mode='full', **kwargs):
         if mode not in ('full', 'diag'):
-            raise RuntimeError('Unknown mode "{}" in NAFLayer.'.format(self.mode))
+            raise RuntimeError('Unknown mode "{}" in NAFLayer.'.format(mode))
 
         self.nb_actions = nb_actions
         self.mode = mode
@@ -281,7 +281,7 @@ class NAFLayer(Layer):
             expected_elements = None
         assert expected_elements is not None
         if input_shape[0][1] != expected_elements:
-            raise RuntimeError("Input 0 (L) should have {} elements but has {}".format(input_shape[0][1]))
+            raise RuntimeError("Input 0 (L) should have {} elements but has {}".format(expected_elements, input_shape[0][1]))
         if input_shape[1][1] != self.nb_actions:
             raise RuntimeError(
                 "Input 1 (mu) should have {} elements but has {}".format(self.nb_actions, input_shape[1][1]))

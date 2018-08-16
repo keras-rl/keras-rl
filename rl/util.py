@@ -287,15 +287,14 @@ def record_demo_data(env_name, steps, frame_delay=0.03, env_seed=123, data_filep
     print("No keys pressed is taking action 0")
 
     transitions = []
-    obser = env.reset()
-    total_reward = 0
+    _ = env.reset()
     total_timesteps = 0
 
     while total_timesteps < steps:
         if total_timesteps % 1000 == 0:
             print("Steps Elapsed: " + str(total_timesteps))
         act = action
-        obs, r, done, info = env.step(act)
+        obs, r, done, _ = env.step(act)
         transitions.append([obs, act, r, done])
         total_timesteps += 1
         env.render(mode='human')

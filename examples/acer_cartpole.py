@@ -10,12 +10,11 @@ warnings.filterwarnings("ignore", message="numpy.ufunc size changed")
 
 import numpy as np
 import gym
-import copy
 
 from keras import backend as K
-from keras.models import Sequential, Model
+from keras.models import Model
 from keras.layers import Dense, Activation, Input, ReLU
-from keras.optimizers import Adam, SGD
+from keras.optimizers import Adam
 
 from rl.agents import ACERAgent
 from rl.agents.acer.episode_memory import EpisodeMemory

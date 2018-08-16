@@ -21,6 +21,7 @@ from rl.agents import ACERAgent
 from rl.agents.acer.episode_memory import EpisodeMemory
 from rl.policy import SoftmaxPolicy
 from rl.common.cmd_util import make_gym_env
+from rl.callbacks import FileLogger, ModelIntervalCheckpoint
 
 # TODO : Add support for atari
 # The current implementation supports simple toy games.
@@ -80,9 +81,33 @@ memory = EpisodeMemory(nsteps, 50000)
 agent = ACERAgent(memory, model_fn, nb_actions, obs_shape, policy=policy, nenvs=nenvs, nsteps=nsteps)
 
 # Define the optimizor to be used
-sgd = Adam(lr=0.00005, clipvalue=10.)
+opt = Adam(lr=0.00005, clipvalue=10.)
 
 # Currently compile do not support metrics.
-agent.compile(sgd)
+agent.compile(opt)
 
-agent.fit(env, 1000000)
+mode = 'test'
+if mode == 'train':
+    # Okay, now it's time to learn something! We capture the interrupt exception so that training
+    # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
+    weights_filename = 'acer_{}_weights.h5f'.format(ENV_NAME)
+    checkpoint_weights_filename = 'acer_' + ENV_NAME + '_weights_{step}.h5f'
+    log_filename = 'acer_{}_log.json'.format(ENV_NAME)
+    callbacks = [ModelIntervalCheckpoint(checkpoint_weights_filename, interval=1000)]
+    callbacks += [FileLogger(log_filename, interval=100)]
+    agent.fit(env, callbacks=callbacks, nb_steps=10000, log_interval=1000)
+
+    # After training is done, we save the final weights one more time.
+    agent.save_weights(weights_filename, overwrite=True)
+
+    # Finally, evaluate our algorithm for 10 episodes.
+    env = gym.make(ENV_NAME)
+    agent.test(env, nb_episodes=10, visualize=False)
+elif mode == 'test':
+    weights_filename = 'acer_{}_weights.h5f'.format(ENV_NAME)
+    # if args.weights:
+    #     weights_filename = args.weights
+    agent.load_weights(weights_filename)
+    env = gym.make(ENV_NAME)
+    agent.test(env, nb_episodes=10, visualize=True)
+# print (abc.losses)

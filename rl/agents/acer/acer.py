@@ -1,7 +1,7 @@
 from __future__ import division
 import warnings
 from collections import namedtuple
-# import multiprocessing as mp
+import os
 
 import numpy as np
 import keras.backend as K
@@ -107,9 +107,11 @@ class ACERAgent(Agent):
         self.model, _, _ = self.make_model(self.nsteps, model_fn)
         self.average_model, _, _ = self.make_model(self.nsteps, model_fn)
         self.step_model, self.step_model_input, self.step_model_output = self.make_model(1, model_fn, 'step_input')
-        self.step_fn = self.make_step_function()
+        self.test_model = None
+        self.step_fn = self.make_function(self.step_model_input, self.step_model_output)
         self.update_step_model_weights()
         self.update_average_model_weights()
+        self.testing = False
 
         self.nbatch = self.nenvs * self.nsteps
         self.trajectory = [[] for _ in range(self.nenvs)]
@@ -221,16 +223,18 @@ class ACERAgent(Agent):
         # print ('Agent Compiled')
         self.compiled = True
 
-    def make_model(self, nsteps, model_fn, name=None):
-        shape = (self.nenvs * nsteps,) + self.obs_shape
+    def make_model(self, nsteps, model_fn, name=None, nenvs=None):
+        if nenvs == None:
+            nenvs = self.nenvs
+        shape = (nenvs * nsteps,) + self.obs_shape
         inp = K.placeholder(shape=shape)
         if name == None:
             return model_fn(inp)
         else:
             return model_fn(inp, name)
 
-    def make_step_function(self):
-        return K.function(inputs=self.step_model_input, outputs=self.step_model_output)
+    def make_function(self, inp, out):
+        return K.function(inputs=inp, outputs=out)
 
     def update_step_model_weights(self):
         self.step_model.set_weights(self.model.get_weights())
@@ -250,20 +254,37 @@ class ACERAgent(Agent):
         # Select an action.
         if (len(self.obs_shape) + 1) == len(observation.shape):
             state = np.asarray(observation, dtype=np.float32)
+            if self.testing is True:
+                self.testing = False
         elif (len(self.obs_shape)) == len(observation.shape):
+            # This is for testing the game
+            self.testing = True
+            if self.testing:
+                self.test_model, inp, out = self.make_model(nsteps=1, model_fn=self.model_fn, nenvs=1, name='test_input')
+                self.test_fn = self.make_function(inp, out)
+                self.testing = 'True'
             state = np.asarray([observation], dtype=np.float32)
         else:
             raise ValueError('The dimention of state is inconsistent with the input dimention')
-        _, mus = self.step_fn([state])
-        self.recent_observation = observation
-        # To deal with error : ValueError: probabilities do not sum to 1
-        # Note the axis is 1
-        self.recent_mus = mus
-        self.recent_action = []
-        for i in range(len(self.recent_mus)):
-            action = self.policy.select_action(self.nb_actions, self.recent_mus[i])
-            self.recent_action.append(action)
-        return self.recent_action
+        if self.testing:
+            _, mus = self.test_fn([state])
+            self.recent_observation = observation
+            self.recent_mus = mus[0]
+            self.recent_action = self.policy.select_action(self.nb_actions, self.recent_mus)
+            return self.recent_action
+        else:
+            _, mus = self.step_fn([state])
+            self.recent_observation = observation
+            self.recent_mus = mus
+            self.recent_action = []
+            for i in range(len(self.recent_mus)):
+                action = self.policy.select_action(self.nb_actions, self.recent_mus[i])
+                self.recent_action.append(action)
+            return self.recent_action
+
+    # We do not need this function. However, for generality we will define it.
+    def update_target_models_hard(self):
+        pass
 
     @property
     def metrics_names(self):

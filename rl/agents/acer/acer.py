@@ -288,6 +288,10 @@ class ACERAgent(Agent):
         self.update_step_model_weights()
         self.update_average_model_weights()
         self.update_target_models_hard()
+        if not self.training:
+            if not self.step_model:
+                self.make_test_model()
+                self.update_test_model_weights()
 
     def save_weights(self, filepath, overwrite=False):
         filename, extension = os.path.splitext(filepath)
@@ -389,6 +393,8 @@ class ACERAgent(Agent):
         self.train_fn([obs, old_mus, A, R, D])
         self.update_step_model_weights()
         self.update_average_model_weights()
+        if self.test_model:
+            self.update_test_model_weights()
 
     def learn_from_memory(self):
         n = np.random.poisson(self.replay_ratio)

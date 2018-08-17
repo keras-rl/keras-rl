@@ -121,13 +121,15 @@ class Agent(object):
         episode_step = None
         did_abort = False
 
-        # multiprocessing checks if the env is multiagent synchronous environment
+        # synchronous_agents checks if the env is multiagent synchronous environment
         # This will help in learning in actor critic envrionements
-        multiprocessing = hasattr(env, 'remotes')
-        if multiprocessing:
-            done_ = True
+        synchronous_agents = hasattr(env, 'remotes')
+        if synchronous_agents:
+            # done0 is done result forfirst agent
+            done0 = True
+            nenvs = len(env)
         try:
-            if not multiprocessing:
+            if not synchronous_agents:
                 while self.step < nb_steps:
                     if observation is None:  # start of a new episode
                         callbacks.on_episode_begin(episode)
@@ -185,16 +187,13 @@ class Agent(object):
                         observation = deepcopy(observation)
                         if self.processor is not None:
                             observation, r, done, info = self.processor.process_step(observation, r, done, info)
-                        if not isinstance(info, tuple):
-                            for key, value in info.items():
-                                if not np.isreal(value):
-                                    continue
-                                if key not in accumulated_info:
-                                    accumulated_info[key] = np.zeros_like(value)
-                                accumulated_info[key] += value
-                        elif isinstance(info, tuple):
-                            # We will not save the info values for simultaneous environments
-                            continue
+                        for key, value in info.items():
+                            if not np.isreal(value):
+                                continue
+                            if key not in accumulated_info:
+                                accumulated_info[key] = np.zeros_like(value)
+                            accumulated_info[key] += value
+
                         callbacks.on_action_end(action)
                         reward += r
                         if done:
@@ -238,9 +237,12 @@ class Agent(object):
                         observation = None
                         episode_step = None
                         episode_reward = None
-            else :
+            else:
+                # This is learning in actor critic agents where we will define
+                # synchronous agents
+
                 while self.step < nb_steps:
-                    if done_:
+                    if done0:
                         callbacks.on_episode_begin(episode)
                         episode_step = np.int16(0)
                         episode_reward = np.float32(0)
@@ -274,8 +276,10 @@ class Agent(object):
                     callbacks.on_action_end(action[0])
                     metrics = self.backward(r, terminal=done)
 
-                    done_ = done[0]
-                    episode_reward += r[0]
+                    # For metrics we will only look at the first agent
+                    done0 = done[0]
+                    reward = r[0]
+                    episode_reward += reward
 
                     step_logs = {
                         'action': action,
@@ -286,11 +290,12 @@ class Agent(object):
                         'info': accumulated_info,
                     }
 
+                    # Total steps taken is nevns * 1.
                     callbacks.on_step_end(episode_step, step_logs)
                     episode_step += 1
                     self.step += 1
 
-                    if done_:
+                    if done0:
                         # This episode is finished, report and reset.
                         episode_logs = {
                             'episode_reward': episode_reward,

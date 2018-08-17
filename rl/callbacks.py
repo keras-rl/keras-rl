@@ -15,7 +15,11 @@ from keras.utils.generic_utils import Progbar
 class Callback(KerasCallback):
     def _set_env(self, env):
         self.env = env
-
+        if hasattr(env, 'remotes'):
+            self.nenvs = len(env)
+        else:
+            # For normal environment number of agent is 1
+            self.nenvs = 1
     def on_episode_begin(self, episode, logs={}):
         """Called at beginning of each episode"""
         pass
@@ -262,7 +266,7 @@ class TrainIntervalLogger(Callback):
                 print('{} episodes - episode_reward: {:.3f} [{:.3f}, {:.3f}]{}{}'.format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards), formatted_metrics, formatted_infos))
                 print('')
             self.reset()
-            print('Interval {} ({} steps performed)'.format(self.step // self.interval + 1, self.step))
+            print('Interval {} ({} steps performed)'.format(self.step // self.interval + 1, self.nenvs * self.step))
 
     def on_step_end(self, step, logs):
         """ Update progression bar at the end of each step """

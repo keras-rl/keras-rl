@@ -137,7 +137,7 @@ class ACERAgent(Agent):
             raise ValueError('Please add your metrics to the computation graph. Current implementation supports None')
 
         #TODO : Check if needed metrics
-        self.model.metrics_names = None
+        self.model.metrics_names = [None]
 
         inp = self.model.input
         Q, mus = self.model(inp)

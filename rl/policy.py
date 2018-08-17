@@ -125,7 +125,7 @@ class SoftmaxPolicy(Policy):
     - takes action according to the pobability distribution
 
     """
-    def select_action(self, nb_actions, probs, testing=False):
+    def select_action(self, nb_actions, probs):
         """Return the selected action
 
         # Arguments
@@ -137,9 +137,6 @@ class SoftmaxPolicy(Policy):
         """
         # To remove the error related to sum not equal to 1
         probs = probs/sum(probs)
-        if not testing:
-            if np.isnan(np.array(probs)).any():
-                raise ValueError('NaN occured')
         action = np.random.choice(range(nb_actions), p=probs)
         return action
 

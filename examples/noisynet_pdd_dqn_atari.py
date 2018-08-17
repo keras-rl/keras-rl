@@ -9,7 +9,7 @@ from keras.optimizers import Adam
 import keras.backend as K
 from rl.agents.dqn import DQNAgent
 from rl.policy import GreedyQPolicy
-from rl.memory import PrioritizedMemory #,Sequential
+from rl.memory import PrioritizedMemory
 from rl.core import Processor
 from rl.callbacks import TrainEpisodeLogger, ModelIntervalCheckpoint
 from rl.layers import NoisyNetDense
@@ -59,7 +59,7 @@ dense= Flatten()(cv3)
 dense = NoisyNetDense(512, activation='relu')(dense)
 buttons = NoisyNetDense(nb_actions, activation='linear')(dense)
 model = Model(inputs=frame,outputs=buttons)
-print(model.summary())
+model.summary()
 
 #You can use any Memory you want.
 memory = PrioritizedMemory(limit=1000000, alpha=.6, start_beta=.4, end_beta=1., steps_annealed=10000000, window_length=WINDOW_LENGTH)
@@ -73,7 +73,7 @@ policy = GreedyQPolicy()
 
 dqn = DQNAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
                processor=processor, enable_double_dqn=True, enable_dueling_network=True, nb_steps_warmup=50000, gamma=.99, target_model_update=10000,
-               train_interval=4, delta_clip=1.)
+               train_interval=4, delta_clip=1., custom_model_objects={"NoisyNetDense":NoisyNetDense})
 
 #Prioritized Memories typically use lower learning rates
 lr = .00025
@@ -93,7 +93,7 @@ if args.mode == 'train':
     dqn.save_weights(weights_filename, overwrite=True)
 
 elif args.mode == 'test':
-    weights_filename = 'noiseynet_pdd_dqn_{}_weights.h5f'.format(args.env_name)
+    weights_filename = 'noisynet_pdd_dqn_{}_weights.h5f'.format(args.env_name)
     if args.weights:
         weights_filename = args.weights
     dqn.load_weights(weights_filename)

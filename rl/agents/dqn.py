@@ -18,7 +18,7 @@ class AbstractDQNAgent(Agent):
     """
     def __init__(self, nb_actions, memory, gamma=.99, batch_size=32, nb_steps_warmup=1000,
                  train_interval=1, memory_interval=1, target_model_update=10000,
-                 delta_range=None, delta_clip=np.inf, custom_model_objects={"NoisyNetDense":NoisyNetDense}, **kwargs):
+                 delta_range=None, delta_clip=np.inf, custom_model_objects={}, **kwargs):
         super(AbstractDQNAgent, self).__init__(**kwargs)
 
         # Soft vs hard target model updates.
@@ -673,7 +673,7 @@ class DQfDAgent(AbstractDQNAgent):
         #multi-step learning parameter.
         self.n_step = n_step
         self.pretraining_steps = pretraining_steps
-        #margin to add when action of expert != action of agent
+        #margin to add when action of agent != action of expert
         self.large_margin = large_margin
         #coefficient of supervised loss component of the loss function
         self.lam_2 = lam_2
@@ -686,7 +686,7 @@ class DQfDAgent(AbstractDQNAgent):
 
         self.reset_states()
 
-        assert type(self.memory) == PartitionedMemory, "DQfD needs a PartitionedMemory to store expert transitions without overwriting them."
+        assert isinstance(self.memory, PartitionedMemory), "DQfD needs a PartitionedMemory to store expert transitions without overwriting them."
         assert len(self.memory.observations) > 0, "Pre-load the memory with demonstration data."
 
     def compile(self, optimizer, metrics=[]):
@@ -704,7 +704,7 @@ class DQfDAgent(AbstractDQNAgent):
             optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
 
         def dqfd_error(args):
-            y_true, y_true_n, y_pred, importance_weights, agent_actions, l, lam_2, mask = args
+            y_true, y_true_n, y_pred, importance_weights, agent_actions, large_margin, lam_2, mask = args
             #Standard DQN loss
             j_dq = huber_loss(y_true, y_pred, self.delta_clip) * mask
             j_dq *= importance_weights
@@ -716,7 +716,7 @@ class DQfDAgent(AbstractDQNAgent):
             #Large margin supervised classification loss
             Q_a = y_pred * agent_actions
             Q_ae = y_pred * mask
-            j_e =  lam_2 * K.square(Q_a + l - Q_ae)
+            j_e =  lam_2 * K.square(Q_a + large_margin - Q_ae)
             j_e = K.sum(j_e, axis=-1)
             # in Keras, j_l2 from the paper is implemented as a part of the network itself (using regularizers.l2)
             return j_dq + j_n + j_e
@@ -727,11 +727,11 @@ class DQfDAgent(AbstractDQNAgent):
         mask = Input(name='mask', shape=(self.nb_actions,))
         importance_weights = Input(name='importance_weights',shape=(self.nb_actions,))
         agent_actions = Input(name='agent_actions',shape=(self.nb_actions,))
-        l = Input(name='large-margin',shape=(self.nb_actions,))
+        large_margin = Input(name='large-margin',shape=(self.nb_actions,))
         lam_2 = Input(name='lam_2',shape=(self.nb_actions,))
-        loss_out = Lambda(dqfd_error, output_shape=(1,), name='loss')([y_true, y_true_n, y_pred, importance_weights, agent_actions, l, lam_2, mask])
+        loss_out = Lambda(dqfd_error, output_shape=(1,), name='loss')([y_true, y_true_n, y_pred, importance_weights, agent_actions, large_margin, lam_2, mask])
         ins = [self.model.input] if type(self.model.input) is not list else self.model.input
-        trainable_model = Model(inputs=ins + [y_true, y_true_n, importance_weights, agent_actions, l, lam_2, mask], outputs=[loss_out, y_pred])
+        trainable_model = Model(inputs=ins + [y_true, y_true_n, importance_weights, agent_actions, large_margin, lam_2, mask], outputs=[loss_out, y_pred])
         assert len(trainable_model.output_names) == 2
         combined_metrics = {trainable_model.output_names[1]: metrics}
         losses = [
@@ -910,7 +910,7 @@ class DQfDAgent(AbstractDQNAgent):
             agent_actions = np.eye(self.nb_actions)[agent_actions]
             expert_actions = masks
             #l is the large margin term, which skews loss function towards incorrect imitations
-            l = np.zeros_like(expert_actions, dtype='float32')
+            large_margin = np.zeros_like(expert_actions, dtype='float32')
             #lambda_2 is used to eliminate supervised loss for self-generated transitions
             lam_2 = np.zeros_like(expert_actions, dtype='float32')
 
@@ -924,10 +924,10 @@ class DQfDAgent(AbstractDQNAgent):
                         if agent_actions[i,j] == 1:
                             if expert_actions[i,j] != 1:
                                 #if agent and expert had different predictions, increase l
-                                l[i,j] = self.large_margin
+                                large_margin[i,j] = self.large_margin
 
             ins = [state0_batch] if type(self.model.input) is not list else state0_batch
-            metrics = self.trainable_model.train_on_batch(ins + [targets, targets_n, importance_weights, agent_actions, l, lam_2, masks], [dummy_targets, targets])
+            metrics = self.trainable_model.train_on_batch(ins + [targets, targets_n, importance_weights, agent_actions, large_margin, lam_2, masks], [dummy_targets, targets])
 
             assert len(idxs) == self.batch_size
             #Calculate new priorities.

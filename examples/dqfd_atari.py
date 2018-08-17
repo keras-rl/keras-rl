@@ -68,10 +68,12 @@ dense= Flatten()(cv3)
 dense = Dense(512, activation='relu', kernel_regularizer=l2(1e-4))(dense)
 buttons = Dense(nb_actions, activation='linear', kernel_regularizer=l2(1e-4))(dense)
 model = Model(inputs=frame,outputs=buttons)
-print(model.summary())
+model.summary()
 
 processor = AtariDQfDProcessor()
+
 # record_demo_data('GopherDeterministic-v4', steps=50000, data_filepath='gopher_expert.npy', frame_delay=0.03)
+
 # Load and process the demonstration data.
 expert_demo_data = processor.process_demo_data(load_demo_data_from_file('gopher_expert.npy'))
 memory = PartitionedMemory(limit=1000000, pre_load_data=expert_demo_data, alpha=.4, start_beta=.6, end_beta=.6, window_length=WINDOW_LENGTH)

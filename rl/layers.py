@@ -27,10 +27,12 @@ class NoisyNetDense(Layer):
                 **kwargs):
 
         super(NoisyNetDense, self).__init__(**kwargs)
+
         self.units = units
+
         self.activation = activations.get(activation)
         self.kernel_constraint = constraints.get(kernel_constraint) if kernel_constraint is not None else None
-        self.bias_constraint = constriants.get(bias_constraint)if kernel_constraint is not None else None
+        self.bias_constraint = constraints.get(bias_constraint) if kernel_constraint is not None else None
         self.kernel_regularizer = regularizers.get(kernel_regularizer)if kernel_constraint is not None else None
         self.bias_regularizer = regularizers.get(bias_regularizer) if kernel_constraint is not None else None
 

@@ -20,3 +20,4 @@ Write me
 - [Deep Reinforcement Learning with Double Q-learning](http://www0.cs.ucl.ac.uk/staff/d.silver/web/Applications_files/doubledqn.pdf), van Hasselt et al., 2015
 - [Dueling Network Architectures for Deep Reinforcement Learning](https://arxiv.org/abs/1511.06581), Wang et al., 2016
 - [Prioritized Experience Replay](https://arxiv.org/abs/1511.05952?context=cs), Schaul et al., 2016
+- [Deep Q-learning from Demonstrations](https://arxiv.org/pdf/1704.03732.pdf), Hester et al., 2017

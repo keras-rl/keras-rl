@@ -109,7 +109,6 @@ class ACERAgent(Agent):
         self.step_fn = self.make_function(self.step_model_input, self.step_model_output)
         self.update_step_model_weights()
         self.update_average_model_weights()
-        self.testing = False
 
         self.nbatch = self.nenvs * self.nsteps
         self.trajectory = [[] for _ in range(self.nenvs)]
@@ -223,6 +222,11 @@ class ACERAgent(Agent):
         else:
             return model_fn(inp, name)
 
+    def make_test_model(self):
+        self.test_model, inp, out = self.make_model(nsteps=1, model_fn=self.model_fn, nenvs=1, name='test_input')
+        self.test_fn = self.make_function(inp, out)
+        self.update_test_model_weights()
+
     def make_function(self, inp, out):
         return K.function(inputs=inp, outputs=out)
 
@@ -249,25 +253,19 @@ class ACERAgent(Agent):
         # Select an action.
         if (len(self.obs_shape) + 1) == len(observation.shape):
             state = np.asarray(observation, dtype=np.float32)
-            if self.testing is True:
-                self.testing = False
+
         elif (len(self.obs_shape)) == len(observation.shape):
             # This is for testing the game
-            self.testing = True
-            if not self.test_model:
-                self.test_model, inp, out = self.make_model(nsteps=1, model_fn=self.model_fn, nenvs=1, name='test_input')
-                self.test_fn = self.make_function(inp, out)
-                self.testing = 'True'
-                self.update_test_model_weights()
-
+            if not self.test_model and not self.training:
+                self.make_test_model()
             state = np.asarray([observation], dtype=np.float32)
         else:
             raise ValueError('The dimention of state is inconsistent with the input dimention')
-        if self.testing:
+        if not self.training:
             _, mus = self.test_fn([state])
             self.recent_observation = observation
             self.recent_mus = mus[0]
-            self.recent_action = self.policy.select_action(self.nb_actions, self.recent_mus, testing=True)
+            self.recent_action = self.policy.select_action(self.nb_actions, self.recent_mus)
             return self.recent_action
         else:
             _, mus = self.step_fn([state])
@@ -304,7 +302,9 @@ class ACERAgent(Agent):
             self.model.reset_states()
             self.average_model.reset_states()
             self.step_model.reset_states()
-            if self.testing:
+            if not self.training:
+                if not self.test_model:
+                    self.make_test_model()
                 self.test_model.reset_states()
 
     @property

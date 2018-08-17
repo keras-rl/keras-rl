@@ -136,10 +136,9 @@ class ACERAgent(Agent):
         if len(metrics) != 0:
             raise ValueError('Please add your metrics to the computation graph. Current implementation supports None')
 
-        self.model.metrics_names = ['Avg_Rewards']
+        #TODO : Check if needed metrics
+        self.model.metrics_names = None
 
-        # print ('Compiling the Agent')
-        # print (K.backend())
         inp = self.model.input
         Q, mus = self.model(inp)
         _, avg_mus = self.average_model(inp)
@@ -161,14 +160,12 @@ class ACERAgent(Agent):
         assert len(Qret) == self.nbatch
 
         f_i = get_by_index(mus, A)
-        # print ('Qret and f_i calculated')
 
         # Policy gradient loss
         adv = Qret - V
         logf = K.log(f_i + self.eps)
         gain_f = logf * K.stop_gradient(adv * K.clip(rho_i, min_value=0, max_value=self.trace_max))
         loss_f = -K.sum(gain_f)
-        # print ('Loss f calculated')
 
         # Bias correction for the truncation
         adv_bc = Q - K.reshape(V, (self.nbatch, 1))
@@ -177,7 +174,6 @@ class ACERAgent(Agent):
         loss_bc = -K.sum(gain_bc)
 
         loss_policy = loss_bc + loss_f
-        # print ('policy loss calculated')
 
         # Add Entropy
         entropy = -K.mean(K.sum(K.log(mus)*mus, axis=1))
@@ -196,16 +192,13 @@ class ACERAgent(Agent):
             loss_policy += trust_err
 
         loss_policy -= self.entropy_weight*entropy
-        # print len(Qret)
-        # print Qret
-        # print (K.int_shape(Q_i), len(Qret))
+
         loss_value = 0.5 * K.mean(K.square(K.stop_gradient(Qret) - Q_i))
         
         total_loss = loss_policy + self.value_weight*loss_value
 
         inputs = [inp]
         inputs = inputs + [old_mus, A, R, D]
-        # metrics = K.mean(f_i * R)
 
         updates = self.optimizer.get_updates(total_loss, self.model.trainable_weights)
 

@@ -3,7 +3,7 @@ import warnings
 import keras.backend as K
 from keras.models import Model
 from keras.layers import Lambda, Input, Layer, Dense
-
+from keras.utils.generic_utils import Progbar
 from rl.core import Agent
 from rl.policy import EpsGreedyQPolicy, GreedyQPolicy
 from rl.util import *
@@ -82,6 +82,38 @@ class AbstractDQNAgent(Agent):
             'delta_clip': self.delta_clip,
             'memory': get_object_config(self.memory),
         }
+
+    def forward(self, observation):
+        # Select an action.
+        state = self.memory.get_recent_state(observation)
+        q_values = self.compute_q_values(state)
+        if self.training:
+            action = self.policy.select_action(q_values=q_values)
+        else:
+            action = self.test_policy.select_action(q_values=q_values)
+
+        # Book-keeping.
+        self.recent_observation = observation
+        self.recent_action = action
+
+        return action
+
+    def _calc_double_q_values(self, state1_batch):
+        # According to the paper "Deep Reinforcement Learning with Double Q-learning"
+        # (van Hasselt et al., 2015), in Double DQN, the online network predicts the actions
+        # while the target network is used to estimate the Q value.
+        q_values = self.model.predict_on_batch(state1_batch)
+        assert q_values.shape == (self.batch_size, self.nb_actions)
+        actions = np.argmax(q_values, axis=1)
+        assert actions.shape == (self.batch_size,)
+
+        # Now, estimate Q values using the target network but select the values with the
+        # highest Q value wrt to the online model (as computed above).
+        target_q_values = self.target_model.predict_on_batch(state1_batch)
+        assert target_q_values.shape == (self.batch_size, self.nb_actions)
+        q_batch = target_q_values[range(self.batch_size), actions]
+
+        return q_batch
 
 # An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
 # http://arxiv.org/pdf/1312.5602.pdf
@@ -237,21 +269,6 @@ class DQNAgent(AbstractDQNAgent):
     def update_target_model_hard(self):
         self.target_model.set_weights(self.model.get_weights())
 
-    def forward(self, observation):
-        # Select an action.
-        state = self.memory.get_recent_state(observation)
-        q_values = self.compute_q_values(state)
-        if self.training:
-            action = self.policy.select_action(q_values=q_values)
-        else:
-            action = self.test_policy.select_action(q_values=q_values)
-
-        # Book-keeping.
-        self.recent_observation = observation
-        self.recent_action = action
-
-        return action
-
     def backward(self, reward, terminal):
         # Store most recent experience in memory.
         if self.step % self.memory_interval == 0:
@@ -314,19 +331,7 @@ class DQNAgent(AbstractDQNAgent):
 
             # Compute Q values for mini-batch update.
             if self.enable_double_dqn:
-                # According to the paper "Deep Reinforcement Learning with Double Q-learning"
-                # (van Hasselt et al., 2015), in Double DQN, the online network predicts the actions
-                # while the target network is used to estimate the Q value.
-                q_values = self.model.predict_on_batch(state1_batch)
-                assert q_values.shape == (self.batch_size, self.nb_actions)
-                actions = np.argmax(q_values, axis=1)
-                assert actions.shape == (self.batch_size,)
-
-                # Now, estimate Q values using the target network but select the values with the
-                # highest Q value wrt to the online model (as computed above).
-                target_q_values = self.target_model.predict_on_batch(state1_batch)
-                assert target_q_values.shape == (self.batch_size, self.nb_actions)
-                q_batch = target_q_values[range(self.batch_size), actions]
+                q_batch = self._calc_double_q_values(state1_batch)
             else:
                 # Compute the q_values given state1, and extract the maximum for each sample in the batch.
                 # We perform this prediction on the target_model instead of the model for reasons
@@ -673,6 +678,7 @@ class DQfDAgent(AbstractDQNAgent):
         #multi-step learning parameter.
         self.n_step = n_step
         self.pretraining_steps = pretraining_steps
+        self.pretraining = True
         #margin to add when action of agent != action of expert
         self.large_margin = large_margin
         #coefficient of supervised loss component of the loss function
@@ -760,34 +766,32 @@ class DQfDAgent(AbstractDQNAgent):
     def update_target_model_hard(self):
         self.target_model.set_weights(self.model.get_weights())
 
-    def forward(self, observation):
-        # Select an action.
-        state = self.memory.get_recent_state(observation)
-        q_values = self.compute_q_values(state)
-        if self.training:
-            action = self.policy.select_action(q_values=q_values)
-        else:
-            action = self.test_policy.select_action(q_values=q_values)
+    def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
+            visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
+            nb_max_episode_steps=None):
+        progbar = Progbar(self.pretraining_steps, interval=.1)
+        print("Pretraining for {} steps...".format(self.pretraining_steps))
+        for step in range(self.pretraining_steps):
+            self.backward(0, False)
+            progbar.update(step)
+        self.pretraining = False
 
-        # Book-keeping.
-        self.recent_observation = observation
-        self.recent_action = action
-
-        return action
+        super(DQfDAgent, self).fit(env, nb_steps, action_repetition, callbacks, verbose,
+                visualize, nb_max_start_steps, start_step_policy, log_interval,
+                nb_max_episode_steps)
 
     def backward(self, reward, terminal):
         # Store most recent experience in memory.
-        if self.step % self.memory_interval == 0 and self.step > self.pretraining_steps:
+        if self.step % self.memory_interval == 0 and not self.pretraining:
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)
 
         metrics = [np.nan for _ in self.metrics_names]
-        if not self.training:
+        if not self.training and not self.pretraining:
             return metrics
 
         # Train the network on a single stochastic batch.
-        if self.step % self.train_interval == 0:
-
+        if (self.step % self.train_interval == 0) or self.pretraining:
             # Calculations for current beta value based on a linear schedule.
             current_beta = self.memory.calculate_beta(self.step)
             # Sample from the memory.
@@ -839,25 +843,8 @@ class DQfDAgent(AbstractDQNAgent):
 
             # Compute Q values for mini-batch update.
             if self.enable_double_dqn:
-                q_values = self.model.predict_on_batch(state1_batch)
-                assert q_values.shape == (self.batch_size, self.nb_actions)
-                actions = np.argmax(q_values, axis=1)
-                assert actions.shape == (self.batch_size,)
-                # Now, estimate Q values using the target network but select the values with the
-                # highest Q value wrt to the online model (as computed above).
-                target_q_values = self.target_model.predict_on_batch(state1_batch)
-                assert target_q_values.shape == (self.batch_size, self.nb_actions)
-                q_batch = target_q_values[range(self.batch_size), actions]
-
-                # Repeat this process for the n-step state.
-                q_values_n = self.model.predict_on_batch(state_batch_n)
-                assert q_values_n.shape == (self.batch_size, self.nb_actions)
-                actions_n = np.argmax(q_values_n, axis=1)
-                assert actions_n.shape == (self.batch_size,)
-                target_q_values_n = self.target_model.predict_on_batch(state_batch_n)
-                assert target_q_values_n.shape == (self.batch_size, self.nb_actions)
-                q_batch_n = target_q_values_n[range(self.batch_size), actions_n]
-
+                q_batch = self._calc_double_q_values(state1_batch)
+                q_batch_n = self._calc_double_q_values(state_batch_n)
             else:
                 target_q_values = self.target_model.predict_on_batch(state1_batch)
                 assert target_q_values.shape == (self.batch_size, self.nb_actions)

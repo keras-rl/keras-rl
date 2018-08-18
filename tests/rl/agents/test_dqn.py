@@ -8,9 +8,9 @@ from numpy.testing import assert_allclose
 from keras.models import Sequential, Model
 from keras.layers import Input, Dense, Flatten, Concatenate
 
-from rl.agents.dqn import DQNAgent, NAFAgent
+from rl.agents.dqn import DQNAgent, NAFAgent, DQfDAgent
 from rl.layers import *
-from rl.memory import SequentialMemory
+from rl.memory import SequentialMemory, PartitionedMemory
 from rl.processors import MultiInputProcessor
 
 from ..util import MultiInputTestEnv
@@ -28,6 +28,16 @@ def test_single_dqn_input():
         agent.compile('sgd')
         agent.fit(MultiInputTestEnv((3,)), nb_steps=10)
 
+def test_single_dqfd_input():
+    model = Sequential()
+    model.add(Flatten(input_shape=(2, 3)))
+    model.add(Dense(2))
+    pre_load_data = np.array([[np.random.rand(3),1,2,False] for i in range(20)])
+    memory = PartitionedMemory(limit=40, pre_load_data=pre_load_data, window_length=2)
+    dqfd = DQfDAgent(model, nb_actions=2, memory=memory, enable_double_dqn=True,
+                    pretraining_steps=20, batch_size=4, n_step=3)
+    dqfd.compile('sgd')
+    dqfd.fit(MultiInputTestEnv((3,)), nb_steps=10)
 
 def test_multi_dqn_input():
     input1 = Input(shape=(2, 3))

@@ -8,7 +8,7 @@ from keras.layers import Flatten, Conv2D, Input, Dense
 from keras.optimizers import Adam
 from keras.regularizers import l2
 import keras.backend as K
-from rl.agents.dqfd import DQfDAgent
+from rl.agents.dqn import DQfDAgent
 from rl.policy import LinearAnnealedPolicy, EpsGreedyQPolicy
 from rl.memory import PartitionedMemory
 from rl.core import Processor

@@ -115,6 +115,25 @@ class AbstractDQNAgent(Agent):
 
         return q_batch
 
+    def _build_dueling_arch(self, model, dueling_type):
+        #bulid the two-stream architecture
+        layer = model.layers[-2]
+        nb_action = model.output._keras_shape[-1]
+        y = Dense(nb_action + 1, activation='linear')(layer.output)
+        #preserve use of noisy nets.
+        if isinstance(layer, NoisyNetDense):
+            y = NoisyNetDense(nb_action + 1, activation='linear')(layer.output)
+        # options for dual-stream merger
+        if dueling_type == 'avg':
+            outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.mean(a[:, 1:], axis=1, keepdims=True), output_shape=(nb_action,))(y)
+        elif dueling_type == 'max':
+            outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.max(a[:, 1:], axis=1, keepdims=True), output_shape=(nb_action,))(y)
+        elif dueling_type == 'naive':
+            outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:], output_shape=(nb_action,))(y)
+        else:
+            assert False, "dueling_type must be one of {'avg','max','naive'}"
+        return Model(inputs=model.input, outputs=outputlayer)
+
 # An implementation of the DQN agent as described in Mnih (2013) and Mnih (2015).
 # http://arxiv.org/pdf/1312.5602.pdf
 # http://arxiv.org/abs/1509.06461
@@ -154,33 +173,7 @@ class DQNAgent(AbstractDQNAgent):
         self.enable_dueling_network = enable_dueling_network
         self.dueling_type = dueling_type
         if self.enable_dueling_network:
-            # get the second last layer of the model, abandon the last layer
-            layer = model.layers[-2]
-            nb_action = model.output._keras_shape[-1]
-            # layer y has a shape (nb_action+1,)
-            # y[:,0] represents V(s;theta)
-            # y[:,1:] represents A(s,a;theta)
-            y = Dense(nb_action + 1, activation='linear')(layer.output)
-            if isinstance(layer, NoisyNetDense):
-                y = NoisyNetDense(nb_action + 1, activation='linear')(layer.output)
-            # caculate the Q(s,a;theta)
-            # dueling_type == 'avg'
-            # Q(s,a;theta) = V(s;theta) + (A(s,a;theta)-Avg_a(A(s,a;theta)))
-            # dueling_type == 'max'
-            # Q(s,a;theta) = V(s;theta) + (A(s,a;theta)-max_a(A(s,a;theta)))
-            # dueling_type == 'naive'
-            # Q(s,a;theta) = V(s;theta) + A(s,a;theta)
-            if self.dueling_type == 'avg':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.mean(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
-            elif self.dueling_type == 'max':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.max(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
-            elif self.dueling_type == 'naive':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:], output_shape=(nb_action,))(y)
-            else:
-                assert False, "dueling_type must be one of {'avg','max','naive'}"
-
-            model = Model(inputs=model.input, outputs=outputlayer)
-
+            model = self._build_dueling_arch(model, dueling_type)
         # Related objects.
         self.model = model
         if policy is None:
@@ -193,9 +186,8 @@ class DQNAgent(AbstractDQNAgent):
         self.reset_states()
 
         #flag for changes to algorithm that come from dealing with importance sampling weights and priorities
-        self.prioritized = True if type(self.memory) == PrioritizedMemory else False
-
-
+        self.prioritized = True if isinstance(self.memory, PrioritizedMemory) else False
+        
     def get_config(self):
         config = super(DQNAgent, self).get_config()
         config['enable_double_dqn'] = self.enable_double_dqn
@@ -226,8 +218,8 @@ class DQNAgent(AbstractDQNAgent):
             y_true, y_pred, importance_weights, mask = args
             loss = huber_loss(y_true, y_pred, self.delta_clip)
             loss *= mask  # apply element-wise mask
-            #adjust updates by importance weights. Note that importance weights are just 1.0
-            #(and have no effect) if not using a prioritized memory
+            # adjust updates by importance weights. Note that importance weights are just 1.0
+            # (and have no effect) if not using a prioritized memory
             return K.sum(loss * importance_weights, axis=-1)
 
         # Create trainable model. The problem is that we need to mask the output since we only
@@ -639,7 +631,7 @@ class DQfDAgent(AbstractDQNAgent):
         train_interval__: The integer number of steps between each learning process.
         delta_clip__: A component of the huber loss.
         n_step__: exponent for multi-step learning. Larger values extend the future reward approximations further into the future.
-        pretraining_steps__: Length of 'pretraining' in which the agent learns exclusively from the expert demonstration data. In this implementation, the agent still interacts with the env, but is not adding experiences to memory.
+        pretraining_steps__: Length of 'pretraining' in which the agent learns exclusively from the expert demonstration data.
         large_margin__: Constant value that pushes loss of incorrect action choices a margin higher than the others.
         lam_2__: Imitation loss coefficient.
         """
@@ -656,23 +648,7 @@ class DQfDAgent(AbstractDQNAgent):
         self.enable_dueling_network = enable_dueling_network
         self.dueling_type = dueling_type
         if self.enable_dueling_network:
-            #bulid the two-stream architecture
-            layer = model.layers[-2]
-            nb_action = model.output._keras_shape[-1]
-            y = Dense(nb_action + 1, activation='linear')(layer.output)
-            #preserve use of noisy nets.
-            if isinstance(layer, NoisyNetDense):
-                y = NoisyNetDense(nb_action + 1, activation='linear')(layer.output)
-            # options for dual-stream merger
-            if self.dueling_type == 'avg':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.mean(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
-            elif self.dueling_type == 'max':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:] - K.max(a[:, 1:], keepdims=True), output_shape=(nb_action,))(y)
-            elif self.dueling_type == 'naive':
-                outputlayer = Lambda(lambda a: K.expand_dims(a[:, 0], -1) + a[:, 1:], output_shape=(nb_action,))(y)
-            else:
-                assert False, "dueling_type must be one of {'avg','max','naive'}"
-            model = Model(inputs=model.input, outputs=outputlayer)
+            model = self._build_dueling_arch(model, dueling_type)
         self.model = model
 
         #multi-step learning parameter.
@@ -722,7 +698,7 @@ class DQfDAgent(AbstractDQNAgent):
             #Large margin supervised classification loss
             Q_a = y_pred * agent_actions
             Q_ae = y_pred * mask
-            j_e =  lam_2 * K.square(Q_a + large_margin - Q_ae)
+            j_e =  lam_2 * (Q_a + large_margin - Q_ae)
             j_e = K.sum(j_e, axis=-1)
             # in Keras, j_l2 from the paper is implemented as a part of the network itself (using regularizers.l2)
             return j_dq + j_n + j_e
@@ -905,7 +881,7 @@ class DQfDAgent(AbstractDQNAgent):
             # with a postiive entry where the agent and expert actions differ
             for i, idx in enumerate(idxs):
                 if idx < self.memory.permanent_idx:
-                    #this is an expert demonstration, enable supervised loss for this action
+                    #this is an expert demonstration, enable supervised loss
                     lam_2[i,:] = self.lam_2
                     for j in range(agent_actions.shape[1]):
                         if agent_actions[i,j] == 1:

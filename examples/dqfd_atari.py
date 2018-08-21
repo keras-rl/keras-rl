@@ -9,7 +9,7 @@ from keras.optimizers import Adam
 from keras.regularizers import l2
 import keras.backend as K
 from rl.agents.dqn import DQfDAgent
-from rl.policy import LinearAnnealedPolicy, EpsGreedyQPolicy
+from rl.policy import EpsGreedyQPolicy
 from rl.memory import PartitionedMemory
 from rl.core import Processor
 from rl.callbacks import TrainEpisodeLogger, ModelIntervalCheckpoint
@@ -35,8 +35,7 @@ class AtariDQfDProcessor(Processor):
         return processed_batch
 
     def process_reward(self, reward):
-        return np.clip(reward, -1., 1.)
-        #return np.sign(reward) * np.log(1 + abs(reward)) (used in paper)
+        return np.sign(reward) * np.log(1 + abs(reward))
 
     def process_demo_data(self, demo_data):
         #Important addition from dqn example.
@@ -47,7 +46,7 @@ class AtariDQfDProcessor(Processor):
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--mode', choices=['train', 'test'], default='train')
-parser.add_argument('--env-name', type=str, default='GopherDeterministic-v4')
+parser.add_argument('--env-name', type=str, default='HeroDeterministic-v4')
 parser.add_argument('--weights', type=str, default=None)
 args = parser.parse_args()
 
@@ -72,14 +71,13 @@ model.summary()
 
 processor = AtariDQfDProcessor()
 
-# record_demo_data('GopherDeterministic-v4', steps=50000, data_filepath='gopher_expert.npy', frame_delay=0.03)
+# record_demo_data('HeroDeterministic-v4', steps=50000, data_filepath='hero_expert.npy', frame_delay=0.03)
 
 # Load and process the demonstration data.
-expert_demo_data = processor.process_demo_data(load_demo_data_from_file('gopher_expert.npy'))
+expert_demo_data = processor.process_demo_data(load_demo_data_from_file('hero_expert.npy'))
 memory = PartitionedMemory(limit=1000000, pre_load_data=expert_demo_data, alpha=.4, start_beta=.6, end_beta=.6, window_length=WINDOW_LENGTH)
 
-policy = LinearAnnealedPolicy(EpsGreedyQPolicy(), attr='eps', value_max=1., value_min=.01, value_test=.05,
-                              nb_steps=1000000)
+policy = EpsGreedyQPolicy(.01)
 
 dqfd = DQfDAgent(model=model, nb_actions=nb_actions, policy=policy, memory=memory,
                processor=processor, enable_double_dqn=True, enable_dueling_network=True, gamma=.99, target_model_update=10000,

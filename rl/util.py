@@ -286,16 +286,20 @@ def record_demo_data(env_name, steps, frame_delay=0.03, env_seed=123, data_filep
     print("Press keys 1 2 3 ... to take actions 1 2 3 ...")
     print("No keys pressed is taking action 0")
 
-    transitions = []
-    _ = env.reset()
+    experiences = []
+    obs = env.reset()
     total_timesteps = 0
 
     while total_timesteps < steps:
         if total_timesteps % 1000 == 0:
             print("Steps Elapsed: " + str(total_timesteps))
+        transition = [obs]
         act = action
+        transition.append(act)
         obs, r, done, _ = env.step(act)
-        transitions.append([obs, act, r, done])
+        transition.append(r)
+        transition.append(done)
+        experiences.append(transition)
         total_timesteps += 1
         env.render(mode='human')
         if done:
@@ -309,7 +313,7 @@ def record_demo_data(env_name, steps, frame_delay=0.03, env_seed=123, data_filep
         #Gym runs the environments fast by default. Tweak the frame_delay parameter to adjust play speed.
         time.sleep(frame_delay)
 
-    data_matrix = np.array(transitions)
+    data_matrix = np.array(experiences)
     np.save(data_filepath, data_matrix)
 
 def load_demo_data_from_file(data_filepath='expert_demo_data.npy'):

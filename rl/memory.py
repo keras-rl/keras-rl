@@ -320,13 +320,10 @@ class EpisodeParameterMemory(Memory):
             self.intermediate_rewards.append(reward)
 
     def finalize_episode(self, params):
-        """Append an observation to the memory
+        """Closes the current episode, sums up rewards and stores the parameters
 
         # Argument
-            observation (dict): Observation returned by environment
-            action (int): Action taken to obtain this observation
-            reward (float): Reward obtained by taking this action
-            terminal (boolean): Is the state terminal
+            params (object): Parameters associated with the episode to be stored and then retrieved back in sample()
         """
         total_reward = sum(self.intermediate_rewards)
         self.total_rewards.append(total_reward)

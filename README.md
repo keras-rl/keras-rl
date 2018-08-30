@@ -62,6 +62,10 @@ If you want to run the examples, you'll also have to install:
 - **gym** by OpenAI: [Installation instruction](https://github.com/openai/gym#installation)
 - **h5py**: simply run `pip install h5py`
 
+For atari example you will also need:
+- **Pillow**: `pip install Pillow`
+- **gym[atari]**: Atari module for gym. Use `pip install gym[atari]`
+
 Once you have installed everything, you can try out a simple example:
 ```bash
 python examples/dqn_cartpole.py

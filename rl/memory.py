@@ -46,12 +46,10 @@ def sample_batch_indexes(low, high, size):
 class RingBuffer(object):
     def __init__(self, maxlen):
         self.maxlen = maxlen
-        self.start = 0
-        self.length = 0
-        self.data = [None for _ in range(maxlen)]
+        self.data = deque(maxlen=maxlen)
 
     def __len__(self):
-        return self.length
+        return self.length()
 
     def __getitem__(self, idx):
         """Return element of buffer at specific index
@@ -62,9 +60,9 @@ class RingBuffer(object):
         # Returns
             The element of buffer at given index
         """
-        if idx < 0 or idx >= self.length:
+        if idx < 0 or idx >= self.length():
             raise KeyError()
-        return self.data[(self.start + idx) % self.maxlen]
+        return self.data[idx]
 
     def append(self, v):
         """Append an element to the buffer
@@ -72,17 +70,18 @@ class RingBuffer(object):
         # Argument
             v (object): Element to append
         """
-        if self.length < self.maxlen:
-            # We have space, simply increase the length.
-            self.length += 1
-        elif self.length == self.maxlen:
-            # No space, "remove" the first item.
-            self.start = (self.start + 1) % self.maxlen
-        else:
-            # This should never happen.
-            raise RuntimeError()
-        self.data[(self.start + self.length - 1) % self.maxlen] = v
+        self.data.append(v)
 
+    def length(self):
+        """Return the length of Deque
+
+        # Argument
+            None
+
+        # Returns
+            The lenght of deque element
+        """
+        return len(self.data)
 
 def zeroed_observation(observation):
     """Return an array of zeros with same shape as given observation
@@ -328,13 +327,10 @@ class EpisodeParameterMemory(Memory):
             self.intermediate_rewards.append(reward)
 
     def finalize_episode(self, params):
-        """Append an observation to the memory
+        """Closes the current episode, sums up rewards and stores the parameters
 
         # Argument
-            observation (dict): Observation returned by environment
-            action (int): Action taken to obtain this observation
-            reward (float): Reward obtained by taking this action
-            terminal (boolean): Is the state terminal
+            params (object): Parameters associated with the episode to be stored and then retrieved back in sample()
         """
         total_reward = sum(self.intermediate_rewards)
         self.total_rewards.append(total_reward)

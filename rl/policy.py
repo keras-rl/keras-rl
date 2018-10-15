@@ -42,8 +42,8 @@ class Policy(object):
 
 class LinearAnnealedPolicy(Policy):
     """Implement the linear annealing policy
-    
-    Linear Annealing Policy computes a current threshold value and 
+
+    Linear Annealing Policy computes a current threshold value and
     transfers it to an inner policy which chooses the action. The threshold
     value is following a linear function decreasing over time."""
     def __init__(self, inner_policy, attr, value_max, value_min, value_test, nb_steps):
@@ -130,7 +130,7 @@ class SoftmaxPolicy(Policy):
 
         # Arguments
             probs (np.ndarray) : Probabilty for each action
-        
+
         # Returns
             action
 
@@ -140,9 +140,9 @@ class SoftmaxPolicy(Policy):
 
 class EpsGreedyQPolicy(Policy):
     """Implement the epsilon greedy policy
-    
+
     Eps Greedy policy either:
-    
+
     - takes a random action with probability epsilon
     - takes current best action with prob (1 - epsilon)
     """
@@ -169,7 +169,7 @@ class EpsGreedyQPolicy(Policy):
         return action
 
     def get_config(self):
-        """Return configurations of EpsGreedyPolicy
+        """Return configurations of EpsGreedyQPolicy
 
         # Returns
             Dict of config
@@ -228,7 +228,7 @@ class BoltzmannQPolicy(Policy):
         return action
 
     def get_config(self):
-        """Return configurations of EpsGreedyPolicy
+        """Return configurations of BoltzmannQPolicy
 
         # Returns
             Dict of config
@@ -278,7 +278,7 @@ class MaxBoltzmannQPolicy(Policy):
         return action
 
     def get_config(self):
-        """Return configurations of EpsGreedyPolicy
+        """Return configurations of MaxBoltzmannQPolicy
 
         # Returns
             Dict of config
@@ -346,7 +346,7 @@ class BoltzmannGumbelQPolicy(Policy):
         return action
 
     def get_config(self):
-        """Return configurations of EpsGreedyPolicy
+        """Return configurations of BoltzmannGumbelQPolicy
 
         # Returns
             Dict of config

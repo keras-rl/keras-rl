@@ -434,6 +434,9 @@ class NAFLayer(Layer):
                 except TypeError:
                     # New TF behavior
                     L_flat = tf.concat([zeros, L_flat], 1)
+                except ValueError:
+                    # New TF behavior
+                    L_flat = tf.concat([zeros, L_flat], 1)
 
                 # Create mask that can be used to gather elements from L_flat and put them
                 # into a lower triangular matrix.

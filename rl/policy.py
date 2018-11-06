@@ -167,7 +167,7 @@ class ExponentialAnnealedPolicy(Policy):
         if self.agent.training:
             # exponential decay
             value = max(float(self.value_min), float(self.value_max) *
-                    np.power(float(self.decay_rate), float(self.agent.step)))
+                        np.power(float(self.decay_rate), float(self.agent.step)))
         else:
             value = self.value_test
         return value

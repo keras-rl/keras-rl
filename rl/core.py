@@ -50,14 +50,15 @@ class Agent(object):
         """
         return {}
 
-    def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
+    def fit(self, env, nb_steps=None, action_repetition=1, callbacks=None, verbose=1,
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
-            nb_max_episode_steps=None):
+            nb_max_episode_steps=None, nb_max_episodes=None):
         """Trains the agent on the given environment.
 
         # Arguments
             env: (`Env` instance): Environment that the agent interacts with. See [Env](#env) for details.
-            nb_steps (integer): Number of training steps to be performed.
+            nb_steps (integer): Number of training steps to be performed. `None` means that this stopping
+                criterion is not used. At least one of nb_steps and nb_max_episodes must be other than `None`.
             action_repetition (integer): Number of times the agent repeats the same action without
                 observing the environment again. Setting this to a value > 1 can be useful
                 if a single action only has a very small effect on the environment.
@@ -77,6 +78,9 @@ class Agent(object):
             nb_max_episode_steps (integer): Number of steps per episode that the agent performs before
                 automatically resetting the environment. Set to `None` if each episode should run
                 (potentially indefinitely) until the environment signals a terminal state.
+            nb_max_episodes (integer): The maximum number of episodes that the agent is to run. If set to
+                `None`, the number of episodes is not constrained. At least one of nb_steps and nb_max_episodes
+                must be other than `None`.
 
         # Returns
             A `keras.callbacks.History` instance that recorded the entire training process.
@@ -85,6 +89,9 @@ class Agent(object):
             raise RuntimeError('Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
             raise ValueError('action_repetition must be >= 1, is {}'.format(action_repetition))
+
+        if nb_steps is None and nb_max_episodes is None:
+            raise RuntimeError("At least one of nb_steps and nb_max_episodes is required to be other than `None`, otherwise the learning would go on indefinitely.")
 
         self.training = True
 
@@ -106,6 +113,7 @@ class Agent(object):
         callbacks._set_env(env)
         params = {
             'nb_steps': nb_steps,
+            'nb_max_episodes': nb_max_episodes
         }
         if hasattr(callbacks, 'set_params'):
             callbacks.set_params(params)
@@ -121,7 +129,7 @@ class Agent(object):
         episode_step = None
         did_abort = False
         try:
-            while self.step < nb_steps:
+            while nb_steps is None or self.step < nb_steps:
                 if observation is None:  # start of a new episode
                     callbacks.on_episode_begin(episode)
                     episode_step = np.int16(0)
@@ -227,6 +235,10 @@ class Agent(object):
                     observation = None
                     episode_step = None
                     episode_reward = None
+
+                    if nb_max_episodes and episode >= nb_max_episodes:
+                        break
+
         except KeyboardInterrupt:
             # We catch keyboard interrupts here so that training can be be safely aborted.
             # This is so common that we've built this right into this function, which ensures that

@@ -134,7 +134,11 @@ class TrainEpisodeLogger(Callback):
         """ Print training values at beginning of training """
         self.train_start = timeit.default_timer()
         self.metrics_names = self.model.metrics_names
-        print('Training for {} steps ...'.format(self.params['nb_steps']))
+        
+        if not self.params['nb_steps'] is None:
+            print('Training for {} steps ...'.format(self.params['nb_steps']))
+        else:
+            print('Training for {} episodes ...'.format(self.params['nb_max_episodes']))
         
     def on_train_end(self, logs):
         """ Print training time at end of training """
@@ -172,11 +176,17 @@ class TrainEpisodeLogger(Callback):
                 metrics_variables += [name, value]          
         metrics_text = metrics_template.format(*metrics_variables)
 
-        nb_step_digits = str(int(np.ceil(np.log10(self.params['nb_steps']))) + 1)
-        template = '{step: ' + nb_step_digits + 'd}/{nb_steps}: episode: {episode}, duration: {duration:.3f}s, episode steps: {episode_steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, mean reward: {reward_mean:.3f} [{reward_min:.3f}, {reward_max:.3f}], mean action: {action_mean:.3f} [{action_min:.3f}, {action_max:.3f}], mean observation: {obs_mean:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
+        if self.params['nb_steps'] is None:
+            nb_step_digits = str(int(np.ceil(np.log10(self.step))) + 1)
+            template = '{step: ' + nb_step_digits + 'd}: episode: {episode}/{nb_max_episodes}, duration: {duration:.3f}s, episode steps: {episode_steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, mean reward: {reward_mean:.3f} [{reward_min:.3f}, {reward_max:.3f}], mean action: {action_mean:.3f} [{action_min:.3f}, {action_max:.3f}], mean observation: {obs_mean:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
+        else:
+            nb_step_digits = str(int(np.ceil(np.log10(self.params['nb_steps']))) + 1)    
+            template = '{step: ' + nb_step_digits + 'd}/{nb_steps}: episode: {episode}, duration: {duration:.3f}s, episode steps: {episode_steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, mean reward: {reward_mean:.3f} [{reward_min:.3f}, {reward_max:.3f}], mean action: {action_mean:.3f} [{action_min:.3f}, {action_max:.3f}], mean observation: {obs_mean:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
+
         variables = {
             'step': self.step,
             'nb_steps': self.params['nb_steps'],
+            'nb_max_episodes': self.params['nb_max_episodes'],
             'episode': episode + 1,
             'duration': duration,
             'episode_steps': episode_steps,
@@ -211,7 +221,6 @@ class TrainEpisodeLogger(Callback):
         self.metrics[episode].append(logs['metrics'])
         self.step += 1
 
-
 class TrainIntervalLogger(Callback):
     def __init__(self, interval=10000):
         self.interval = interval
@@ -231,10 +240,40 @@ class TrainIntervalLogger(Callback):
         """ Initialize training statistics at beginning of training """
         self.train_start = timeit.default_timer()
         self.metrics_names = self.model.metrics_names
-        print('Training for {} steps ...'.format(self.params['nb_steps']))
+
+        if not self.params['nb_steps'] is None:
+            print('Training for {} steps ...'.format(self.params['nb_steps']))
+        else:
+            print('Training for {} episodes ...'.format(self.params['nb_max_episodes']))
+
+    def _print_episode_report(self):
+        metrics = np.array(self.metrics)
+        assert (metrics.shape == (self.interval, len(self.metrics_names)) or
+            metrics.shape == (self.step % self.interval, len(self.metrics_names)))
+        formatted_metrics = ''
+        if not np.isnan(metrics).all():  # not all values are means
+            means = np.nanmean(self.metrics, axis=0)
+            assert means.shape == (len(self.metrics_names),)
+            for name, mean in zip(self.metrics_names, means):
+                formatted_metrics += ' - {}: {:.3f}'.format(name, mean)
+        
+        formatted_infos = ''
+        if len(self.infos) > 0:
+            infos = np.array(self.infos)
+            if not np.isnan(infos).all():  # not all values are means
+                means = np.nanmean(self.infos, axis=0)
+                assert means.shape == (len(self.info_names),)
+                for name, mean in zip(self.info_names, means):
+                    formatted_infos += ' - {}: {:.3f}'.format(name, mean)
+        print('{} episodes - episode_reward: {:.3f} [{:.3f}, {:.3f}]{}{}\n'.format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards), formatted_metrics, formatted_infos))
 
     def on_train_end(self, logs):
         """ Print training duration at end of training """
+        # also print the episode report if there are still some
+        # episodes at this point that we did not report on yet
+        if len(self.episode_rewards) > 0:
+            print('')
+            self._print_episode_report()
         duration = timeit.default_timer() - self.train_start
         print('done, took {:.3f} seconds'.format(duration))
 
@@ -242,25 +281,7 @@ class TrainIntervalLogger(Callback):
         """ Print metrics if interval is over """
         if self.step % self.interval == 0:
             if len(self.episode_rewards) > 0:
-                metrics = np.array(self.metrics)
-                assert metrics.shape == (self.interval, len(self.metrics_names))
-                formatted_metrics = ''
-                if not np.isnan(metrics).all():  # not all values are means
-                    means = np.nanmean(self.metrics, axis=0)
-                    assert means.shape == (len(self.metrics_names),)
-                    for name, mean in zip(self.metrics_names, means):
-                        formatted_metrics += ' - {}: {:.3f}'.format(name, mean)
-                
-                formatted_infos = ''
-                if len(self.infos) > 0:
-                    infos = np.array(self.infos)
-                    if not np.isnan(infos).all():  # not all values are means
-                        means = np.nanmean(self.infos, axis=0)
-                        assert means.shape == (len(self.info_names),)
-                        for name, mean in zip(self.info_names, means):
-                            formatted_infos += ' - {}: {:.3f}'.format(name, mean)
-                print('{} episodes - episode_reward: {:.3f} [{:.3f}, {:.3f}]{}{}'.format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards), formatted_metrics, formatted_infos))
-                print('')
+                self._print_episode_report()
             self.reset()
             print('Interval {} ({} steps performed)'.format(self.step // self.interval + 1, self.step))
 

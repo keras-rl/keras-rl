@@ -117,6 +117,105 @@ class LinearAnnealedPolicy(Policy):
         config['inner_policy'] = get_object_config(self.inner_policy)
         return config
 
+
+class ExponentialAnnealedPolicy(Policy):
+    """Implement the exponential annealing policy
+
+    Exponential Annealing Policy computes a current threshold value and
+    transfers it to an inner policy which chooses the action. The threshold
+    value is following exponential decay with the specified decay rate."""
+    def __init__(self, inner_policy, attr, value_max, value_min, value_test,
+                 decay_rate=None, nb_steps=None):
+        """
+        # Arguments
+            decay_rate (float): The exponential decay rate. Either this or 
+                                nb_steps must be other than None.
+            nb_steps (int): If the number of steps is specified and decay_rate
+                            is None, decay rate is calculated automatically
+                            to match the number of steps. If decay_rate is not
+                            None, it takes precedence and nb_steps is ignored.
+                            Either this or decay_rate must be other than None.
+        """
+
+        if not hasattr(inner_policy, attr):
+            raise ValueError('Policy does not have attribute "{}".'.format(attr))
+
+        if decay_rate is None and nb_steps is None:
+            raise ValueError('Either decay_rate or nb_steps must be other than None.')
+
+        super(ExponentialAnnealedPolicy, self).__init__()
+
+        self.inner_policy = inner_policy
+        self.attr = attr
+        self.value_max = value_max
+        self.value_min = value_min
+        self.value_test = value_test
+
+        # if decay_rate is None and nb_steps is specified, calculate the
+        # decay_rate that will decay to value_min over nb_steps steps
+        if decay_rate is None:
+            self.decay_rate = np.power(np.e, np.log(value_min / value_max) / nb_steps)
+        else:
+            self.decay_rate = decay_rate
+
+    def get_current_value(self):
+        """Return current annealing value
+
+        # Returns
+            Value to use in annealing
+        """
+        if self.agent.training:
+            # exponential decay
+            value = max(float(self.value_min), float(self.value_max) *
+                    np.power(float(self.decay_rate), float(self.agent.step)))
+        else:
+            value = self.value_test
+        return value
+
+    def select_action(self, **kwargs):
+        """Choose an action to perform
+
+        # Returns
+            Action to take (int)
+        """
+        setattr(self.inner_policy, self.attr, self.get_current_value())
+        return self.inner_policy.select_action(**kwargs)
+
+    @property
+    def metrics_names(self):
+        """Return names of metrics
+
+        # Returns
+            List of metric names
+        """
+        return ['mean_{}'.format(self.attr)]
+
+    @property
+    def metrics(self):
+        """Return metrics values
+
+        # Returns
+            List of metric values
+        """
+
+        return [getattr(self.inner_policy, self.attr)]
+
+    def get_config(self):
+        """Return configurations of LinearAnnealedPolicy
+
+        # Returns
+            Dict of config
+        """
+        config = super(LinearAnnealedPolicy, self).get_config()
+        config['attr'] = self.attr
+        config['value_max'] = self.value_max
+        config['value_min'] = self.value_min
+        config['value_test'] = self.value_test
+        config['decay_rate'] = self.decay_rate
+        config['inner_policy'] = get_object_config(self.inner_policy)
+        return config
+
+
 class SoftmaxPolicy(Policy):
     """ Implement softmax policy for multinimial distribution
 
@@ -137,6 +236,7 @@ class SoftmaxPolicy(Policy):
         """
         action = np.random.choice(range(nb_actions), p=probs)
         return action
+
 
 class EpsGreedyQPolicy(Policy):
     """Implement the epsilon greedy policy

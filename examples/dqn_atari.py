@@ -102,7 +102,7 @@ dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
 if args.mode == 'train':
     # Okay, now it's time to learn something! We capture the interrupt exception so that training
-    # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
+    # can be prematurely aborted. Notice that now you can use the built-in Keras callbacks!
     weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
     checkpoint_weights_filename = 'dqn_' + args.env_name + '_weights_{step}.h5f'
     log_filename = 'dqn_{}_log.json'.format(args.env_name)

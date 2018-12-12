@@ -450,7 +450,7 @@ class NAFLayer(Layer):
                     # Multiply by the mask first to avoid exponentiating everything, even
                     # though we'll multiply by it again later, this saves on computation and
                     # can help prevent NaNs that might crop up during exponentiation.
-                    x_ *= diag_mask
+                    x_ = x * diag_mask
                     # Exponentiate only the elements kept by the mask, with the rest being set
                     # to e^0 = 1 as a result.
                     x_ = K.exp(x_) + K.epsilon()

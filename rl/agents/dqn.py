@@ -415,15 +415,6 @@ class NAFLayer(Layer):
                 # Number of elements in a triangular matrix.
                 nb_elems = (self.nb_actions * self.nb_actions + self.nb_actions) // 2
 
-                # Create mask for the diagonal elements in L_flat. This is used to exponentiate
-                # only the diagonal elements, which is done before gathering.
-                diag_indeces = [0]
-                for row in range(1, self.nb_actions):
-                    diag_indeces.append(diag_indeces[-1] + (row + 1))
-                diag_mask = np.zeros(1 + nb_elems)  # +1 for the leading zero
-                diag_mask[np.array(diag_indeces) + 1] = 1
-                diag_mask = K.variable(diag_mask)
-
                 # Add leading zero element to each element in the L_flat. We use this zero
                 # element when gathering L_flat into a lower triangular matrix L.
                 nb_rows = tf.shape(L_flat)[0]
@@ -446,11 +437,25 @@ class NAFLayer(Layer):
                     K.zeros((self.nb_actions, self.nb_actions)),
                 ]
 
+                # Create mask for the diagonal elements in L_flat. This is used to exponentiate
+                # only the diagonal elements, which is done before gathering.
+                diag_indices = [0]
+                for row in range(1, self.nb_actions):
+                    diag_indices.append(diag_indices[-1] + (row + 1))
+                diag_mask = np.zeros(1 + nb_elems)  # +1 for the leading zero
+                diag_mask[np.array(diag_indices) + 1] = 1
+                diag_mask = K.variable(diag_mask)
+
                 def fn(a, x):
-                    # Exponentiate everything. This is much easier than only exponentiating
-                    # the diagonal elements, and, usually, the action space is relatively low.
-                    x_ = K.exp(x) + K.epsilon()
-                    # Only keep the diagonal elements.
+                    # Multiply by the mask first to avoid exponentiating everything, even
+                    # though we'll multiply by it again later, this saves on computation and
+                    # can help prevent NaNs that might crop up during exponentiation.
+                    x_ *= diag_mask
+                    # Exponentiate only the elements kept by the mask, with the rest being set
+                    # to e^0 = 1 as a result.
+                    x_ = K.exp(x_) + K.epsilon()
+                    # Remove all the e^0 = 1 entries that were created by exponentiating the
+                    # non-diagonal elements of x_ and set them to 0 instead.
                     x_ *= diag_mask
                     # Add the original, non-diagonal elements.
                     x_ += x * (1. - diag_mask)

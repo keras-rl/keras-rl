@@ -135,7 +135,7 @@ class TrainEpisodeLogger(Callback):
         self.train_start = timeit.default_timer()
         self.metrics_names = self.model.metrics_names
         print('Training for {} steps ...'.format(self.params['nb_steps']))
-        
+
     def on_train_end(self, logs):
         """ Print training time at end of training """
         duration = timeit.default_timer() - self.train_start
@@ -169,7 +169,7 @@ class TrainEpisodeLogger(Callback):
                 except Warning:
                     value = '--'
                     metrics_template += '{}: {}'
-                metrics_variables += [name, value]          
+                metrics_variables += [name, value]
         metrics_text = metrics_template.format(*metrics_variables)
 
         nb_step_digits = str(int(np.ceil(np.log10(self.params['nb_steps']))) + 1)
@@ -243,22 +243,27 @@ class TrainIntervalLogger(Callback):
         if self.step % self.interval == 0:
             if len(self.episode_rewards) > 0:
                 metrics = np.array(self.metrics)
-                assert metrics.shape == (self.interval, len(self.metrics_names))
+                assert metrics.shape == (self.interval, len(self.metrics_names)), (metrics.shape, (self.interval, len(self.metrics_names)))
                 formatted_metrics = ''
                 if not np.isnan(metrics).all():  # not all values are means
                     means = np.nanmean(self.metrics, axis=0)
-                    assert means.shape == (len(self.metrics_names),)
+                    assert means.shape == (len(self.metrics_names),), (means.shape, (len(self.metrics_names),))
                     for name, mean in zip(self.metrics_names, means):
                         formatted_metrics += ' - {}: {:.3f}'.format(name, mean)
-                
+
                 formatted_infos = ''
                 if len(self.infos) > 0:
                     infos = np.array(self.infos)
                     if not np.isnan(infos).all():  # not all values are means
                         means = np.nanmean(self.infos, axis=0)
-                        assert means.shape == (len(self.info_names),)
-                        for name, mean in zip(self.info_names, means):
-                            formatted_infos += ' - {}: {:.3f}'.format(name, mean)
+                        try:
+                            assert means.shape == (len(self.info_names),), (means.shape, (len(self.info_names),))
+                            for name, mean in zip(self.info_names, means):
+                                formatted_infos += ' - {}: {:.3f}'.format(name, mean)
+                        except:
+                            import traceback
+                            traceback.print_exc()
+                            print("Ignoring error in infos {}.".format(self.infos))
                 print('{} episodes - episode_reward: {:.3f} [{:.3f}, {:.3f}]{}{}'.format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards), formatted_metrics, formatted_infos))
                 print('')
             self.reset()
@@ -310,7 +315,7 @@ class FileLogger(Callback):
         self.starts[episode] = timeit.default_timer()
 
     def on_episode_end(self, episode, logs):
-        """ Compute and print metrics at the end of each episode """ 
+        """ Compute and print metrics at the end of each episode """
         duration = timeit.default_timer() - self.starts[episode]
 
         metrics = self.metrics[episode]

@@ -2,7 +2,7 @@ from __future__ import division
 import warnings
 
 import keras.backend as K
-from keras.models import Model
+from keras.models import Model, load_model
 from keras.layers import Lambda, Input, Layer, Dense
 
 from rl.core import Agent
@@ -209,8 +209,15 @@ class DQNAgent(AbstractDQNAgent):
         self.model.load_weights(filepath)
         self.update_target_model_hard()
 
+    def load(self, filepath):
+        self.model = load_model(filepath)
+        self.update_target_model_hard()
+
     def save_weights(self, filepath, overwrite=False):
         self.model.save_weights(filepath, overwrite=overwrite)
+
+    def save(self, filepath, overwrite=False):
+        self.model.save(filepath, overwrite=overwrite)
 
     def reset_states(self):
         self.recent_action = None

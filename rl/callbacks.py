@@ -367,12 +367,13 @@ class Visualizer(Callback):
 
 
 class ModelIntervalCheckpoint(Callback):
-    def __init__(self, filepath, interval, verbose=0):
+    def __init__(self, filepath, interval, verbose=0, save_model = False):
         super(ModelIntervalCheckpoint, self).__init__()
         self.filepath = filepath
         self.interval = interval
         self.verbose = verbose
         self.total_steps = 0
+        self.save_model = save_model
 
     def on_step_end(self, step, logs={}):
         """ Save weights at interval steps during training """
@@ -383,5 +384,11 @@ class ModelIntervalCheckpoint(Callback):
 
         filepath = self.filepath.format(step=self.total_steps, **logs)
         if self.verbose > 0:
-            print('Step {}: saving model to {}'.format(self.total_steps, filepath))
+            print('Step {}: saving weights to {}'.format(self.total_steps, filepath))
         self.model.save_weights(filepath, overwrite=True)
+
+        if self.save_model:
+            if self.verbose:
+                print('Step {}: saving model to {}'.format(self.total_steps, filepath))
+            self.model.save(filepath, overwrite=True)
+

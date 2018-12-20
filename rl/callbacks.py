@@ -253,17 +253,17 @@ class TrainIntervalLogger(Callback):
 
                 formatted_infos = ''
                 if len(self.infos) > 0:
-                    infos = np.array(self.infos)
-                    if not np.isnan(infos).all():  # not all values are means
-                        means = np.nanmean(self.infos, axis=0)
-                        try:
-                            assert means.shape == (len(self.info_names),), (means.shape, (len(self.info_names),))
+                    try:
+                        infos = np.array(self.infos)
+                        if not np.isnan(infos).all():  # not all values are means
+                            means = np.nanmean(infos, axis=0)
+                            assert means.shape[0] == len(self.info_names), (means.shape, len(self.info_names))
                             for name, mean in zip(self.info_names, means):
                                 formatted_infos += ' - {}: {:.3f}'.format(name, mean)
-                        except:
-                            import traceback
-                            traceback.print_exc()
-                            print("Ignoring error in infos {}.".format(self.infos))
+                    except:
+                        import traceback
+                        traceback.print_exc()
+                        print("Ignoring error in infos {}.".format(self.infos))
                 print('{} episodes - episode_reward: {:.3f} [{:.3f}, {:.3f}]{}{}'.format(len(self.episode_rewards), np.mean(self.episode_rewards), np.min(self.episode_rewards), np.max(self.episode_rewards), formatted_metrics, formatted_infos))
                 print('')
             self.reset()

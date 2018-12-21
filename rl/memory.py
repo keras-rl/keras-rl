@@ -724,7 +724,7 @@ class PartitionedMemory(Memory):
             assert 0 <= idx < self.limit
             #expert transition priorities receive an extra boost
             if idx < self.permanent_idx:
-                priority = (priorities[i] ** self.alpha) + .999
+                priority = (priorities[i] ** self.alpha) + partitioned_boost
             else:
                 priority = (priorities[i] ** self.alpha)
             self.sum_tree[idx] = priority

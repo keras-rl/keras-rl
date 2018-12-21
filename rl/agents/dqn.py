@@ -7,7 +7,7 @@ from keras.layers import Lambda, Input, Layer, Dense
 from rl.core import Agent
 from rl.policy import EpsGreedyQPolicy, GreedyQPolicy
 from rl.util import *
-from rl.memory import PrioritizedMemory, PartitionedMemory
+from rl.memory import PrioritizedMemory
 
 def mean_q(y_true, y_pred):
     return K.mean(K.max(y_pred, axis=-1))
@@ -159,7 +159,7 @@ class DQNAgent(AbstractDQNAgent):
         self.reset_states()
 
         #flag for changes to algorithm that come from dealing with importance sampling weights and priorities
-        self.prioritized = True if isinstance(self.memory, (PrioritizedMemory, PartitionedMemory)) else False
+        self.prioritized = True if isinstance(self.memory, PrioritizedMemory) else False
 
 
     def get_config(self):

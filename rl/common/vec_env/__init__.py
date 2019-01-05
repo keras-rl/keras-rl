@@ -52,7 +52,7 @@ class VecEnv(object):
         return self.step_wait()
 
     def render(self, mode='human'):
-        logger.warn('Render not defined for %s'%self)
+        logger.warn('Render not defined for %s' % self)
 
     def seed(self, i):
         raise NotImplementedError()
@@ -70,9 +70,11 @@ class CloudpickleWrapper(object):
     """
     def __init__(self, x):
         self.x = x
+
     def __getstate__(self):
         import cloudpickle
         return cloudpickle.dumps(self.x)
+
     def __setstate__(self, ob):
         import pickle
         self.x = pickle.loads(ob)

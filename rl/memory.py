@@ -351,8 +351,6 @@ class PartitionedRingBuffer(object):
         return self.length
 
     def __getitem__(self, idx):
-        if idx < 0:
-            raise KeyError()
         return self.data[idx % self.maxlen]
 
     def append(self, v):
@@ -430,7 +428,7 @@ class PrioritizedMemory(Memory):
 
         return idxs
 
-    def sample(self, batch_size, beta=1., nstep=1, gamma=1.):
+    def sample(self, batch_size, beta=1., n_step=1, gamma=1.):
         idxs = self._sample_proportional(batch_size)
 
         #importance sampling weights are a stability measure
@@ -445,7 +443,7 @@ class PrioritizedMemory(Memory):
         for idx in idxs:
             while idx < self.window_length + 1:
                 idx += 1
-            while idx + nstep > self.nb_entries and self.nb_entries < self.limit:
+            while idx + n_step > self.nb_entries and self.nb_entries < self.limit:
                 # We are fine with nstep spilling back to the beginning of the buffer
                 # once it has been filled.
                 idx -= 1
@@ -454,7 +452,7 @@ class PrioritizedMemory(Memory):
                 # Skip this transition because the environment was reset here. Select a new, random
                 # transition and use this instead. This may cause the batch to contain the same
                 # transition twice.
-                idx = sample_batch_indexes(self.window_length + 1, self.nb_entries - nstep, size=1)[0]
+                idx = sample_batch_indexes(self.window_length + 1, self.nb_entries - n_step, size=1)[0]
                 terminal0 = self.terminals[idx - 2]
 
             assert self.window_length + 1 <= idx < self.nb_entries
@@ -482,20 +480,20 @@ class PrioritizedMemory(Memory):
             action = self.actions[idx - 1]
             # N-step TD
             reward = 0
-            nstep = nstep
-            for i in range(nstep):
+            n_step = n_step
+            for i in range(n_step):
                 reward += (gamma**i) * self.rewards[idx + i - 1]
                 if self.terminals[idx + i - 1]:
                     #episode terminated before length of n-step rollout.
-                    nstep = i
+                    n_step = i
                     break
 
-            terminal1 = self.terminals[idx + nstep - 1]
+            terminal1 = self.terminals[idx + n_step - 1]
 
             # We assemble the second state in a similar way.
-            state1 = [self.observations[idx + nstep - 1]]
+            state1 = [self.observations[idx + n_step - 1]]
             for offset in range(0, self.window_length - 1):
-                current_idx = idx + nstep - 1 - offset
+                current_idx = idx + n_step - 1 - offset
                 assert current_idx >= 1
                 current_terminal = self.terminals[current_idx - 1]
                 if current_terminal and not self.ignore_episode_boundaries:

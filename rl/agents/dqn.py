@@ -104,6 +104,7 @@ class DQNAgent(AbstractDQNAgent):
         target_model_update__: How often to update the target model. Longer intervals stabilize training.
         train_interval__: The integer number of steps between each learning process.
         delta_clip__: A component of the huber loss.
+        n_step__: N-step temporal difference error. Only has an effect on agents with a prioritized memory.
     """
     def __init__(self, model, policy=None, test_policy=None, enable_double_dqn=True, enable_dueling_network=False,
                  dueling_type='avg', n_step=1, *args, **kwargs):

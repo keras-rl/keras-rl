@@ -334,6 +334,37 @@ class EpisodeParameterMemory(Memory):
         config['limit'] = self.limit
         return config
 
+class PartitionedRingBuffer(object):
+    """
+    Buffer with a section that can be sampled from but never overwritten.
+    Used for demonstration data. Can be used without a partition,
+    where it would function as a fixed-idxs variant of RingBuffer.
+    """
+    def __init__(self, maxlen):
+        self.maxlen = maxlen
+        self.length = 0
+        self.data = [None for _ in range(maxlen)]
+        self.permanent_idx = 0
+        self.next_idx = 0
+
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, idx):
+        return self.data[idx % self.maxlen]
+
+    def append(self, v):
+        if self.length < self.maxlen:
+            self.length += 1
+        self.data[(self.permanent_idx + self.next_idx)] = v
+        self.next_idx = (self.next_idx + 1) % (self.maxlen - self.permanent_idx)
+
+    def load(self, load_data):
+        assert len(load_data) < self.maxlen, "Must leave space to write new data."
+        for idx, data in enumerate(load_data):
+            self.length += 1
+            self.data[idx] = data
+            self.permanent_idx += 1
 
 class PrioritizedMemory(Memory):
     def __init__(self, limit, alpha=.4, start_beta=1., end_beta=1., steps_annealed=1, **kwargs):
@@ -343,11 +374,10 @@ class PrioritizedMemory(Memory):
         self.limit = limit
 
         #Transitions are stored in individual RingBuffers, similar to the SequentialMemory.
-        #This does complicate things a bit relative to the OpenAI baseline implementation.
-        self.actions = RingBuffer(limit)
-        self.rewards = RingBuffer(limit)
-        self.terminals = RingBuffer(limit)
-        self.observations = RingBuffer(limit)
+        self.actions = PartitionedRingBuffer(limit)
+        self.rewards = PartitionedRingBuffer(limit)
+        self.terminals = PartitionedRingBuffer(limit)
+        self.observations = PartitionedRingBuffer(limit)
 
         assert alpha >= 0
         #how aggressively to sample based on TD error
@@ -398,7 +428,7 @@ class PrioritizedMemory(Memory):
 
         return idxs
 
-    def sample(self, batch_size, beta=1.):
+    def sample(self, batch_size, beta=1., n_step=1, gamma=1.):
         idxs = self._sample_proportional(batch_size)
 
         #importance sampling weights are a stability measure
@@ -413,13 +443,16 @@ class PrioritizedMemory(Memory):
         for idx in idxs:
             while idx < self.window_length + 1:
                 idx += 1
-
+            while idx + n_step > self.nb_entries and self.nb_entries < self.limit:
+                # We are fine with nstep spilling back to the beginning of the buffer
+                # once it has been filled.
+                idx -= 1
             terminal0 = self.terminals[idx - 2]
             while terminal0:
                 # Skip this transition because the environment was reset here. Select a new, random
                 # transition and use this instead. This may cause the batch to contain the same
                 # transition twice.
-                idx = sample_batch_indexes(self.window_length + 1, self.nb_entries, size=1)[0]
+                idx = sample_batch_indexes(self.window_length + 1, self.nb_entries - n_step, size=1)[0]
                 terminal0 = self.terminals[idx - 2]
 
             assert self.window_length + 1 <= idx < self.nb_entries
@@ -430,8 +463,7 @@ class PrioritizedMemory(Memory):
             #normalize weights according to the maximum value
             importance_weights.append(importance_weight/max_importance_weight)
 
-            # Code for assembling stacks of observations and dealing with episode boundaries is borrowed from
-            # SequentialMemory
+            #assemble the initial state from the ringbuffer.
             state0 = [self.observations[idx - 1]]
             for offset in range(0, self.window_length - 1):
                 current_idx = idx - 2 - offset
@@ -444,11 +476,33 @@ class PrioritizedMemory(Memory):
                 state0.insert(0, self.observations[current_idx])
             while len(state0) < self.window_length:
                 state0.insert(0, zeroed_observation(state0[0]))
+
             action = self.actions[idx - 1]
-            reward = self.rewards[idx - 1]
-            terminal1 = self.terminals[idx - 1]
-            state1 = [np.copy(x) for x in state0[1:]]
-            state1.append(self.observations[idx])
+            # N-step TD
+            reward = 0
+            n_step = n_step
+            for i in range(n_step):
+                reward += (gamma**i) * self.rewards[idx + i - 1]
+                if self.terminals[idx + i - 1]:
+                    #episode terminated before length of n-step rollout.
+                    n_step = i
+                    break
+
+            terminal1 = self.terminals[idx + n_step - 1]
+
+            # We assemble the second state in a similar way.
+            state1 = [self.observations[idx + n_step - 1]]
+            for offset in range(0, self.window_length - 1):
+                current_idx = idx + n_step - 1 - offset
+                assert current_idx >= 1
+                current_terminal = self.terminals[current_idx - 1]
+                if current_terminal and not self.ignore_episode_boundaries:
+                    # The previously handled observation was terminal, don't add the current one.
+                    # Otherwise we would leak into a different episode.
+                    break
+                state1.insert(0, self.observations[current_idx])
+            while len(state1) < self.window_length:
+                state1.insert(0, zeroed_observation(state0[0]))
 
             assert len(state0) == self.window_length
             assert len(state1) == len(state0)

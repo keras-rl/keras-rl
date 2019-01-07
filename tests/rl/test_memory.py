@@ -3,7 +3,7 @@ import pytest
 import numpy as np
 from numpy.testing import assert_allclose
 
-from rl.memory import SequentialMemory, RingBuffer
+from rl.memory import SequentialMemory, RingBuffer, PartitionedRingBuffer
 
 
 def test_ring_buffer():
@@ -39,6 +39,19 @@ def test_ring_buffer():
     b.append(8)
     assert_elements(b, [4, 5, 6, 7, 8])
 
+def test_partitioned_ring_buffer():
+    b = PartitionedRingBuffer(5)
+    b.load([9,9])
+    b.append(1)
+    assert b.data == [9, 9, 1, None, None]
+    for i in range(4):
+        b.append(0)
+    assert b.data == [9, 9, 0, 0, 0]
+    b.append(2)
+    assert b.data == [9, 9, 0, 0, 2]
+    for i in range(5):
+        b.append(0)
+    assert b.data ==  [9, 9, 0, 0, 0]
 
 def test_get_recent_state_with_episode_boundaries():
     memory = SequentialMemory(3, window_length=2, ignore_episode_boundaries=False)

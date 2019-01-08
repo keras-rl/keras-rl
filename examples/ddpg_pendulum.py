@@ -11,7 +11,6 @@ from rl.random import OrnsteinUhlenbeckProcess
 
 
 ENV_NAME = 'Pendulum-v0'
-gym.undo_logger_setup()
 
 
 # Get the environment and extract the number of actions.

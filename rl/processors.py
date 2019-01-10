@@ -56,12 +56,13 @@ class MultiInputProcessor(Processor):
             for idx_state, state in enumerate(state_batch):
                 for idx_window in range(state_batch.shape[1]):
                     for i in range(order.shape[2]):
-                        if not len(state_batch[idx_state][idx_window]) == self.nb_inputs: 
+                        if not len(state[idx_window]) == self.nb_inputs:
                             raise AssertionError()
                         order[idx_state, idx_window, i] = state_batch[idx_state][idx_window][key][i]
             ordered_dict[key] = order
 
         return ordered_dict
+
 
 class WhiteningNormalizerProcessor(Processor):
     """Normalizes the observations to have zero mean and standard deviation of one,

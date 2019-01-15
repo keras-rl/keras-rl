@@ -77,6 +77,12 @@ Some sample weights are available on [keras-rl-weights](https://github.com/matth
 
 If you have questions or problems, please file an issue or, even better, fix the problem yourself and submit a pull request!
 
+## External Projects
+
+- [Starcraft II Learning Environment](https://soygema.github.io/starcraftII_machine_learning/#0)
+
+You're using Keras-RL on a project? Open a PR and share it!
+
 ## Citing
 
 If you use `keras-rl` in your research, you can cite it as follows:

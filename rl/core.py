@@ -352,12 +352,17 @@ class Agent(object):
                         observation, r, d, info = self.processor.process_step(observation, r, d, info)
                     callbacks.on_action_end(action)
                     reward += r
-                    for key, value in info.items():
-                        if not np.isreal(value):
-                            continue
-                        if key not in accumulated_info:
-                            accumulated_info[key] = np.zeros_like(value)
-                        accumulated_info[key] += value
+                    try:
+                        for key, value in info.items():
+                            if not np.isreal(value).all():
+                                continue
+                            if key not in accumulated_info:
+                                accumulated_info[key] = np.zeros_like(value)
+                            accumulated_info[key] += value
+                    except:
+                        import traceback
+                        traceback.print_exc()
+                        print("Ignoring error in info {}.".format(info))
                     if d:
                         done = True
                         break

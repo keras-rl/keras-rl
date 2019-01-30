@@ -259,7 +259,7 @@ class TrainIntervalLogger(Callback):
                             means = np.nanmean(infos, axis=0)
                             assert means.shape[0] == len(self.info_names), (means.shape, len(self.info_names))
                             for name, mean in zip(self.info_names, means):
-                                formatted_infos += ' - {}: {:.3f}'.format(name, mean)
+                                formatted_infos += ' - {}: {}'.format(name, mean)
                     except:
                         import traceback
                         traceback.print_exc()

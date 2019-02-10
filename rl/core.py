@@ -52,7 +52,7 @@ class Agent(object):
 
     def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
             visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
-            nb_max_episode_steps=None):
+            nb_max_episode_steps=None, history=None):
         """Trains the agent on the given environment.
 
         # Arguments
@@ -77,6 +77,7 @@ class Agent(object):
             nb_max_episode_steps (integer): Number of steps per episode that the agent performs before
                 automatically resetting the environment. Set to `None` if each episode should run
                 (potentially indefinitely) until the environment signals a terminal state.
+            history (instance of keras.callbacks.History): You can use a custom history object here. Set to `None` to use the default one.
 
         # Returns
             A `keras.callbacks.History` instance that recorded the entire training process.
@@ -96,7 +97,8 @@ class Agent(object):
             callbacks += [TrainEpisodeLogger()]
         if visualize:
             callbacks += [Visualizer()]
-        history = History()
+        if history is None:
+            history = History()
         callbacks += [history]
         callbacks = CallbackList(callbacks)
         if hasattr(callbacks, 'set_model'):

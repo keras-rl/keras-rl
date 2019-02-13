@@ -240,7 +240,7 @@ class Agent(object):
         return history
 
     def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
-             nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1):
+             nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1, history=None):
         """Callback that is called before training begins.
 
         # Arguments
@@ -265,6 +265,7 @@ class Agent(object):
             nb_max_episode_steps (integer): Number of steps per episode that the agent performs before
                 automatically resetting the environment. Set to `None` if each episode should run
                 (potentially indefinitely) until the environment signals a terminal state.
+            history (instance of keras.callbacks.History): You can use a custom history object here. Set to `None` to use the default one.
 
         # Returns
             A `keras.callbacks.History` instance that recorded the entire training process.
@@ -283,7 +284,8 @@ class Agent(object):
             callbacks += [TestLogger()]
         if visualize:
             callbacks += [Visualizer()]
-        history = History()
+        if history is None:
+            history = History()
         callbacks += [history]
         callbacks = CallbackList(callbacks)
         if hasattr(callbacks, 'set_model'):

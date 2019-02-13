@@ -7,8 +7,10 @@ from tempfile import mkdtemp
 
 import numpy as np
 
+from keras import __version__ as KERAS_VERSION
 from keras.callbacks import Callback as KerasCallback, CallbackList as KerasCallbackList, TensorBoard, CSVLogger
 from keras.utils.generic_utils import Progbar
+from keras import backend as K
 # from rl.core import Agent
 
 
@@ -17,21 +19,27 @@ class Callback(KerasCallback):
         self.env = env
 
     def on_episode_begin(self, episode, logs={}):
+        """Called at beginning of each episode"""
         pass
 
     def on_episode_end(self, episode, logs={}):
+        """Called at end of each episode"""
         pass
 
     def on_step_begin(self, step, logs={}):
+        """Called at beginning of each step"""
         pass
 
     def on_step_end(self, step, logs={}):
+        """Called at end of each step"""
         pass
 
     def on_action_begin(self, action, logs={}):
+        """Called at beginning of each action"""
         pass
 
     def on_action_end(self, action, logs={}):
+        """Called at end of each action"""
         pass
 
 
@@ -46,11 +54,13 @@ class CallbackList(KerasCallbackList):
                 callback.set_model(model)
 
     def _set_env(self, env):
+        """ Set environment for each callback in callbackList """
         for callback in self.callbacks:
             if callable(getattr(callback, '_set_env', None)):
                 callback._set_env(env)
 
     def on_episode_begin(self, episode, logs={}):
+        """ Called at beginning of each episode for each callback in callbackList"""
         for callback in self.callbacks:
             # Check if callback supports the more appropriate `on_episode_begin` callback.
             # If not, fall back to `on_epoch_begin` to be compatible with built-in Keras callbacks.
@@ -60,6 +70,7 @@ class CallbackList(KerasCallbackList):
                 callback.on_epoch_begin(episode, logs=logs)
 
     def on_episode_end(self, episode, logs={}):
+        """ Called at end of each episode for each callback in callbackList"""
         for callback in self.callbacks:
             # Check if callback supports the more appropriate `on_episode_end` callback.
             # If not, fall back to `on_epoch_end` to be compatible with built-in Keras callbacks.
@@ -69,6 +80,7 @@ class CallbackList(KerasCallbackList):
                 callback.on_epoch_end(episode, logs=logs)
 
     def on_step_begin(self, step, logs={}):
+        """ Called at beginning of each step for each callback in callbackList"""
         for callback in self.callbacks:
             # Check if callback supports the more appropriate `on_step_begin` callback.
             # If not, fall back to `on_batch_begin` to be compatible with built-in Keras callbacks.
@@ -78,6 +90,7 @@ class CallbackList(KerasCallbackList):
                 callback.on_batch_begin(step, logs=logs)
 
     def on_step_end(self, step, logs={}):
+        """ Called at end of each step for each callback in callbackList"""
         for callback in self.callbacks:
             # Check if callback supports the more appropriate `on_step_end` callback.
             # If not, fall back to `on_batch_end` to be compatible with built-in Keras callbacks.
@@ -87,21 +100,26 @@ class CallbackList(KerasCallbackList):
                 callback.on_batch_end(step, logs=logs)
 
     def on_action_begin(self, action, logs={}):
+        """ Called at beginning of each action for each callback in callbackList"""
         for callback in self.callbacks:
             if callable(getattr(callback, 'on_action_begin', None)):
                 callback.on_action_begin(action, logs=logs)
 
     def on_action_end(self, action, logs={}):
+        """ Called at end of each action for each callback in callbackList"""
         for callback in self.callbacks:
             if callable(getattr(callback, 'on_action_end', None)):
                 callback.on_action_end(action, logs=logs)
 
 
 class TestLogger(Callback):
+    """ Logger Class for Test """
     def on_train_begin(self, logs):
+        """ Print logs at beginning of training"""
         print('Testing for {} episodes ...'.format(self.params['nb_episodes']))
 
     def on_episode_end(self, episode, logs):
+        """ Print logs at end of each episode """
         template = 'Episode {0}: reward: {1:.3f}, steps: {2}'
         variables = [
             episode + 1,
@@ -124,15 +142,18 @@ class TrainEpisodeLogger(Callback):
         self.step = 0
 
     def on_train_begin(self, logs):
+        """ Print training values at beginning of training """
         self.train_start = timeit.default_timer()
         self.metrics_names = self.model.metrics_names
         print('Training for {} steps ...'.format(self.params['nb_steps']))
         
     def on_train_end(self, logs):
+        """ Print training time at end of training """
         duration = timeit.default_timer() - self.train_start
         print('done, took {:.3f} seconds'.format(duration))
 
     def on_episode_begin(self, episode, logs):
+        """ Reset environment variables at beginning of each episode """
         self.episode_start[episode] = timeit.default_timer()
         self.observations[episode] = []
         self.rewards[episode] = []
@@ -140,6 +161,7 @@ class TrainEpisodeLogger(Callback):
         self.metrics[episode] = []
 
     def on_episode_end(self, episode, logs):
+        """ Compute and print training statistics of the episode when done """
         duration = timeit.default_timer() - self.episode_start[episode]
         episode_steps = len(self.observations[episode])
 
@@ -192,6 +214,7 @@ class TrainEpisodeLogger(Callback):
         del self.metrics[episode]
 
     def on_step_end(self, step, logs):
+        """ Update statistics of episode after each step """
         episode = logs['episode']
         self.observations[episode].append(logs['observation'])
         self.rewards[episode].append(logs['reward'])
@@ -207,6 +230,7 @@ class TrainIntervalLogger(Callback):
         self.reset()
 
     def reset(self):
+        """ Reset statistics """
         self.interval_start = timeit.default_timer()
         self.progbar = Progbar(target=self.interval)
         self.metrics = []
@@ -215,15 +239,18 @@ class TrainIntervalLogger(Callback):
         self.episode_rewards = []
 
     def on_train_begin(self, logs):
+        """ Initialize training statistics at beginning of training """
         self.train_start = timeit.default_timer()
         self.metrics_names = self.model.metrics_names
         print('Training for {} steps ...'.format(self.params['nb_steps']))
 
     def on_train_end(self, logs):
+        """ Print training duration at end of training """
         duration = timeit.default_timer() - self.train_start
         print('done, took {:.3f} seconds'.format(duration))
 
     def on_step_begin(self, step, logs):
+        """ Print metrics if interval is over """
         if self.step % self.interval == 0:
             if len(self.episode_rewards) > 0:
                 metrics = np.array(self.metrics)
@@ -249,16 +276,21 @@ class TrainIntervalLogger(Callback):
             print('Interval {} ({} steps performed)'.format(self.step // self.interval + 1, self.step))
 
     def on_step_end(self, step, logs):
+        """ Update progression bar at the end of each step """
         if self.info_names is None:
             self.info_names = logs['info'].keys()
         values = [('reward', logs['reward'])]
-        self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
+        if KERAS_VERSION > '2.1.3':
+            self.progbar.update((self.step % self.interval) + 1, values=values)
+        else:
+            self.progbar.update((self.step % self.interval) + 1, values=values, force=True)
         self.step += 1
         self.metrics.append(logs['metrics'])
         if len(self.info_names) > 0:
             self.infos.append([logs['info'][k] for k in self.info_names])
 
     def on_episode_end(self, episode, logs):
+        """ Update reward value at the end of each episode """
         self.episode_rewards.append(logs['episode_reward'])
 
 
@@ -274,20 +306,24 @@ class FileLogger(Callback):
         self.data = {}
 
     def on_train_begin(self, logs):
+        """ Initialize model metrics before training """
         self.metrics_names = self.model.metrics_names
 
     def on_train_end(self, logs):
+        """ Save model at the end of training """
         self.save_data()
 
     def on_episode_begin(self, episode, logs):
+        """ Initialize metrics at the beginning of each episode """
         assert episode not in self.metrics
         assert episode not in self.starts
         self.metrics[episode] = []
         self.starts[episode] = timeit.default_timer()
 
     def on_episode_end(self, episode, logs):
+        """ Compute and print metrics at the end of each episode """ 
         duration = timeit.default_timer() - self.starts[episode]
-        
+
         metrics = self.metrics[episode]
         if np.isnan(metrics).all():
             mean_metrics = np.array([np.nan for _ in self.metrics_names])
@@ -311,9 +347,11 @@ class FileLogger(Callback):
         del self.starts[episode]
 
     def on_step_end(self, step, logs):
+        """ Append metric at the end of each step """
         self.metrics[logs['episode']].append(logs['metrics'])
 
     def save_data(self):
+        """ Save metrics in a json file """
         if len(self.data.keys()) == 0:
             return
 
@@ -335,6 +373,7 @@ class FileLogger(Callback):
 
 class Visualizer(Callback):
     def on_action_end(self, action, logs):
+        """ Render environment at the end of each action """
         self.env.render(mode='human')
 
 
@@ -347,6 +386,7 @@ class ModelIntervalCheckpoint(Callback):
         self.total_steps = 0
 
     def on_step_end(self, step, logs={}):
+        """ Save weights at interval steps during training """
         self.total_steps += 1
         if self.total_steps % self.interval != 0:
             # Nothing to do.

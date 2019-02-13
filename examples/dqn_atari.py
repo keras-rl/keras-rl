@@ -63,11 +63,11 @@ elif K.image_dim_ordering() == 'th':
     model.add(Permute((1, 2, 3), input_shape=input_shape))
 else:
     raise RuntimeError('Unknown image_dim_ordering.')
-model.add(Convolution2D(32, 8, 8, subsample=(4, 4)))
+model.add(Convolution2D(32, (8, 8), strides=(4, 4)))
 model.add(Activation('relu'))
-model.add(Convolution2D(64, 4, 4, subsample=(2, 2)))
+model.add(Convolution2D(64, (4, 4), strides=(2, 2)))
 model.add(Activation('relu'))
-model.add(Convolution2D(64, 3, 3, subsample=(1, 1)))
+model.add(Convolution2D(64, (3, 3), strides=(1, 1)))
 model.add(Activation('relu'))
 model.add(Flatten())
 model.add(Dense(512))
@@ -102,7 +102,7 @@ dqn.compile(Adam(lr=.00025), metrics=['mae'])
 
 if args.mode == 'train':
     # Okay, now it's time to learn something! We capture the interrupt exception so that training
-    # can be prematurely aborted. Notice that you can the built-in Keras callbacks!
+    # can be prematurely aborted. Notice that now you can use the built-in Keras callbacks!
     weights_filename = 'dqn_{}_weights.h5f'.format(args.env_name)
     checkpoint_weights_filename = 'dqn_' + args.env_name + '_weights_{step}.h5f'
     log_filename = 'dqn_{}_log.json'.format(args.env_name)

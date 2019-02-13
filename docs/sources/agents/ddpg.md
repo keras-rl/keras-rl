@@ -2,7 +2,7 @@
 
 ---
 
-<span style="float:right;">[[source]](https://github.com/matthiasplappert/keras-rl/blob/master/rl/agents/ddpg.py#L22)</span>
+<span style="float:right;">[[source]](https://github.com/keras-rl/keras-rl/blob/master/rl/agents/ddpg.py#L22)</span>
 ### DDPGAgent
 
 ```python

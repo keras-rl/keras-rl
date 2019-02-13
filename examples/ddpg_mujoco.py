@@ -19,7 +19,6 @@ class MujocoProcessor(WhiteningNormalizerProcessor):
 
 
 ENV_NAME = 'HalfCheetah-v1'
-gym.undo_logger_setup()
 
 
 # Get the environment and extract the number of actions.

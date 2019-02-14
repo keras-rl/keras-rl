@@ -129,7 +129,7 @@ class Agent(object):
                 if observation is None:  # start of a new episode
                     callbacks.on_episode_begin(episode)
 
-                    episode_step = np.int16(0)
+                    self.episode_step = np.int16(0)
                     episode_reward = np.float32(0)
 
                     # Obtain the initial observation by resetting the environment.

@@ -5,7 +5,10 @@ import keras.optimizers as optimizers
 import keras.backend as K
 
 
-def clone_model(model, custom_objects={}):
+def clone_model(model, custom_objects=None):
+    if custom_objects is None:
+        custom_objects = {}
+
     # Requires Keras 1.0.7 since get_config has breaking changes.
     config = {
         'class_name': model.__class__.__name__,

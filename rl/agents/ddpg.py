@@ -25,7 +25,7 @@ class DDPGAgent(Agent):
     def __init__(self, nb_actions, actor, critic, critic_action_input, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
                  train_interval=1, memory_interval=1, delta_range=None, delta_clip=np.inf,
-                 random_process=None, custom_model_objects={}, target_model_update=.001, **kwargs):
+                 random_process=None, custom_model_objects=None, target_model_update=.001, **kwargs):
         if hasattr(actor.output, '__len__') and len(actor.output) > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
         if hasattr(critic.output, '__len__') and len(critic.output) > 1:
@@ -34,6 +34,8 @@ class DDPGAgent(Agent):
             raise ValueError('Critic "{}" does not have designated action input "{}".'.format(critic, critic_action_input))
         if not hasattr(critic.input, '__len__') or len(critic.input) < 2:
             raise ValueError('Critic "{}" does not have enough inputs. The critic must have at exactly two inputs, one for the action and one for the observation.'.format(critic))
+        if custom_model_objects is None:
+            custom_model_objects = {}
 
         super(DDPGAgent, self).__init__(**kwargs)
 
@@ -79,7 +81,10 @@ class DDPGAgent(Agent):
     def uses_learning_phase(self):
         return self.actor.uses_learning_phase or self.critic.uses_learning_phase
 
-    def compile(self, optimizer, metrics=[]):
+    def compile(self, optimizer, metrics=None):
+        if metrics is None:
+            metrics = []
+
         metrics += [mean_q]
 
         if type(optimizer) in (list, tuple):

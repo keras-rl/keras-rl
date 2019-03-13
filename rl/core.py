@@ -14,6 +14,7 @@ from rl.callbacks import (
 )
 
 
+
 class Agent(object):
     """Abstract base class for all implemented agents.
 
@@ -426,7 +427,7 @@ class Agent(object):
         """
         raise NotImplementedError()
 
-    def compile(self, optimizer, metrics=[]):
+    def compile(self, optimizer, metrics=None):
         """Compiles an agent and the underlaying models to be used for training and testing.
 
         # Arguments

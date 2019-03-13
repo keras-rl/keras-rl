@@ -78,7 +78,7 @@ Callback that is called before training begins."
 
 
 ```python
-compile(self, optimizer, metrics=[])
+compile(self, optimizer, metrics=None)
 ```
 
 

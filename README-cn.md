@@ -1,4 +1,4 @@
-# Deep Reinforcement Learning for Keras
+# Keras实现深度强化学习
 [![Build Status](https://api.travis-ci.org/keras-rl/keras-rl.svg?branch=master)](https://travis-ci.org/keras-rl/keras-rl)
 [![Documentation](https://readthedocs.org/projects/keras-rl/badge/)](http://keras-rl.readthedocs.io/)
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/keras-rl/keras-rl/blob/master/LICENSE)
@@ -14,19 +14,19 @@
 </table>
 
 
-## What is it?
-[中文说明](README-cn.md)
+## keras-rl是什么？
+[English](README.md)
 
-`keras-rl` implements some state-of-the art deep reinforcement learning algorithms in Python and seamlessly integrates with the deep learning library [Keras](http://keras.io).
+`keras-rl` 使用python实现了一些经典的深度强化学习算法并且能与深度学习库[Keras](http://keras.io)无缝集成.
 
-Furthermore, `keras-rl` works with [OpenAI Gym](https://gym.openai.com/) out of the box. This means that evaluating and playing around with different algorithms is easy.
+此外, `keras-rl` 和[OpenAI Gym](https://gym.openai.com/)一起开箱即用. 这意味着你想要评估或者训练不同的算法变得非常简单.
 
-Of course you can extend `keras-rl` according to your own needs. You can use built-in Keras callbacks and metrics or define your own.
-Even more so, it is easy to implement your own environments and even algorithms by simply extending some simple abstract classes. Documentation is available [online](http://keras-rl.readthedocs.org).
+当然你也可以根据你自己的需要扩展 `keras-rl`. 你可以使用内置的 Keras 回调函数和指标或者完全自己定义.
+更重要的是, 通过简单的扩展一些抽象类，就很容易实现自己的环境甚至是算法. [点击查看在线文档](http://keras-rl.readthedocs.org).
 
 
-## What is included?
-As of today, the following algorithms have been implemented:
+## keras-rl包含了哪些?
+直到今天截止，以下算法已经被实现：
 
 - [x] Deep Q Learning (DQN) [[1]](http://arxiv.org/abs/1312.5602), [[2]](https://www.nature.com/articles/nature14236)
 - [x] Double DQN [[3]](http://arxiv.org/abs/1509.06461)
@@ -38,18 +38,18 @@ As of today, the following algorithms have been implemented:
 - [ ] Asynchronous Advantage Actor-Critic (A3C) [[5]](http://arxiv.org/abs/1602.01783)
 - [ ] Proximal Policy Optimization Algorithms (PPO) [[11]](https://arxiv.org/abs/1707.06347)
 
-You can find more information on each agent in the [doc](http://keras-rl.readthedocs.io/en/latest/agents/overview/).
+更多关于agent的信息请查看 [文档](http://keras-rl.readthedocs.io/en/latest/agents/overview/).
 
 
-## Installation
+## 安装
 
-- Install Keras-RL from Pypi (recommended):
+- 从Pypi安装 (推荐):
 
 ```
 pip install keras-rl
 ```
 
-- Install from Github source:
+- 从github源码安装:
 
 ```
 git clone https://github.com/keras-rl/keras-rl.git
@@ -57,36 +57,37 @@ cd keras-rl
 python setup.py install
 ```
 
-## Examples
+## 示例
 
-If you want to run the examples, you'll also have to install:
-- **gym** by OpenAI: [Installation instruction](https://github.com/openai/gym#installation)
-- **h5py**: simply run `pip install h5py`
+如果你想要运行代码示例，你还需要安装:
+- **gym** by OpenAI: [安装说明](https://github.com/openai/gym#installation)
+- **h5py**: 直接运行 `pip install h5py`
 
-For atari example you will also need:
+如果是atari示例, 你还需要安装:
 - **Pillow**: `pip install Pillow`
-- **gym[atari]**: Atari module for gym. Use `pip install gym[atari]`
+- **gym[atari]**: gym Atari 模块. Use `pip install gym[atari]`
 
-Once you have installed everything, you can try out a simple example:
+安装完所有内容后，您可以尝试一个简单的示例
 ```bash
 python examples/dqn_cartpole.py
 ```
-This is a very simple example and it should converge relatively quickly, so it's a great way to get started!
-It also visualizes the game during training, so you can watch it learn. How cool is that?
+这是一个非常简单的例子，它应该会相对快速地完成收敛，恭喜你已经入门了！
+它还可以在训练期间进行可视化，所以您可以观看它是如何学习的。 很酷吧？
 
-Some sample weights are available on [keras-rl-weights](https://github.com/matthiasplappert/keras-rl-weights).
+更多的已经训练好的[模型参数](https://github.com/matthiasplappert/keras-rl-weights).
 
 If you have questions or problems, please file an issue or, even better, fix the problem yourself and submit a pull request!
+如果您有任何疑问或问题，请在github上提出issue，或者更好的是解决它并提交PR！
 
-## External Projects
+## 扩展项目
 
-- [Starcraft II Learning Environment](https://soygema.github.io/starcraftII_machine_learning/#0)
+- [星际争霸2环境](https://soygema.github.io/starcraftII_machine_learning/#0)
 
-You're using Keras-RL on a project? Open a PR and share it!
+你是否正在项目中使用Keras-RL?告诉我们！
 
-## Citing
+## 引用
 
-If you use `keras-rl` in your research, you can cite it as follows:
+如果你在研究中使用了`keras-rl`, 你需要声明以下引用:
 ```bibtex
 @misc{plappert2016kerasrl,
     author = {Matthias Plappert},
@@ -98,7 +99,7 @@ If you use `keras-rl` in your research, you can cite it as follows:
 }
 ```
 
-## References
+## 参考文献
 
 1. *Playing Atari with Deep Reinforcement Learning*, Mnih et al., 2013
 2. *Human-level control through deep reinforcement learning*, Mnih et al., 2015

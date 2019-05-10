@@ -113,7 +113,8 @@ class IndependentGaussianProcess(ProbabilityDistribution):
         mu, log_sigma = x
         assert mu.shape == (self.n,)
         assert log_sigma.shape == (self.n,)
-        return np.random.normal(mu, np.exp(np.nan_to_num(log_sigma)))
+        return np.random.normal(mu, np.exp(log_sigma))
+        #return np.random.normal(mu, np.nan_to_num(np.exp(np.nan_to_num(log_sigma))))
 
     def sample_dim(self):
         return (self.n,)
@@ -121,4 +122,5 @@ class IndependentGaussianProcess(ProbabilityDistribution):
     def get_dist(self, x):
         mu, log_sigma, y = x
         return K.constant(- self.n * math.log(2*math.pi) / 2 ) - K.sum(log_sigma, axis=1, keepdims=True) - \
-               K.sum(K.exp( 2 * K.log(K.abs(y - mu)) - K.constant(math.log(2.0)) - 2 * log_sigma), axis=1, keepdims=True)
+               K.sum( 0.5 * K.square(y - mu) * K.exp(-2 * log_sigma), axis=1, keepdims=True)
+               #K.sum(K.exp( 2 * K.log(K.abs(y - mu)) - K.constant(math.log(2.0)) - 2 * log_sigma), axis=1, keepdims=True)

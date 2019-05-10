@@ -192,7 +192,8 @@ class PPOAgent(Agent):
         def clipped_loss(args):
             log_prob_theta, log_prob_thetaold, advantage = args
             prob_ratio = K.exp(log_prob_theta - log_prob_thetaold)
-            return K.minimum(prob_ratio * advantage, K.clip(prob_ratio, 1-self.epsilon, 1+self.epsilon) * advantage)
+            #prob_ratio = log_prob_theta - log_prob_thetaold
+            return -1.0 * K.minimum(prob_ratio * advantage, K.clip(prob_ratio, 1-self.epsilon, 1+self.epsilon) * advantage)
         loss_out = Lambda(clipped_loss, name='loss')([log_prob_theta, log_prob_thetaold, advantage])
         trainable_model = Model(inputs=[action, state, advantage] +
                                        #self._get_actor_dummy_inputs(target=True) +

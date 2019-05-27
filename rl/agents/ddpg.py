@@ -19,13 +19,21 @@ def mean_q(y_true, y_pred):
 # Deep DPG as described by Lillicrap et al. (2015)
 # http://arxiv.org/pdf/1509.02971v2.pdf
 # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.646.4324&rep=rep1&type=pdf
+# Twin delayed DDPG (TD3) as described by Fujimoto et al. (2018)
+# https://arxiv.org/abs/1802.09477
 class DDPGAgent(Agent):
-    """Write me
+    """
+    # Arguments
+        nb_actions: Number of actions
+        actor, critic: Keras models
+        critic_action_input: input layer in critic model that corresponds to actor output
+        enable_twin_delay: enable Twin Delayed DDPG
     """
     def __init__(self, nb_actions, actor, critic, critic_action_input, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
                  train_interval=1, memory_interval=1, delta_range=None, delta_clip=np.inf,
-                 random_process=None, custom_model_objects={}, target_model_update=.001, **kwargs):
+                 random_process=None, custom_model_objects={}, target_model_update=.001,
+                 enable_twin_delay=False, policy_delay=None, noise_clip = 0.5, **kwargs):
         if hasattr(actor.output, '__len__') and len(actor.output) > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
         if hasattr(critic.output, '__len__') and len(critic.output) > 1:
@@ -52,6 +60,7 @@ class DDPGAgent(Agent):
             delta_clip = delta_range[1]
 
         # Parameters.
+        self.enable_twin_delay = enable_twin_delay
         self.nb_actions = nb_actions
         self.nb_steps_warmup_actor = nb_steps_warmup_actor
         self.nb_steps_warmup_critic = nb_steps_warmup_critic
@@ -63,6 +72,13 @@ class DDPGAgent(Agent):
         self.train_interval = train_interval
         self.memory_interval = memory_interval
         self.custom_model_objects = custom_model_objects
+        self.policy_delay = policy_delay
+        if policy_delay is None:
+            if self.enable_twin_delay:
+                self.policy_delay = 2
+            else:
+                self.policy_delay = 1
+        self.noise_clip = noise_clip
 
         # Related objects.
         self.actor = actor
@@ -122,6 +138,13 @@ class DDPGAgent(Agent):
             critic_optimizer = AdditionalUpdatesOptimizer(critic_optimizer, critic_updates)
         self.critic.compile(optimizer=critic_optimizer, loss=clipped_error, metrics=critic_metrics)
 
+        # Set up second critic network for TD3
+        if self.enable_twin_delay:
+            self.critic2 = clone_model(self.critic, self.custom_model_objects)
+            self.critic2.compile(optimizer=critic_optimizer, loss=clipped_error, metrics=critic_metrics)
+            self.target_critic2 = clone_model(self.critic2, self.custom_model_objects)
+            self.target_critic2.compile(optimizer='sgd', loss='mse')
+
         # Combine actor and critic so that we can get the policy gradient.
         # Assuming critic's state inputs are the same as actor's.
         combined_inputs = []
@@ -173,6 +196,8 @@ class DDPGAgent(Agent):
     def update_target_models_hard(self):
         self.target_critic.set_weights(self.critic.get_weights())
         self.target_actor.set_weights(self.actor.get_weights())
+        if self.enable_twin_delay:
+            self.target_critic2.set_weights(self.critic2.get_weights())
 
     # TODO: implement pickle
 
@@ -186,6 +211,9 @@ class DDPGAgent(Agent):
             self.critic.reset_states()
             self.target_actor.reset_states()
             self.target_critic.reset_states()
+            if self.enable_twin_delay:
+                self.critic2.reset_states()
+                self.target_critic2.reset_states()
 
     def process_state_batch(self, batch):
         batch = np.array(batch)
@@ -202,6 +230,10 @@ class DDPGAgent(Agent):
         if self.training and self.random_process is not None:
             noise = self.random_process.sample()
             assert noise.shape == action.shape
+            if self.enable_twin_delay:
+                noise = np.clip(noise,
+                                -self.noise_clip * np.ones(noise.shape),
+                                self.noise_clip * np.ones(noise.shape))
             action += noise
 
         return action
@@ -224,6 +256,8 @@ class DDPGAgent(Agent):
     @property
     def metrics_names(self):
         names = self.critic.metrics_names[:]
+        if self.enable_twin_delay:
+            names += self.critic2.metrics_names[:]
         if self.processor is not None:
             names += self.processor.metrics_names[:]
         return names
@@ -278,7 +312,12 @@ class DDPGAgent(Agent):
                 else:
                     state1_batch_with_action = [state1_batch]
                 state1_batch_with_action.insert(self.critic_action_input_idx, target_actions)
-                target_q_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
+                if self.enable_twin_delay:
+                    target_q1_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
+                    target_q2_values = self.target_critic2.predict_on_batch(state1_batch_with_action).flatten()
+                    target_q_values = np.minimum(target_q1_values, target_q2_values)
+                else:
+                    target_q_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
                 assert target_q_values.shape == (self.batch_size,)
 
                 # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target ys accordingly,
@@ -295,11 +334,13 @@ class DDPGAgent(Agent):
                     state0_batch_with_action = [state0_batch]
                 state0_batch_with_action.insert(self.critic_action_input_idx, action_batch)
                 metrics = self.critic.train_on_batch(state0_batch_with_action, targets)
+                if self.enable_twin_delay:
+                    metrics += self.critic2.train_on_batch(state0_batch_with_action, targets)
                 if self.processor is not None:
                     metrics += self.processor.metrics
 
             # Update actor, if warm up is over.
-            if self.step > self.nb_steps_warmup_actor:
+            if self.step > self.nb_steps_warmup_actor and self.step % self.policy_delay == 0:
                 # TODO: implement metrics for actor
                 if len(self.actor.inputs) >= 2:
                     inputs = state0_batch[:]

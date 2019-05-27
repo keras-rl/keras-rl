@@ -229,13 +229,12 @@ class DDPGAgent(Agent):
         # Apply noise, if a random process is set.
         if self.training and self.random_process is not None:
             noise = self.random_process.sample()
-            assert noise.shape == action.shape
             if self.enable_twin_delay:
                 noise = np.clip(noise,
                                 -self.noise_clip * np.ones(noise.shape),
                                 self.noise_clip * np.ones(noise.shape))
+            assert noise.shape == action.shape
             action += noise
-
         return action
 
     def forward(self, observation):
@@ -334,8 +333,13 @@ class DDPGAgent(Agent):
                     state0_batch_with_action = [state0_batch]
                 state0_batch_with_action.insert(self.critic_action_input_idx, action_batch)
                 metrics = self.critic.train_on_batch(state0_batch_with_action, targets)
+                if not isinstance(metrics, list):
+                    metrics = [metrics]
                 if self.enable_twin_delay:
-                    metrics += self.critic2.train_on_batch(state0_batch_with_action, targets)
+                    metrics2 = self.critic2.train_on_batch(state0_batch_with_action, targets)
+                    if not isinstance(metrics, list):
+                        metrics2 = [metrics2]
+                    metrics += metrics2
                 if self.processor is not None:
                     metrics += self.processor.metrics
 

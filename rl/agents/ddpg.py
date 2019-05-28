@@ -8,6 +8,7 @@ import keras.backend as K
 import keras.optimizers as optimizers
 
 from rl.core import Agent
+from rl.policy import Policy
 from rl.random import OrnsteinUhlenbeckProcess
 from rl.util import *
 
@@ -33,6 +34,7 @@ class DDPGAgent(Agent):
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
                  train_interval=1, memory_interval=1, delta_range=None, delta_clip=np.inf,
                  random_process=None, custom_model_objects={}, target_model_update=.001,
+                 policy=None,
                  enable_twin_delay=False, policy_delay=None, noise_clip = 0.5, **kwargs):
         if hasattr(actor.output, '__len__') and len(actor.output) > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
@@ -78,6 +80,8 @@ class DDPGAgent(Agent):
                 self.policy_delay = 2
             else:
                 self.policy_delay = 1
+        if policy is None:
+            self.policy = DDPGPolicy()
         self.noise_clip = noise_clip
 
         # Related objects.
@@ -221,26 +225,20 @@ class DDPGAgent(Agent):
             return batch
         return self.processor.process_state_batch(batch)
 
-    def select_action(self, state):
+    def forward(self, observation):
+        # Select an action.
+        state = self.memory.get_recent_state(observation)
         batch = self.process_state_batch([state])
         action = self.actor.predict_on_batch(batch).flatten()
         assert action.shape == (self.nb_actions,)
 
-        # Apply noise, if a random process is set.
-        if self.training and self.random_process is not None:
-            noise = self.random_process.sample()
+        if self.training:
             if self.enable_twin_delay:
-                noise = np.clip(noise,
-                                -self.noise_clip * np.ones(noise.shape),
-                                self.noise_clip * np.ones(noise.shape))
-            assert noise.shape == action.shape
-            action += noise
-        return action
-
-    def forward(self, observation):
-        # Select an action.
-        state = self.memory.get_recent_state(observation)
-        action = self.select_action(state)  # TODO: move this into policy
+                action = self.policy.select_action(action, self.random_process,
+                                                   noise_clip=self.noise_clip)
+            else:
+                action = self.policy.select_action(action, self.random_process,
+                                                   noise_clip=None)
 
         # Book-keeping.
         self.recent_observation = observation
@@ -359,3 +357,17 @@ class DDPGAgent(Agent):
             self.update_target_models_hard()
 
         return metrics
+
+class DDPGPolicy(Policy):
+    """
+    Adds noise sampled from random_process to action
+    """
+    def select_action(self, action, random_process, noise_clip=None):
+        noise = random_process.sample()
+        if noise_clip is not None:
+            noise = np.clip(noise,
+                            -noise_clip * np.ones(noise.shape),
+                            noise_clip * np.ones(noise.shape))
+        assert noise.shape == action.shape
+        action += noise
+        return action

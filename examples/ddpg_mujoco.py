@@ -18,7 +18,7 @@ class MujocoProcessor(WhiteningNormalizerProcessor):
         return np.clip(action, -1., 1.)
 
 
-ENV_NAME = 'HalfCheetah-v1'
+ENV_NAME = 'HalfCheetah-v2'
 
 
 # Get the environment and extract the number of actions.

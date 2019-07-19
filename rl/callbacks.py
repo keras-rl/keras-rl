@@ -173,7 +173,7 @@ class TrainEpisodeLogger(Callback):
         metrics_text = metrics_template.format(*metrics_variables)
 
         nb_step_digits = str(int(np.ceil(np.log10(self.params['nb_steps']))) + 1)
-        template = '{step: ' + nb_step_digits + 'd}/{nb_steps}: episode: {episode}, duration: {duration:.3f}s, episode steps: {episode_steps}, steps per second: {sps:.0f}, episode reward: {episode_reward:.3f}, mean reward: {reward_mean:.3f} [{reward_min:.3f}, {reward_max:.3f}], mean action: {action_mean:.3f} [{action_min:.3f}, {action_max:.3f}], mean observation: {obs_mean:.3f} [{obs_min:.3f}, {obs_max:.3f}], {metrics}'
+        template = '{step: ' + nb_step_digits + 'd}/{nb_steps}: episode: {episode}, duration: {duration:.3f}s, episode steps: {episode_steps:3}, steps per second: {sps:3.0f}, episode reward: {episode_reward:6.3f}, mean reward: {reward_mean:6.3f} [{reward_min:6.3f}, {reward_max:6.3f}], mean action: {action_mean:.3f} [{action_min:.3f}, {action_max:.3f}],  {metrics}'
         variables = {
             'step': self.step,
             'nb_steps': self.params['nb_steps'],
@@ -188,10 +188,7 @@ class TrainEpisodeLogger(Callback):
             'action_mean': np.mean(self.actions[episode]),
             'action_min': np.min(self.actions[episode]),
             'action_max': np.max(self.actions[episode]),
-            'obs_mean': np.mean(self.observations[episode]),
-            'obs_min': np.min(self.observations[episode]),
-            'obs_max': np.max(self.observations[episode]),
-            'metrics': metrics_text,
+            'metrics': metrics_text
         }
         print(template.format(**variables))
 

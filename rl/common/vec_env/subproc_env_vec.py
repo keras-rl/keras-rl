@@ -94,3 +94,7 @@ class SubprocVecEnv(VecEnv):
         for remote in self.remotes:
             remote.send(('seed', rank))
             rank += 1
+        return ([remote.recv() for remote in self.remotes])
+
+    def __len__(self):
+        return self.num_envs

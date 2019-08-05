@@ -135,6 +135,8 @@ class SoftmaxPolicy(Policy):
             action
 
         """
+        # To remove the error related to sum not equal to 1
+        probs = probs/sum(probs)
         action = np.random.choice(range(nb_actions), p=probs)
         return action
 

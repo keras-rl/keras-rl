@@ -34,11 +34,17 @@ As of today, the following algorithms have been implemented:
 - [x] Cross-Entropy Method (CEM) [[7]](http://learning.mpi-sws.org/mlss2016/slides/2016-MLSS-RL.pdf), [[8]](http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.81.6579&rep=rep1&type=pdf)
 - [x] Dueling network DQN (Dueling DQN) [[9]](https://arxiv.org/abs/1511.06581)
 - [x] Deep SARSA [[10]](http://people.inf.elte.hu/lorincz/Files/RL_2006/SuttonBook.pdf)
+- [x] Sample Efficient Actor-Critic (ACER) [[5]](https://arxiv.org/abs/1611.01224)
 - [ ] Asynchronous Advantage Actor-Critic (A3C) [[5]](http://arxiv.org/abs/1602.01783)
 - [ ] Proximal Policy Optimization Algorithms (PPO) [[11]](https://arxiv.org/abs/1707.06347)
 
 You can find more information on each agent in the [doc](http://keras-rl.readthedocs.io/en/latest/agents/overview/).
 
+### Note 
+
+The current version of ACER supports simple toy games. We are working to add atari support soon.
+You can use synchronous environments by using make_gym_env from cmd_utils.py in common folder. Please
+have a look at acer_cartpole.py in the examples folder for better understanding.
 
 ## Installation
 

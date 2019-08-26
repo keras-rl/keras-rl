@@ -340,11 +340,11 @@ class EpisodeParameterMemory(Memory):
         return len(self.total_rewards)
 
     def get_config(self):
-        """Return configurations of SequentialMemory
+        """Return configurations of EpisodeParameterMemory
 
         # Returns
             Dict of config
         """
-        config = super(SequentialMemory, self).get_config()
+        config = super(EpisodeParameterMemory, self).get_config()
         config['limit'] = self.limit
         return config

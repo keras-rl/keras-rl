@@ -9,7 +9,6 @@ import keras.optimizers as optimizers
 
 from rl.core import Agent
 from rl.policy import Policy
-from rl.random import OrnsteinUhlenbeckProcess
 from rl.util import *
 
 
@@ -29,13 +28,17 @@ class DDPGAgent(Agent):
         actor, critic: Keras models
         critic_action_input: input layer in critic model that corresponds to actor output
         enable_twin_delay: enable Twin Delayed DDPG
+        random_process: noise to add to actor during training when agent performs forward pass
+        policy_delay: how many steps to delay policy updates by wrt critic updates
+        noise_sigma: noise to add to actor during training when agent performs backward pass, for critic policy update (TD3)
+        noise_clip: value to clip above noise by (TD3)
     """
     def __init__(self, nb_actions, actor, critic, critic_action_input, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
                  train_interval=1, memory_interval=1, delta_range=None, delta_clip=np.inf,
                  random_process=None, custom_model_objects={}, target_model_update=.001,
-                 policy=None,
-                 enable_twin_delay=False, policy_delay=None, noise_clip = 0.5, **kwargs):
+                 policy=None, enable_twin_delay=False, policy_delay=None, noise_clip=0.5,
+                 noise_sigma=0.2, **kwargs):
         if hasattr(actor.output, '__len__') and len(actor.output) > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
         if hasattr(critic.output, '__len__') and len(critic.output) > 1:
@@ -67,7 +70,6 @@ class DDPGAgent(Agent):
         self.nb_steps_warmup_actor = nb_steps_warmup_actor
         self.nb_steps_warmup_critic = nb_steps_warmup_critic
         self.random_process = random_process
-        self.delta_clip = delta_clip
         self.gamma = gamma
         self.target_model_update = target_model_update
         self.batch_size = batch_size
@@ -83,6 +85,8 @@ class DDPGAgent(Agent):
         if policy is None:
             self.policy = DDPGPolicy()
         self.noise_clip = noise_clip
+        self.noise_sigma = noise_sigma
+        self.delta_clip = delta_clip
 
         # Related objects.
         self.actor = actor
@@ -153,7 +157,7 @@ class DDPGAgent(Agent):
         # Assuming critic's state inputs are the same as actor's.
         combined_inputs = []
         state_inputs = []
-        for i in self.critic.input:
+        for i in self.critic.inputs:
             if i == self.critic_action_input:
                 combined_inputs.append([])
             else:
@@ -162,7 +166,6 @@ class DDPGAgent(Agent):
         combined_inputs[self.critic_action_input_idx] = self.actor(state_inputs)
 
         combined_output = self.critic(combined_inputs)
-
         updates = actor_optimizer.get_updates(
             params=self.actor.trainable_weights, loss=-K.mean(combined_output))
         if self.target_model_update < 1.:
@@ -233,12 +236,8 @@ class DDPGAgent(Agent):
         assert action.shape == (self.nb_actions,)
 
         if self.training:
-            if self.enable_twin_delay:
-                action = self.policy.select_action(action, self.random_process,
-                                                   noise_clip=self.noise_clip)
-            else:
-                action = self.policy.select_action(action, self.random_process,
-                                                   noise_clip=None)
+            action = self.policy.select_action(action, self.random_process,
+                                               noise_clip=None)
 
         # Book-keeping.
         self.recent_observation = observation
@@ -303,6 +302,9 @@ class DDPGAgent(Agent):
             # Update critic, if warm up is over.
             if self.step > self.nb_steps_warmup_critic:
                 target_actions = self.target_actor.predict_on_batch(state1_batch)
+                if self.enable_twin_delay:
+                    # Add clipped noise to target actions
+                    target_actions = self.policy.select_action(target_actions, noise_sigma=self.noise_sigma, noise_clip=self.noise_clip)
                 assert target_actions.shape == (self.batch_size, self.nb_actions)
                 if len(self.critic.inputs) >= 3:
                     state1_batch_with_action = state1_batch[:]
@@ -360,10 +362,16 @@ class DDPGAgent(Agent):
 
 class DDPGPolicy(Policy):
     """
-    Adds noise sampled from random_process to action
+    Adds noise sampled from random_process to action.
+    If random_process is None, draws from N(0, noise_sigma) distribution.
+    If noise_clip is not None, clips noise to [-noise_clip, noise_clip]
     """
-    def select_action(self, action, random_process, noise_clip=None):
-        noise = random_process.sample()
+    def select_action(self, action, random_process=None,
+                      noise_sigma=0.2, noise_clip=None):
+        if random_process is not None:
+            noise = random_process.sample()
+        else:
+            noise = np.random.normal(0, noise_sigma, action.shape)
         if noise_clip is not None:
             noise = np.clip(noise,
                             -noise_clip * np.ones(noise.shape),

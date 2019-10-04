@@ -401,8 +401,13 @@ class ModelIntervalCheckpoint(Callback):
 class WandbLogger(Callback):
     """Similar to TrainEpisodeLogger, but sends data to Weights & Biases to be visualized."""
 
-    def __init__(self):
-        wandb.init(project='keras-rl', anonymous='allow')
+    def __init__(self, **kwargs):
+        kwargs = {
+            'project': 'keras-rl',
+            'anonymous': 'allow',
+            **kwargs
+        }
+        wandb.init(**kwargs)
         self.episode_start = {}
         self.observations = {}
         self.rewards = {}

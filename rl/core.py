@@ -3,6 +3,7 @@ import warnings
 from copy import deepcopy
 
 import numpy as np
+import wandb
 from keras.callbacks import History
 
 from rl.callbacks import (
@@ -10,7 +11,8 @@ from rl.callbacks import (
     TestLogger,
     TrainEpisodeLogger,
     TrainIntervalLogger,
-    Visualizer
+    Visualizer,
+    WandbLogger
 )
 
 

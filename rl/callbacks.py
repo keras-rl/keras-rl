@@ -399,7 +399,7 @@ class ModelIntervalCheckpoint(Callback):
 
 
 class WandbLogger(Callback):
-    """Similar to TrainEpisodeLogger, but sends data to Weights & Biases to be visualized."""
+    """ Similar to TrainEpisodeLogger, but sends data to Weights & Biases to be visualized """
 
     def __init__(self, **kwargs):
         kwargs = {
@@ -435,7 +435,7 @@ class WandbLogger(Callback):
         self.metrics[episode] = []
 
     def on_episode_end(self, episode, logs):
-        """ Compute and print training statistics of the episode when done """
+        """ Compute and log training statistics of the episode when done """
         duration = timeit.default_timer() - self.episode_start[episode]
         episode_steps = len(self.observations[episode])
 

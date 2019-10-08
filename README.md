@@ -87,7 +87,7 @@ You're using Keras-RL on a project? Open a PR and share it!
 
 ## Visualizing Training Metrics
 
-To see graphs of your training progress and compare across runs, add the WandbLogger callback in your agent's `fit()` call:
+To see graphs of your training progress and compare across runs, run `pip install wandb` and add the WandbLogger callback to your agent's `fit()` call:
 
 ```python
 from rl.callbacks import WandbLogger
@@ -96,6 +96,8 @@ from rl.callbacks import WandbLogger
 
 agent.fit(env, nb_steps=50000, callbacks=[WandbLogger()])
 ```
+
+For more info and options, see the [W&B docs](https://docs.wandb.com/getting-started).
 
 ## Citing
 

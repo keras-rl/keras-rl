@@ -71,17 +71,7 @@ def huber_loss(y_true, y_pred, clip_value):
     condition = K.abs(x) < clip_value
     squared_loss = .5 * K.square(x)
     linear_loss = clip_value * (K.abs(x) - .5 * clip_value)
-    if K.backend() == 'tensorflow':
-        import tensorflow as tf
-        if hasattr(tf, 'select'):
-            return tf.select(condition, squared_loss, linear_loss)  # condition, true, false
-        else:
-            return tf.where(condition, squared_loss, linear_loss)  # condition, true, false
-    elif K.backend() == 'theano':
-        from theano import tensor as T
-        return T.switch(condition, squared_loss, linear_loss)
-    else:
-        raise RuntimeError('Unknown backend "{}".'.format(K.backend()))
+    return K.switch(condition, squared_loss, linear_loss)
 
 
 class AdditionalUpdatesOptimizer(optimizers.Optimizer):

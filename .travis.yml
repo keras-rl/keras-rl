@@ -2,31 +2,31 @@ sudo: required
 dist: xenial
 language: python
 matrix:
-    include:
-        - python: 3.6
-          env: KERAS_BACKEND=theano
-        - python: 3.6
-          env: KERAS_BACKEND=tensorflow
-        - python: 2.7
-          env: KERAS_BACKEND=theano
-        - python: 2.7
-          env: KERAS_BACKEND=tensorflow
-        - python: 2.7
-          env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8
-        - python: 2.7
-          env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
-        - python: 3.6
-          env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
-        - python: 2.7
-          env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
-        - python: 3.6
-          env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
+  include:
+    - python: 3.6
+      env: KERAS_BACKEND=theano
+    - python: 3.6
+      env: KERAS_BACKEND=tensorflow
+    - python: 2.7
+      env: KERAS_BACKEND=theano
+    - python: 2.7
+      env: KERAS_BACKEND=tensorflow
+    - python: 2.7
+      env: KERAS_BACKEND=tensorflow TEST_MODE=PEP8
+    - python: 2.7
+      env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
+    - python: 3.6
+      env: KERAS_BACKEND=theano TEST_MODE=INTEGRATION
+    - python: 2.7
+      env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
+    - python: 3.6
+      env: KERAS_BACKEND=tensorflow TEST_MODE=INTEGRATION
 install:
   # Adopted from https://github.com/fchollet/keras/blob/master/.travis.yml.
   - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
-      wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
+    wget https://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh;
     else
-      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
     fi
   - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
@@ -46,6 +46,7 @@ install:
   - pip install "theano<1.0"
   - pip install gym
   - pip install scipy
+  - pip install wandb
   # Bleeding-edge: pip install git+https://github.com/fchollet/keras.git;
   - pip install "keras>=2.0.7";
   - python setup.py install
@@ -58,11 +59,11 @@ script:
   - sed -i -e 's/"backend":[[:space:]]*"[^"]*/"backend":\ "'$KERAS_BACKEND'/g' ~/.keras/keras.json;
   - echo -e "Running tests with the following config:\n$(cat ~/.keras/keras.json)"
   - if [[ "$TEST_MODE" == "INTEGRATION" ]]; then
-      PYTHONPATH=$PWD:$PYTHONPATH py.test tests/integration;
+    PYTHONPATH=$PWD:$PYTHONPATH py.test tests/integration;
     elif [[ "$TEST_MODE" == "PEP8" ]]; then
-      PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8 -m pep8 -n0;
+    PYTHONPATH=$PWD:$PYTHONPATH py.test --pep8 -m pep8 -n0;
     else
-      PYTHONPATH=$PWD:$PYTHONPATH py.test tests/;
+    PYTHONPATH=$PWD:$PYTHONPATH py.test tests/;
     fi
 after_success:
   - coveralls

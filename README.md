@@ -1,9 +1,9 @@
 # Deep Reinforcement Learning for Keras
+
 [![Build Status](https://api.travis-ci.org/keras-rl/keras-rl.svg?branch=master)](https://travis-ci.org/keras-rl/keras-rl)
 [![Documentation](https://readthedocs.org/projects/keras-rl/badge/)](http://keras-rl.readthedocs.io/)
 [![License](https://img.shields.io/github/license/mashape/apistatus.svg?maxAge=2592000)](https://github.com/keras-rl/keras-rl/blob/master/LICENSE)
 [![Join the chat at https://gitter.im/keras-rl/Lobby](https://badges.gitter.im/keras-rl/Lobby.svg)](https://gitter.im/keras-rl/Lobby)
-
 
 <table>
   <tr>
@@ -12,7 +12,6 @@
     <td><img src="/assets/pendulum.gif?raw=true" width="200"></td>
   </tr>
 </table>
-
 
 ## What is it?
 
@@ -23,8 +22,8 @@ Furthermore, `keras-rl` works with [OpenAI Gym](https://gym.openai.com/) out of 
 Of course you can extend `keras-rl` according to your own needs. You can use built-in Keras callbacks and metrics or define your own.
 Even more so, it is easy to implement your own environments and even algorithms by simply extending some simple abstract classes. Documentation is available [online](http://keras-rl.readthedocs.org).
 
-
 ## What is included?
+
 As of today, the following algorithms have been implemented:
 
 - [x] Deep Q Learning (DQN) [[1]](http://arxiv.org/abs/1312.5602), [[2]](https://www.nature.com/articles/nature14236)
@@ -38,7 +37,6 @@ As of today, the following algorithms have been implemented:
 - [ ] Proximal Policy Optimization Algorithms (PPO) [[11]](https://arxiv.org/abs/1707.06347)
 
 You can find more information on each agent in the [doc](http://keras-rl.readthedocs.io/en/latest/agents/overview/).
-
 
 ## Installation
 
@@ -59,17 +57,21 @@ python setup.py install
 ## Examples
 
 If you want to run the examples, you'll also have to install:
+
 - **gym** by OpenAI: [Installation instruction](https://github.com/openai/gym#installation)
 - **h5py**: simply run `pip install h5py`
 
 For atari example you will also need:
+
 - **Pillow**: `pip install Pillow`
 - **gym[atari]**: Atari module for gym. Use `pip install gym[atari]`
 
 Once you have installed everything, you can try out a simple example:
+
 ```bash
 python examples/dqn_cartpole.py
 ```
+
 This is a very simple example and it should converge relatively quickly, so it's a great way to get started!
 It also visualizes the game during training, so you can watch it learn. How cool is that?
 
@@ -83,9 +85,24 @@ If you have questions or problems, please file an issue or, even better, fix the
 
 You're using Keras-RL on a project? Open a PR and share it!
 
+## Visualizing Training Metrics
+
+To see graphs of your training progress and compare across runs, run `pip install wandb` and add the WandbLogger callback to your agent's `fit()` call:
+
+```python
+from rl.callbacks import WandbLogger
+
+...
+
+agent.fit(env, nb_steps=50000, callbacks=[WandbLogger()])
+```
+
+For more info and options, see the [W&B docs](https://docs.wandb.com/getting-started).
+
 ## Citing
 
 If you use `keras-rl` in your research, you can cite it as follows:
+
 ```bibtex
 @misc{plappert2016kerasrl,
     author = {Matthias Plappert},
@@ -99,14 +116,14 @@ If you use `keras-rl` in your research, you can cite it as follows:
 
 ## References
 
-1. *Playing Atari with Deep Reinforcement Learning*, Mnih et al., 2013
-2. *Human-level control through deep reinforcement learning*, Mnih et al., 2015
-3. *Deep Reinforcement Learning with Double Q-learning*, van Hasselt et al., 2015
-4. *Continuous control with deep reinforcement learning*, Lillicrap et al., 2015
-5. *Asynchronous Methods for Deep Reinforcement Learning*, Mnih et al., 2016
-6. *Continuous Deep Q-Learning with Model-based Acceleration*, Gu et al., 2016
-7. *Learning Tetris Using the Noisy Cross-Entropy Method*, Szita et al., 2006
-8. *Deep Reinforcement Learning (MLSS lecture notes)*, Schulman, 2016
-9. *Dueling Network Architectures for Deep Reinforcement Learning*, Wang et al., 2016
-10. *Reinforcement learning: An introduction*, Sutton and Barto, 2011
-11. *Proximal Policy Optimization Algorithms*, Schulman et al., 2017
+1. _Playing Atari with Deep Reinforcement Learning_, Mnih et al., 2013
+2. _Human-level control through deep reinforcement learning_, Mnih et al., 2015
+3. _Deep Reinforcement Learning with Double Q-learning_, van Hasselt et al., 2015
+4. _Continuous control with deep reinforcement learning_, Lillicrap et al., 2015
+5. _Asynchronous Methods for Deep Reinforcement Learning_, Mnih et al., 2016
+6. _Continuous Deep Q-Learning with Model-based Acceleration_, Gu et al., 2016
+7. _Learning Tetris Using the Noisy Cross-Entropy Method_, Szita et al., 2006
+8. _Deep Reinforcement Learning (MLSS lecture notes)_, Schulman, 2016
+9. _Dueling Network Architectures for Deep Reinforcement Learning_, Wang et al., 2016
+10. _Reinforcement learning: An introduction_, Sutton and Barto, 2011
+11. _Proximal Policy Optimization Algorithms_, Schulman et al., 2017

@@ -73,3 +73,6 @@ docs/_build/
 
 # PyBuilder
 target/
+
+# Weights & Biases
+wandb/

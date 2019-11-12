@@ -14,6 +14,7 @@
 </table>
 
 ## What is it?
+[中文说明](README-cn.md)
 
 `keras-rl` implements some state-of-the art deep reinforcement learning algorithms in Python and seamlessly integrates with the deep learning library [Keras](http://keras.io).
 

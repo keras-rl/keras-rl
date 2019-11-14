@@ -8,7 +8,7 @@ import keras.backend as K
 import keras.optimizers as optimizers
 
 from rl.core import Agent
-from rl.random import OrnsteinUhlenbeckProcess
+from rl.policy import Policy
 from rl.util import *
 
 
@@ -19,13 +19,26 @@ def mean_q(y_true, y_pred):
 # Deep DPG as described by Lillicrap et al. (2015)
 # http://arxiv.org/pdf/1509.02971v2.pdf
 # http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.646.4324&rep=rep1&type=pdf
+# Twin delayed DDPG (TD3) as described by Fujimoto et al. (2018)
+# https://arxiv.org/abs/1802.09477
 class DDPGAgent(Agent):
-    """Write me
+    """
+    # Arguments
+        nb_actions: Number of actions
+        actor, critic: Keras models
+        critic_action_input: input layer in critic model that corresponds to actor output
+        enable_twin_delay: enable Twin Delayed DDPG
+        random_process: noise to add to actor during training when agent performs forward pass
+        policy_delay: how many steps to delay policy updates by wrt critic updates
+        noise_sigma: noise to add to actor during training when agent performs backward pass, for critic policy update (TD3)
+        noise_clip: value to clip above noise by (TD3)
     """
     def __init__(self, nb_actions, actor, critic, critic_action_input, memory,
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
                  train_interval=1, memory_interval=1, delta_range=None, delta_clip=np.inf,
-                 random_process=None, custom_model_objects={}, target_model_update=.001, **kwargs):
+                 random_process=None, custom_model_objects={}, target_model_update=.001,
+                 policy=None, enable_twin_delay=False, policy_delay=None, noise_clip=0.5,
+                 noise_sigma=0.2, **kwargs):
         if hasattr(actor.output, '__len__') and len(actor.output) > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
         if hasattr(critic.output, '__len__') and len(critic.output) > 1:
@@ -52,17 +65,28 @@ class DDPGAgent(Agent):
             delta_clip = delta_range[1]
 
         # Parameters.
+        self.enable_twin_delay = enable_twin_delay
         self.nb_actions = nb_actions
         self.nb_steps_warmup_actor = nb_steps_warmup_actor
         self.nb_steps_warmup_critic = nb_steps_warmup_critic
         self.random_process = random_process
-        self.delta_clip = delta_clip
         self.gamma = gamma
         self.target_model_update = target_model_update
         self.batch_size = batch_size
         self.train_interval = train_interval
         self.memory_interval = memory_interval
         self.custom_model_objects = custom_model_objects
+        self.policy_delay = policy_delay
+        if policy_delay is None:
+            if self.enable_twin_delay:
+                self.policy_delay = 2
+            else:
+                self.policy_delay = 1
+        if policy is None:
+            self.policy = DDPGPolicy()
+        self.noise_clip = noise_clip
+        self.noise_sigma = noise_sigma
+        self.delta_clip = delta_clip
 
         # Related objects.
         self.actor = actor
@@ -122,11 +146,18 @@ class DDPGAgent(Agent):
             critic_optimizer = AdditionalUpdatesOptimizer(critic_optimizer, critic_updates)
         self.critic.compile(optimizer=critic_optimizer, loss=clipped_error, metrics=critic_metrics)
 
+        # Set up second critic network for TD3
+        if self.enable_twin_delay:
+            self.critic2 = clone_model(self.critic, self.custom_model_objects)
+            self.critic2.compile(optimizer=critic_optimizer, loss=clipped_error, metrics=critic_metrics)
+            self.target_critic2 = clone_model(self.critic2, self.custom_model_objects)
+            self.target_critic2.compile(optimizer='sgd', loss='mse')
+
         # Combine actor and critic so that we can get the policy gradient.
         # Assuming critic's state inputs are the same as actor's.
         combined_inputs = []
         state_inputs = []
-        for i in self.critic.input:
+        for i in self.critic.inputs:
             if i == self.critic_action_input:
                 combined_inputs.append([])
             else:
@@ -135,7 +166,6 @@ class DDPGAgent(Agent):
         combined_inputs[self.critic_action_input_idx] = self.actor(state_inputs)
 
         combined_output = self.critic(combined_inputs)
-
         updates = actor_optimizer.get_updates(
             params=self.actor.trainable_weights, loss=-K.mean(combined_output))
         if self.target_model_update < 1.:
@@ -173,6 +203,8 @@ class DDPGAgent(Agent):
     def update_target_models_hard(self):
         self.target_critic.set_weights(self.critic.get_weights())
         self.target_actor.set_weights(self.actor.get_weights())
+        if self.enable_twin_delay:
+            self.target_critic2.set_weights(self.critic2.get_weights())
 
     # TODO: implement pickle
 
@@ -186,6 +218,9 @@ class DDPGAgent(Agent):
             self.critic.reset_states()
             self.target_actor.reset_states()
             self.target_critic.reset_states()
+            if self.enable_twin_delay:
+                self.critic2.reset_states()
+                self.target_critic2.reset_states()
 
     def process_state_batch(self, batch):
         batch = np.array(batch)
@@ -193,23 +228,16 @@ class DDPGAgent(Agent):
             return batch
         return self.processor.process_state_batch(batch)
 
-    def select_action(self, state):
+    def forward(self, observation):
+        # Select an action.
+        state = self.memory.get_recent_state(observation)
         batch = self.process_state_batch([state])
         action = self.actor.predict_on_batch(batch).flatten()
         assert action.shape == (self.nb_actions,)
 
-        # Apply noise, if a random process is set.
-        if self.training and self.random_process is not None:
-            noise = self.random_process.sample()
-            assert noise.shape == action.shape
-            action += noise
-
-        return action
-
-    def forward(self, observation):
-        # Select an action.
-        state = self.memory.get_recent_state(observation)
-        action = self.select_action(state)  # TODO: move this into policy
+        if self.training:
+            action = self.policy.select_action(action, self.random_process,
+                                               noise_clip=None)
 
         # Book-keeping.
         self.recent_observation = observation
@@ -224,6 +252,8 @@ class DDPGAgent(Agent):
     @property
     def metrics_names(self):
         names = self.critic.metrics_names[:]
+        if self.enable_twin_delay:
+            names += self.critic2.metrics_names[:]
         if self.processor is not None:
             names += self.processor.metrics_names[:]
         return names
@@ -272,13 +302,21 @@ class DDPGAgent(Agent):
             # Update critic, if warm up is over.
             if self.step > self.nb_steps_warmup_critic:
                 target_actions = self.target_actor.predict_on_batch(state1_batch)
+                if self.enable_twin_delay:
+                    # Add clipped noise to target actions
+                    target_actions = self.policy.select_action(target_actions, noise_sigma=self.noise_sigma, noise_clip=self.noise_clip)
                 assert target_actions.shape == (self.batch_size, self.nb_actions)
                 if len(self.critic.inputs) >= 3:
                     state1_batch_with_action = state1_batch[:]
                 else:
                     state1_batch_with_action = [state1_batch]
                 state1_batch_with_action.insert(self.critic_action_input_idx, target_actions)
-                target_q_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
+                if self.enable_twin_delay:
+                    target_q1_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
+                    target_q2_values = self.target_critic2.predict_on_batch(state1_batch_with_action).flatten()
+                    target_q_values = np.minimum(target_q1_values, target_q2_values)
+                else:
+                    target_q_values = self.target_critic.predict_on_batch(state1_batch_with_action).flatten()
                 assert target_q_values.shape == (self.batch_size,)
 
                 # Compute r_t + gamma * max_a Q(s_t+1, a) and update the target ys accordingly,
@@ -295,11 +333,18 @@ class DDPGAgent(Agent):
                     state0_batch_with_action = [state0_batch]
                 state0_batch_with_action.insert(self.critic_action_input_idx, action_batch)
                 metrics = self.critic.train_on_batch(state0_batch_with_action, targets)
+                if not isinstance(metrics, list):
+                    metrics = [metrics]
+                if self.enable_twin_delay:
+                    metrics2 = self.critic2.train_on_batch(state0_batch_with_action, targets)
+                    if not isinstance(metrics, list):
+                        metrics2 = [metrics2]
+                    metrics += metrics2
                 if self.processor is not None:
                     metrics += self.processor.metrics
 
             # Update actor, if warm up is over.
-            if self.step > self.nb_steps_warmup_actor:
+            if self.step > self.nb_steps_warmup_actor and self.step % self.policy_delay == 0:
                 # TODO: implement metrics for actor
                 if len(self.actor.inputs) >= 2:
                     inputs = state0_batch[:]
@@ -314,3 +359,23 @@ class DDPGAgent(Agent):
             self.update_target_models_hard()
 
         return metrics
+
+class DDPGPolicy(Policy):
+    """
+    Adds noise sampled from random_process to action.
+    If random_process is None, draws from N(0, noise_sigma) distribution.
+    If noise_clip is not None, clips noise to [-noise_clip, noise_clip]
+    """
+    def select_action(self, action, random_process=None,
+                      noise_sigma=0.2, noise_clip=None):
+        if random_process is not None:
+            noise = random_process.sample()
+        else:
+            noise = np.random.normal(0, noise_sigma, action.shape)
+        if noise_clip is not None:
+            noise = np.clip(noise,
+                            -noise_clip * np.ones(noise.shape),
+                            noise_clip * np.ones(noise.shape))
+        assert noise.shape == action.shape
+        action += noise
+        return action

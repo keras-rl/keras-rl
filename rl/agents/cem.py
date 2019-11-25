@@ -90,7 +90,7 @@ class CEMAgent(Agent):
             batch = self.processor.process_state_batch(batch)
 
         action = self.model.predict_on_batch(batch).flatten()
-        if stochastic or self.training:
+        if stochastic:
             return np.random.choice(np.arange(self.nb_actions), p=np.exp(action) / np.sum(np.exp(action)))
         return np.argmax(action)
     

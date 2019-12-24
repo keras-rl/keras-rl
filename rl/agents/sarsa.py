@@ -71,7 +71,10 @@ class SARSAAgent(Agent):
         config['test_policy'] = get_object_config(self.test_policy)
         return config
 
-    def compile(self, optimizer, metrics=[]):
+    def compile(self, optimizer, metrics=None):
+        if metrics is None:
+            metrics = []
+
         metrics += [mean_q]  # register default metrics
 
         def clipped_masked_error(args):

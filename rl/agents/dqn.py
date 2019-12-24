@@ -19,7 +19,10 @@ class AbstractDQNAgent(Agent):
     """
     def __init__(self, nb_actions, memory, gamma=.99, batch_size=32, nb_steps_warmup=1000,
                  train_interval=1, memory_interval=1, target_model_update=10000,
-                 delta_range=None, delta_clip=np.inf, custom_model_objects={}, **kwargs):
+                 delta_range=None, delta_clip=np.inf, custom_model_objects=None, **kwargs):
+        if custom_model_objects is None:
+            custom_model_objects = {}
+
         super(AbstractDQNAgent, self).__init__(**kwargs)
 
         # Soft vs hard target model updates.
@@ -164,7 +167,10 @@ class DQNAgent(AbstractDQNAgent):
             config['target_model'] = get_object_config(self.target_model)
         return config
 
-    def compile(self, optimizer, metrics=[]):
+    def compile(self, optimizer, metrics=None):
+        if metrics is None:
+            metrics = []
+
         metrics += [mean_q]  # register default metrics
 
         # We never train the target model, hence we can set the optimizer and loss arbitrarily.
@@ -594,7 +600,10 @@ class NAFAgent(AbstractDQNAgent):
             self.combined_model.reset_states()
             self.target_V_model.reset_states()
 
-    def compile(self, optimizer, metrics=[]):
+    def compile(self, optimizer, metrics=None):
+        if metrics is None:
+            metrics = []
+
         metrics += [mean_q]  # register default metrics
 
         # Create target V model. We don't need targets for mu or L.

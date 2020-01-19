@@ -26,9 +26,9 @@ class DDPGAgent(Agent):
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
                  train_interval=1, memory_interval=1, delta_range=None, delta_clip=np.inf,
                  random_process=None, custom_model_objects={}, target_model_update=.001, **kwargs):
-        if hasattr(actor.output, '__len__') and len(actor.output) > 1:
+        if hasattr(actor.output, '__shape__') and actor.shape[0] > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
-        if hasattr(critic.output, '__len__') and len(critic.output) > 1:
+        if hasattr(critic.output, '__shape__') and critic.shape[0] > 1:
             raise ValueError('Critic "{}" has more than one output. DDPG expects a critic that has a single output.'.format(critic))
         if critic_action_input not in critic.input:
             raise ValueError('Critic "{}" does not have designated action input "{}".'.format(critic, critic_action_input))

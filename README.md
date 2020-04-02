@@ -54,6 +54,8 @@ cd keras-rl
 python setup.py install
 ```
 
+Downgrade `tensorflow` to 1.14 to run these `keras-rl` examples. A breaking change was introduced in 1.15 (see: https://stackoverflow.com/questions/59682542/typeerror-len-is-not-well-defined-for-symbolic-tensors-activation-3-identity).
+
 ## Examples
 
 If you want to run the examples, you'll also have to install:

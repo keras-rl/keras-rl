@@ -48,7 +48,7 @@ class Agent(object):
         """Configuration of the agent for serialization.
 
         # Returns
-            Dictionnary with agent configuration
+            Dictionary with agent configuration
         """
         return {}
 

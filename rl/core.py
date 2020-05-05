@@ -535,7 +535,7 @@ class Processor(object):
             info (dict): The debug info dictionary as obtained by the environment.
 
         # Returns
-            The tupel (observation, reward, done, reward) with with all elements after being processed.
+            The tuple (observation, reward, done, reward) with with all elements after being processed.
         """
         observation = self.process_observation(observation)
         reward = self.process_reward(reward)

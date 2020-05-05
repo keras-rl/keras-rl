@@ -173,7 +173,7 @@ class Agent(object):
 
                 # Run a single step.
                 callbacks.on_step_begin(episode_step)
-                # This is were all of the work happens. We first perceive and compute the action
+                # This is where all of the work happens. We first perceive and compute the action
                 # (forward step) and then use the reward to improve (backward step).
                 action = self.forward(observation)
                 if self.processor is not None:

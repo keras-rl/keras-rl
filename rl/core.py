@@ -85,7 +85,7 @@ class Agent(object):
         """
         if not self.compiled:
             raise RuntimeError(
-                'Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
+                'You tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
             raise ValueError(
                 'action_repetition must be >= 1, is {}'.format(action_repetition))

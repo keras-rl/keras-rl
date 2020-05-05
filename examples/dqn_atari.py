@@ -55,14 +55,14 @@ nb_actions = env.action_space.n
 # Next, we build our model. We use the same model that was described by Mnih et al. (2015).
 input_shape = (WINDOW_LENGTH,) + INPUT_SHAPE
 model = Sequential()
-if K.image_dim_ordering() == 'tf':
+if K.image_data_format() == 'channels_last':
     # (width, height, channels)
     model.add(Permute((2, 3, 1), input_shape=input_shape))
-elif K.image_dim_ordering() == 'th':
+elif K.image_data_format() == 'channels_first':
     # (channels, width, height)
     model.add(Permute((1, 2, 3), input_shape=input_shape))
 else:
-    raise RuntimeError('Unknown image_dim_ordering.')
+    raise RuntimeError('Unknown image_data_format.')
 model.add(Convolution2D(32, (8, 8), strides=(4, 4)))
 model.add(Activation('relu'))
 model.add(Convolution2D(64, (4, 4), strides=(2, 2)))

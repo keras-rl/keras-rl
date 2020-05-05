@@ -48,7 +48,7 @@ class Agent(object):
         """Configuration of the agent for serialization.
 
         # Returns
-            Dictionnary with agent configuration
+            Dictionary with agent configuration
         """
         return {}
 
@@ -85,7 +85,7 @@ class Agent(object):
         """
         if not self.compiled:
             raise RuntimeError(
-                'Your tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
+                'You tried to fit your agent but it hasn\'t been compiled yet. Please call `compile()` before `fit()`.')
         if action_repetition < 1:
             raise ValueError(
                 'action_repetition must be >= 1, is {}'.format(action_repetition))
@@ -173,7 +173,7 @@ class Agent(object):
 
                 # Run a single step.
                 callbacks.on_step_begin(episode_step)
-                # This is were all of the work happens. We first perceive and compute the action
+                # This is where all of the work happens. We first perceive and compute the action
                 # (forward step) and then use the reward to improve (backward step).
                 action = self.forward(observation)
                 if self.processor is not None:
@@ -535,7 +535,7 @@ class Processor(object):
             info (dict): The debug info dictionary as obtained by the environment.
 
         # Returns
-            The tupel (observation, reward, done, reward) with with all elements after being processed.
+            The tuple (observation, reward, done, reward) with with all elements after being processed.
         """
         observation = self.process_observation(observation)
         reward = self.process_reward(reward)

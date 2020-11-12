@@ -82,6 +82,7 @@ If you have questions or problems, please file an issue or, even better, fix the
 ## External Projects
 
 - [Starcraft II Learning Environment](https://soygema.github.io/starcraftII_machine_learning/#0)
+- [RL for Network and Service Coordination](https://github.com/RealVNF/deep-rl-network-service-coordination)
 
 You're using Keras-RL on a project? Open a PR and share it!
 

@@ -118,11 +118,11 @@ class LinearAnnealedPolicy(Policy):
         return config
 
 class SoftmaxPolicy(Policy):
-    """ Implement softmax policy for multinimial distribution
+    """ Implement softmax policy for multinomial distribution
 
     Simple Policy
 
-    - takes action according to the pobability distribution
+    - takes action according to the probability distribution
 
     """
     def select_action(self, nb_actions, probs):

@@ -33,8 +33,7 @@ model.add(Activation('linear'))
 print(model.summary())
 
 lr = 1e-3
-nb_steps = 50000
-opt = adam_v2.Adam(learning_rate=lr, decay=lr/nb_steps)
+opt = adam_v2.Adam(learning_rate=lr)
 
 # Finally, we configure and compile our agent. You can use every built-in Keras optimizer and
 # even the metrics!

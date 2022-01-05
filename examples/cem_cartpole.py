@@ -3,7 +3,6 @@ import gym
 
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten
-from keras.optimizers import Adam
 
 from rl.agents.cem import CEMAgent
 from rl.memory import EpisodeParameterMemory

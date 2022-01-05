@@ -3,7 +3,7 @@ import gym
 
 from keras.models import Sequential
 from keras.layers import Dense, Activation, Flatten
-from keras.optimizers import Adam
+from keras.optimizers import adam_v2
 
 from rl.agents import SARSAAgent
 from rl.policy import BoltzmannQPolicy
@@ -30,10 +30,13 @@ model.add(Dense(nb_actions))
 model.add(Activation('linear'))
 print(model.summary())
 
+lr = 1e-3
+opt = adam_v2.Adam(learning_rate=lr)
+
 # SARSA does not require a memory.
 policy = BoltzmannQPolicy()
 sarsa = SARSAAgent(model=model, nb_actions=nb_actions, nb_steps_warmup=10, policy=policy)
-sarsa.compile(Adam(lr=1e-3), metrics=['mae'])
+sarsa.compile(opt, metrics=['mae'])
 
 # Okay, now it's time to learn something! We visualize the training here for show, but this
 # slows down training quite a lot. You can always safely abort the training prematurely using

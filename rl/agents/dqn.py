@@ -211,6 +211,12 @@ class DQNAgent(AbstractDQNAgent):
 
     def save_weights(self, filepath, overwrite=False):
         self.model.save_weights(filepath, overwrite=overwrite)
+        
+    def get_weights(self):
+        return self.model.get_weights()
+        
+    def set_weights(self, weights):
+        self.model.set_weights(weights)
 
     def reset_states(self):
         self.recent_action = None

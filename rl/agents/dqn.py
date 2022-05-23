@@ -215,8 +215,8 @@ class DQNAgent(AbstractDQNAgent):
     def get_weights(self):
         self.model.get_weights()
         
-    def set_weights(self):
-        self.model.set_weights()
+    def set_weights(self, weights):
+        self.model.set_weights(weights)
 
     def reset_states(self):
         self.recent_action = None

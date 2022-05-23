@@ -231,6 +231,8 @@ class Agent(object):
                         'nb_episode_steps': episode_step,
                         'nb_steps': self.step,
                     }
+                    for name, i in zip(self.metrics_names, metrics):
+                       episode_logs[name] = i
                     callbacks.on_episode_end(episode, episode_logs)
 
                     episode += 1

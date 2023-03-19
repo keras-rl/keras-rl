@@ -26,9 +26,9 @@ class DDPGAgent(Agent):
                  gamma=.99, batch_size=32, nb_steps_warmup_critic=1000, nb_steps_warmup_actor=1000,
                  train_interval=1, memory_interval=1, delta_range=None, delta_clip=np.inf,
                  random_process=None, custom_model_objects={}, target_model_update=.001, **kwargs):
-        if hasattr(actor.output, '__len__') and len(actor.output) > 1:
+        if isinstance(actor.output, list) and len(actor.output) > 1:
             raise ValueError('Actor "{}" has more than one output. DDPG expects an actor that has a single output.'.format(actor))
-        if hasattr(critic.output, '__len__') and len(critic.output) > 1:
+        if isinstance(critic.output, list) and len(critic.output) > 1:
             raise ValueError('Critic "{}" has more than one output. DDPG expects a critic that has a single output.'.format(critic))
         if critic_action_input not in critic.input:
             raise ValueError('Critic "{}" does not have designated action input "{}".'.format(critic, critic_action_input))
@@ -80,6 +80,7 @@ class DDPGAgent(Agent):
         return self.actor.uses_learning_phase or self.critic.uses_learning_phase
 
     def compile(self, optimizer, metrics=[]):
+        metrics = metrics[:]
         metrics += [mean_q]
 
         if type(optimizer) in (list, tuple):
@@ -115,42 +116,8 @@ class DDPGAgent(Agent):
         # we also compile it with any optimzer and
         self.actor.compile(optimizer='sgd', loss='mse')
 
-        # Compile the critic.
-        if self.target_model_update < 1.:
-            # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
-            critic_updates = get_soft_target_model_updates(self.target_critic, self.critic, self.target_model_update)
-            critic_optimizer = AdditionalUpdatesOptimizer(critic_optimizer, critic_updates)
         self.critic.compile(optimizer=critic_optimizer, loss=clipped_error, metrics=critic_metrics)
 
-        # Combine actor and critic so that we can get the policy gradient.
-        # Assuming critic's state inputs are the same as actor's.
-        combined_inputs = []
-        state_inputs = []
-        for i in self.critic.input:
-            if i == self.critic_action_input:
-                combined_inputs.append([])
-            else:
-                combined_inputs.append(i)
-                state_inputs.append(i)
-        combined_inputs[self.critic_action_input_idx] = self.actor(state_inputs)
-
-        combined_output = self.critic(combined_inputs)
-
-        updates = actor_optimizer.get_updates(
-            params=self.actor.trainable_weights, loss=-K.mean(combined_output))
-        if self.target_model_update < 1.:
-            # Include soft target model updates.
-            updates += get_soft_target_model_updates(self.target_actor, self.actor, self.target_model_update)
-        updates += self.actor.updates  # include other updates of the actor, e.g. for BN
-
-        # Finally, combine it all into a callable function.
-        if K.backend() == 'tensorflow':
-            self.actor_train_fn = K.function(state_inputs + [K.learning_phase()],
-                                             [self.actor(state_inputs)], updates=updates)
-        else:
-            if self.uses_learning_phase:
-                state_inputs += [K.learning_phase()]
-            self.actor_train_fn = K.function(state_inputs, [self.actor(state_inputs)], updates=updates)
         self.actor_optimizer = actor_optimizer
 
         self.compiled = True
@@ -188,9 +155,8 @@ class DDPGAgent(Agent):
             self.target_critic.reset_states()
 
     def process_state_batch(self, batch):
-        batch = np.array(batch)
         if self.processor is None:
-            return batch
+            return np.array(batch)
         return self.processor.process_state_batch(batch)
 
     def select_action(self, state):
@@ -234,7 +200,14 @@ class DDPGAgent(Agent):
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)
 
-        metrics = [np.nan for _ in self.metrics_names]
+        if self.metrics_names:
+            metrics = [np.nan for _ in self.metrics_names]
+        else:
+            # metrics_names unavailable until model has been trained
+            metrics = [
+                np.nan
+                for _ in self.critic.compiled_loss.get_config()['losses']
+            ] + [np.nan for _ in self.critic.compiled_metrics._metrics]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
@@ -300,17 +273,28 @@ class DDPGAgent(Agent):
 
             # Update actor, if warm up is over.
             if self.step > self.nb_steps_warmup_actor:
+                import tensorflow as tf
                 # TODO: implement metrics for actor
                 if len(self.actor.inputs) >= 2:
                     inputs = state0_batch[:]
                 else:
                     inputs = [state0_batch]
-                if self.uses_learning_phase:
-                    inputs += [self.training]
-                action_values = self.actor_train_fn(inputs)[0]
+                with tf.GradientTape() as tape:
+                    action_values = self.actor(inputs, training=True)
+                    critic_value = self.critic([action_values, inputs],
+                                               training=True)
+                    actor_loss = -tf.math.reduce_mean(critic_value)
+                actor_grad = tape.gradient(actor_loss,
+                                           self.actor.trainable_variables)
+                self.actor_optimizer.apply_gradients(
+                        zip(actor_grad, self.actor.trainable_variables)
+                        )
                 assert action_values.shape == (self.batch_size, self.nb_actions)
 
         if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
             self.update_target_models_hard()
+        elif self.target_model_update < 1.:
+            soft_update_model(self.target_critic, self.critic, self.target_model_update)
+            soft_update_model(self.target_actor, self.actor, self.target_model_update)
 
         return metrics

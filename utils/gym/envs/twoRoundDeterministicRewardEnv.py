@@ -21,7 +21,7 @@ class TwoRoundDeterministicRewardEnv(gym.Env):
             reward = rewards[self.firstAction][action]
             done = True
 
-        return self.get_obs(), reward, done, {}
+        return self.get_obs(), reward, done, False, {}
 
     def get_obs(self):
         if self.firstAction is None:
@@ -31,4 +31,4 @@ class TwoRoundDeterministicRewardEnv(gym.Env):
 
     def reset(self):
         self.firstAction = None
-        return self.get_obs()
+        return self.get_obs(), {}

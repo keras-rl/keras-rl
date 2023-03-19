@@ -44,6 +44,14 @@ def get_soft_target_model_updates(target, source, tau):
         updates.append((tw, tau * sw + (1. - tau) * tw))
     return updates
 
+def soft_update_model(target, source, tau):
+    target_weights = target.get_weights()
+    source_weights = source.get_weights()
+    assert len(target_weights) == len(source_weights)
+    target.set_weights([
+        tau * sw + (1. - tau) * tw
+        for tw, sw in zip(target_weights, source_weights)
+        ])
 
 def get_object_config(o):
     if o is None:

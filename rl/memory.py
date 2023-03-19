@@ -4,6 +4,7 @@ import warnings
 import random
 
 import numpy as np
+from copy import copy
 
 
 # This is to be understood as a transition: Given `state0`, performing `action`
@@ -228,7 +229,7 @@ class SequentialMemory(Memory):
             # Okay, now we need to create the follow-up state. This is state0 shifted on timestep
             # to the right. Again, we need to be careful to not include an observation from the next
             # episode if the last state is terminal.
-            state1 = [np.copy(x) for x in state0[1:]]
+            state1 = [copy(x) for x in state0[1:]]
             state1.append(self.observations[idx])
 
             assert len(state0) == self.window_length

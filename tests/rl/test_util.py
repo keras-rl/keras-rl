@@ -5,7 +5,7 @@ from numpy.testing import assert_allclose
 
 from keras.models import Model, Sequential
 from keras.layers import Input, Dense, Concatenate
-from keras.optimizers import SGD
+from keras.optimizers.optimizer_experimental.sgd import SGD
 import keras.backend as K
 
 from rl.util import clone_optimizer, clone_model, huber_loss, WhiteningNormalizer

@@ -14,9 +14,8 @@ from rl.memory import SequentialMemory
 
 def test_cdqn():
     # TODO: replace this with a simpler environment where we can actually test if it finds a solution
-    env = gym.make('Pendulum-v0')
+    env = gym.make('Pendulum-v1')
     np.random.seed(123)
-    env.seed(123)
     random.seed(123)
     nb_actions = env.action_space.shape[0]
 
@@ -47,16 +46,15 @@ def test_cdqn():
                      gamma=.99, target_model_update=1e-3)
     agent.compile(Adam(lr=1e-3))
 
-    agent.fit(env, nb_steps=400, visualize=False, verbose=0, nb_max_episode_steps=100)
-    h = agent.test(env, nb_episodes=2, visualize=False, nb_max_episode_steps=100)
+    agent.fit(env, nb_steps=400, verbose=0, nb_max_episode_steps=100, seed=123)
+    h = agent.test(env, nb_episodes=2, nb_max_episode_steps=100, seed=123)
     # TODO: evaluate history
 
 
 def test_ddpg():
     # TODO: replace this with a simpler environment where we can actually test if it finds a solution
-    env = gym.make('Pendulum-v0')
+    env = gym.make('Pendulum-v1')
     np.random.seed(123)
-    env.seed(123)
     random.seed(123)
     nb_actions = env.action_space.shape[0]
 
@@ -84,6 +82,6 @@ def test_ddpg():
                       random_process=random_process, gamma=.99, target_model_update=1e-3)
     agent.compile([Adam(lr=1e-3), Adam(lr=1e-3)])
 
-    agent.fit(env, nb_steps=400, visualize=False, verbose=0, nb_max_episode_steps=100)
-    h = agent.test(env, nb_episodes=2, visualize=False, nb_max_episode_steps=100)
+    agent.fit(env, nb_steps=400, verbose=0, nb_max_episode_steps=100, seed=123)
+    h = agent.test(env, nb_episodes=2, nb_max_episode_steps=100, seed=123)
     # TODO: evaluate history

@@ -129,7 +129,15 @@ class SARSAAgent(Agent):
         return action
 
     def backward(self, reward, terminal):
-        metrics = [np.nan for _ in self.metrics_names]
+        if self.metrics_names:
+            metrics = [np.nan for _ in self.metrics_names]
+        else:
+            # metrics_names unavailable until model has been trained
+            metrics = [
+                np.nan for _ in self.trainable_model.compiled_loss._losses
+            ] + [
+                np.nan for _ in self.trainable_model.compiled_metrics._metrics
+            ]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.

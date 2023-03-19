@@ -10,7 +10,7 @@ import wandb
 
 from keras import __version__ as KERAS_VERSION
 from keras.callbacks import Callback as KerasCallback, CallbackList as KerasCallbackList
-from keras.utils.generic_utils import Progbar
+from keras.utils import Progbar
 
 
 class Callback(KerasCallback):
@@ -135,7 +135,6 @@ class TrainEpisodeLogger(Callback):
     def on_train_begin(self, logs):
         """ Print training values at beginning of training """
         self.train_start = timeit.default_timer()
-        self.metrics_names = self.model.metrics_names
         print('Training for {} steps ...'.format(self.params['nb_steps']))
 
     def on_train_end(self, logs):
@@ -162,7 +161,7 @@ class TrainEpisodeLogger(Callback):
         metrics_variables = []
         with warnings.catch_warnings():
             warnings.filterwarnings('error')
-            for idx, name in enumerate(self.metrics_names):
+            for idx, name in enumerate(self.model.metrics_names):
                 if idx > 0:
                     metrics_template += ', '
                 try:
@@ -234,7 +233,6 @@ class TrainIntervalLogger(Callback):
     def on_train_begin(self, logs):
         """ Initialize training statistics at beginning of training """
         self.train_start = timeit.default_timer()
-        self.metrics_names = self.model.metrics_names
         print('Training for {} steps ...'.format(self.params['nb_steps']))
 
     def on_train_end(self, logs):
@@ -248,12 +246,12 @@ class TrainIntervalLogger(Callback):
             if len(self.episode_rewards) > 0:
                 metrics = np.array(self.metrics)
                 assert metrics.shape == (
-                    self.interval, len(self.metrics_names))
+                    self.interval, len(self.model.metrics_names))
                 formatted_metrics = ''
                 if not np.isnan(metrics).all():  # not all values are means
                     means = np.nanmean(self.metrics, axis=0)
-                    assert means.shape == (len(self.metrics_names),)
-                    for name, mean in zip(self.metrics_names, means):
+                    assert means.shape == (len(self.model.metrics_names),)
+                    for name, mean in zip(self.model.metrics_names, means):
                         formatted_metrics += ' - {}: {:.3f}'.format(name, mean)
 
                 formatted_infos = ''
@@ -368,12 +366,6 @@ class FileLogger(Callback):
         # grow strictly monotonously.
         with open(self.filepath, 'w') as f:
             json.dump(sorted_data, f)
-
-
-class Visualizer(Callback):
-    def on_action_end(self, action, logs):
-        """ Render environment at the end of each action """
-        self.env.render(mode='human')
 
 
 class ModelIntervalCheckpoint(Callback):

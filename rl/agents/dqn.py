@@ -54,9 +54,8 @@ class AbstractDQNAgent(Agent):
         self.compiled = False
 
     def process_state_batch(self, batch):
-        batch = np.array(batch)
         if self.processor is None:
-            return batch
+            return np.array(batch)
         return self.processor.process_state_batch(batch)
 
     def compute_batch_q_values(self, state_batch):
@@ -105,9 +104,9 @@ class DQNAgent(AbstractDQNAgent):
         super(DQNAgent, self).__init__(*args, **kwargs)
 
         # Validate (important) input.
-        if hasattr(model.output, '__len__') and len(model.output) > 1:
+        if isinstance(model.output, list) and len(model.output) > 1:
             raise ValueError('Model "{}" has more than one output. DQN expects a model that has a single output.'.format(model))
-        if model.output._keras_shape != (None, self.nb_actions):
+        if model.output.shape != (None, self.nb_actions):
             raise ValueError('Model output "{}" has invalid shape. DQN expects a model that has one dimension for each action, in this case {}.'.format(model.output, self.nb_actions))
 
         # Parameters.
@@ -117,7 +116,7 @@ class DQNAgent(AbstractDQNAgent):
         if self.enable_dueling_network:
             # get the second last layer of the model, abandon the last layer
             layer = model.layers[-2]
-            nb_action = model.output._keras_shape[-1]
+            nb_action = model.output.shape[-1]
             # layer y has a shape (nb_action+1,)
             # y[:,0] represents V(s;theta)
             # y[:,1:] represents A(s,a;theta)
@@ -165,6 +164,7 @@ class DQNAgent(AbstractDQNAgent):
         return config
 
     def compile(self, optimizer, metrics=[]):
+        metrics = metrics[:]
         metrics += [mean_q]  # register default metrics
 
         # We never train the target model, hence we can set the optimizer and loss arbitrarily.
@@ -172,11 +172,6 @@ class DQNAgent(AbstractDQNAgent):
         self.target_model.compile(optimizer='sgd', loss='mse')
         self.model.compile(optimizer='sgd', loss='mse')
 
-        # Compile model.
-        if self.target_model_update < 1.:
-            # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
-            updates = get_soft_target_model_updates(self.target_model, self.model, self.target_model_update)
-            optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
 
         def clipped_masked_error(args):
             y_true, y_pred, mask = args
@@ -243,7 +238,15 @@ class DQNAgent(AbstractDQNAgent):
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)
 
-        metrics = [np.nan for _ in self.metrics_names]
+        if self.metrics_names:
+            metrics = [np.nan for _ in self.metrics_names]
+        else:
+            # metrics_names unavailable until model has been trained
+            metrics = [
+                np.nan for _ in self.trainable_model.compiled_loss._losses
+            ] + [
+                np.nan for _ in self.trainable_model.compiled_metrics._metrics
+            ]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
@@ -330,6 +333,8 @@ class DQNAgent(AbstractDQNAgent):
 
         if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
             self.update_target_model_hard()
+        elif self.target_model_update < 1.:
+            soft_update_model(self.target_model, self.model, self.target_model_update)
 
         return metrics
 
@@ -422,12 +427,11 @@ class NAFLayer(Layer):
                     diag_indeces.append(diag_indeces[-1] + (row + 1))
                 diag_mask = np.zeros(1 + nb_elems)  # +1 for the leading zero
                 diag_mask[np.array(diag_indeces) + 1] = 1
-                diag_mask = K.variable(diag_mask)
 
                 # Add leading zero element to each element in the L_flat. We use this zero
                 # element when gathering L_flat into a lower triangular matrix L.
                 nb_rows = tf.shape(L_flat)[0]
-                zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
+                zeros = tf.expand_dims(tf.tile(tf.zeros((1, )), [nb_rows]), 1)
                 try:
                     # Old TF behavior.
                     L_flat = tf.concat(1, [zeros, L_flat])
@@ -442,8 +446,8 @@ class NAFLayer(Layer):
 
                 # Finally, process each element of the batch.
                 init = [
-                    K.zeros((self.nb_actions, self.nb_actions)),
-                    K.zeros((self.nb_actions, self.nb_actions)),
+                    tf.zeros((self.nb_actions, self.nb_actions)),
+                    tf.zeros((self.nb_actions, self.nb_actions)),
                 ]
 
                 def fn(a, x):
@@ -496,7 +500,7 @@ class NAFLayer(Layer):
                 # Add leading zero element to each element in the L_flat. We use this zero
                 # element when gathering L_flat into a lower triangular matrix L.
                 nb_rows = tf.shape(L_flat)[0]
-                zeros = tf.expand_dims(tf.tile(K.zeros((1,)), [nb_rows]), 1)
+                zeros = tf.expand_dims(tf.tile(tf.zeros((1, )), [nb_rows]), 1)
                 try:
                     # Old TF behavior.
                     L_flat = tf.concat(1, [zeros, L_flat])
@@ -509,7 +513,7 @@ class NAFLayer(Layer):
                     x_ = tf.gather(x, diag_mask)
                     return x_
 
-                P = tf.scan(fn, L_flat, initializer=K.zeros((self.nb_actions, self.nb_actions)))
+                P = tf.scan(fn, L_flat, initializer=tf.zeros((self.nb_actions, self.nb_actions)))
             else:
                 raise RuntimeError('Unknown Keras backend "{}".'.format(K.backend()))
         assert P is not None
@@ -595,6 +599,7 @@ class NAFAgent(AbstractDQNAgent):
             self.target_V_model.reset_states()
 
     def compile(self, optimizer, metrics=[]):
+        metrics = metrics[:]
         metrics += [mean_q]  # register default metrics
 
         # Create target V model. We don't need targets for mu or L.
@@ -604,9 +609,9 @@ class NAFAgent(AbstractDQNAgent):
         # Build combined model.
         a_in = Input(shape=(self.nb_actions,), name='action_input')
         if type(self.V_model.input) is list:
-            observation_shapes = [i._keras_shape[1:] for i in self.V_model.input]
+            observation_shapes = [i.shape[1:] for i in self.V_model.input]
         else:
-            observation_shapes = [self.V_model.input._keras_shape[1:]]
+            observation_shapes = [self.V_model.input.shape[1:]]
         os_in = [Input(shape=shape, name='observation_input_{}'.format(idx)) for idx, shape in enumerate(observation_shapes)]
         L_out = self.L_model([a_in] + os_in)
         V_out = self.V_model(os_in)
@@ -615,11 +620,6 @@ class NAFAgent(AbstractDQNAgent):
         A_out = NAFLayer(self.nb_actions, mode=self.covariance_mode)([L_out, mu_out, a_in])
         combined_out = Lambda(lambda x: x[0]+x[1], output_shape=lambda x: x[0])([A_out, V_out])
         combined = Model(inputs=[a_in] + os_in, outputs=[combined_out])
-        # Compile combined model.
-        if self.target_model_update < 1.:
-            # We use the `AdditionalUpdatesOptimizer` to efficiently soft-update the target model.
-            updates = get_soft_target_model_updates(self.target_V_model, self.V_model, self.target_model_update)
-            optimizer = AdditionalUpdatesOptimizer(optimizer, updates)
 
         def clipped_error(y_true, y_pred):
             return K.mean(huber_loss(y_true, y_pred, self.delta_clip), axis=-1)
@@ -659,7 +659,16 @@ class NAFAgent(AbstractDQNAgent):
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)
 
-        metrics = [np.nan for _ in self.metrics_names]
+        if self.metrics_names:
+            metrics = [np.nan for _ in self.metrics_names]
+        else:
+            # metrics_names unavailable until model has been trained
+            metrics = [
+                np.nan for _ in self.combined_model.compiled_loss.get_config()
+                ['losses']
+            ] + [
+                np.nan for _ in self.combined_model.compiled_metrics._metrics
+            ]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.
@@ -715,6 +724,8 @@ class NAFAgent(AbstractDQNAgent):
 
         if self.target_model_update >= 1 and self.step % self.target_model_update == 0:
             self.update_target_model_hard()
+        elif self.target_model_update < 1.:
+            soft_update_model(self.target_V_model, self.V_model, self.target_model_update)
 
         return metrics
 

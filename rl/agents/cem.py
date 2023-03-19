@@ -85,9 +85,10 @@ class CEMAgent(Agent):
         self.recent_action = None
 
     def select_action(self, state, stochastic=False):
-        batch = np.array([state])
         if self.processor is not None:
-            batch = self.processor.process_state_batch(batch)
+            batch = self.processor.process_state_batch([state])
+        else:
+            batch = np.array([state])
 
         action = self.model.predict_on_batch(batch).flatten()
         if stochastic or self.training:
@@ -134,7 +135,15 @@ class CEMAgent(Agent):
             self.memory.append(self.recent_observation, self.recent_action, reward, terminal,
                                training=self.training)
 
-        metrics = [np.nan for _ in self.metrics_names]
+        if self.metrics_names:
+            metrics = [np.nan for _ in self.metrics_names]
+        else:
+            # metrics_names unavailable until model has been trained
+            metrics = [
+                np.nan for _ in self.trainable_model.compiled_loss._losses
+            ] + [
+                np.nan for _ in self.trainable_model.compiled_metrics._metrics
+            ]
         if not self.training:
             # We're done here. No need to update the experience memory since we only use the working
             # memory to obtain the state over the most recent observations.

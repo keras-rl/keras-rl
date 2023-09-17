@@ -15,7 +15,6 @@ from utils.gym.envs import TwoRoundDeterministicRewardEnv
 def test_dqn():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
-    env.seed(123)
     random.seed(123)
     nb_actions = env.action_space.n
 
@@ -32,16 +31,15 @@ def test_dqn():
                    target_model_update=1e-1, policy=policy, enable_double_dqn=False)
     dqn.compile(Adam(lr=1e-3))
 
-    dqn.fit(env, nb_steps=2000, visualize=False, verbose=0)
+    dqn.fit(env, nb_steps=2000, verbose=0)
     policy.eps = 0.
-    h = dqn.test(env, nb_episodes=20, visualize=False)
+    h = dqn.test(env, nb_episodes=20)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
 
 
 def test_double_dqn():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
-    env.seed(123)
     random.seed(123)
     nb_actions = env.action_space.n
 
@@ -58,16 +56,15 @@ def test_double_dqn():
                    target_model_update=1e-1, policy=policy, enable_double_dqn=True)
     dqn.compile(Adam(lr=1e-3))
 
-    dqn.fit(env, nb_steps=2000, visualize=False, verbose=0)
+    dqn.fit(env, nb_steps=2000, verbose=0)
     policy.eps = 0.
-    h = dqn.test(env, nb_episodes=20, visualize=False)
+    h = dqn.test(env, nb_episodes=20)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
 
 
 def test_cem():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
-    env.seed(123)
     random.seed(123)
     nb_actions = env.action_space.n
 
@@ -82,15 +79,14 @@ def test_cem():
     dqn = CEMAgent(model=model, nb_actions=nb_actions, memory=memory)
     dqn.compile()
 
-    dqn.fit(env, nb_steps=2000, visualize=False, verbose=1)
-    h = dqn.test(env, nb_episodes=20, visualize=False)
+    dqn.fit(env, nb_steps=2000, verbose=1)
+    h = dqn.test(env, nb_episodes=20)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
 
 
 def test_duel_dqn():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
-    env.seed(123)
     random.seed(123)
     nb_actions = env.action_space.n
 
@@ -106,16 +102,15 @@ def test_duel_dqn():
                    target_model_update=1e-1, policy=policy, enable_double_dqn=False, enable_dueling_network=True)
     dqn.compile(Adam(lr=1e-3))
 
-    dqn.fit(env, nb_steps=2000, visualize=False, verbose=0)
+    dqn.fit(env, nb_steps=2000, verbose=0)
     policy.eps = 0.
-    h = dqn.test(env, nb_episodes=20, visualize=False)
+    h = dqn.test(env, nb_episodes=20)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)
 
 
 def test_sarsa():
     env = TwoRoundDeterministicRewardEnv()
     np.random.seed(123)
-    env.seed(123)
     random.seed(123)
     nb_actions = env.action_space.n
 
@@ -129,7 +124,7 @@ def test_sarsa():
     sarsa = SARSAAgent(model=model, nb_actions=nb_actions, nb_steps_warmup=50, policy=policy)
     sarsa.compile(Adam(lr=1e-3))
 
-    sarsa.fit(env, nb_steps=20000, visualize=False, verbose=0)
+    sarsa.fit(env, nb_steps=20000, verbose=0)
     policy.eps = 0.
-    h = sarsa.test(env, nb_episodes=20, visualize=False)
+    h = sarsa.test(env, nb_episodes=20)
     assert_allclose(np.mean(h.history['episode_reward']), 3.)

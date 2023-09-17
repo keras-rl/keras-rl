@@ -15,11 +15,11 @@ class TestEnv(Env):
         self.state += 1
         done = self.state >= 6
         reward = float(self.state) / 10.
-        return np.array(self.state), reward, done, {}
+        return np.array(self.state), reward, done, False, {}
 
     def reset(self):
         self.state = 1
-        return np.array(self.state)
+        return np.array(self.state), {}
 
     def seed(self, seed=None):
         pass
@@ -113,11 +113,11 @@ def test_copy_observations():
                 reward = float(self.state) / 10.
                 obs = np.array(self.state)
                 original_observations.append(obs)
-                return obs, reward, done, {}
+                return obs, reward, done, False, {}
 
             def reset(self):
                 self.state = 1
-                return np.array(self.state)
+                return np.array(self.state), {}
 
             def seed(self, seed=None):
                 pass
@@ -138,7 +138,7 @@ def test_copy_observations():
         agent = TestAgent(memory, processor=processor)
         env = LocalEnv()
         agent.compile()
-        getattr(agent, method)(env, 20, verbose=0, visualize=False)
+        getattr(agent, method)(env, 20, verbose=0)
 
         assert len(observations) == len(original_observations)
         assert_allclose(np.array(observations), np.array(original_observations))

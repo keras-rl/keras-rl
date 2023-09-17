@@ -10,7 +10,6 @@ from rl.callbacks import (
     TestLogger,
     TrainEpisodeLogger,
     TrainIntervalLogger,
-    Visualizer,
     WandbLogger
 )
 
@@ -53,8 +52,8 @@ class Agent(object):
         return {}
 
     def fit(self, env, nb_steps, action_repetition=1, callbacks=None, verbose=1,
-            visualize=False, nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
-            nb_max_episode_steps=None):
+            nb_max_start_steps=0, start_step_policy=None, log_interval=10000,
+            nb_max_episode_steps=None, seed=None):
         """Trains the agent on the given environment.
 
         # Arguments
@@ -66,9 +65,6 @@ class Agent(object):
             callbacks (list of `keras.callbacks.Callback` or `rl.callbacks.Callback` instances):
                 List of callbacks to apply during training. See [callbacks](/callbacks) for details.
             verbose (integer): 0 for no logging, 1 for interval logging (compare `log_interval`), 2 for episode logging
-            visualize (boolean): If `True`, the environment is visualized during training. However,
-                this is likely going to slow down training significantly and is thus intended to be
-                a debugging instrument.
             nb_max_start_steps (integer): Number of maximum steps that the agent performs at the beginning
                 of each episode using `start_step_policy`. Notice that this is an upper limit since
                 the exact number of steps to be performed is sampled uniformly from [0, max_start_steps]
@@ -98,8 +94,6 @@ class Agent(object):
             callbacks += [TrainIntervalLogger(interval=log_interval)]
         elif verbose > 1:
             callbacks += [TrainEpisodeLogger()]
-        if visualize:
-            callbacks += [Visualizer()]
         history = History()
         callbacks += [history]
         callbacks = CallbackList(callbacks)
@@ -133,7 +127,8 @@ class Agent(object):
 
                     # Obtain the initial observation by resetting the environment.
                     self.reset_states()
-                    observation = deepcopy(env.reset())
+                    observation, info = deepcopy(
+                        env.reset() if seed is None else env.reset(seed=seed))
                     if self.processor is not None:
                         observation = self.processor.process_observation(
                             observation)
@@ -160,7 +155,7 @@ class Agent(object):
                         if done:
                             warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(
                                 nb_random_start_steps))
-                            observation = deepcopy(env.reset())
+                            observation, info = deepcopy(env.reset() if seed is None else env.reset(seed=seed))
                             if self.processor is not None:
                                 observation = self.processor.process_observation(
                                     observation)
@@ -183,7 +178,9 @@ class Agent(object):
                 done = False
                 for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
-                    observation, r, done, info = env.step(action)
+                    observation, r, terminated, truncated, info = env.step(
+                        action)
+                    done = terminated or truncated
                     observation = deepcopy(observation)
                     if self.processor is not None:
                         observation, r, done, info = self.processor.process_step(
@@ -247,8 +244,9 @@ class Agent(object):
 
         return history
 
-    def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None, visualize=True,
-             nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1):
+    def test(self, env, nb_episodes=1, action_repetition=1, callbacks=None,
+             nb_max_episode_steps=None, nb_max_start_steps=0, start_step_policy=None, verbose=1,
+             seed=None):
         """Callback that is called before training begins.
 
         # Arguments
@@ -260,9 +258,6 @@ class Agent(object):
             callbacks (list of `keras.callbacks.Callback` or `rl.callbacks.Callback` instances):
                 List of callbacks to apply during training. See [callbacks](/callbacks) for details.
             verbose (integer): 0 for no logging, 1 for interval logging (compare `log_interval`), 2 for episode logging
-            visualize (boolean): If `True`, the environment is visualized during training. However,
-                this is likely going to slow down training significantly and is thus intended to be
-                a debugging instrument.
             nb_max_start_steps (integer): Number of maximum steps that the agent performs at the beginning
                 of each episode using `start_step_policy`. Notice that this is an upper limit since
                 the exact number of steps to be performed is sampled uniformly from [0, max_start_steps]
@@ -291,8 +286,6 @@ class Agent(object):
 
         if verbose >= 1:
             callbacks += [TestLogger()]
-        if visualize:
-            callbacks += [Visualizer()]
         history = History()
         callbacks += [history]
         callbacks = CallbackList(callbacks)
@@ -318,7 +311,8 @@ class Agent(object):
 
             # Obtain the initial observation by resetting the environment.
             self.reset_states()
-            observation = deepcopy(env.reset())
+            observation, info = deepcopy(
+                env.reset() if seed is None else env.reset(seed=seed))
             if self.processor is not None:
                 observation = self.processor.process_observation(observation)
             assert observation is not None
@@ -335,7 +329,8 @@ class Agent(object):
                 if self.processor is not None:
                     action = self.processor.process_action(action)
                 callbacks.on_action_begin(action)
-                observation, r, done, info = env.step(action)
+                observation, r, terminated, truncated, info = env.step(action)
+                done = terminated or truncated
                 observation = deepcopy(observation)
                 if self.processor is not None:
                     observation, r, done, info = self.processor.process_step(
@@ -344,7 +339,7 @@ class Agent(object):
                 if done:
                     warnings.warn('Env ended before {} random steps could be performed at the start. You should probably lower the `nb_max_start_steps` parameter.'.format(
                         nb_random_start_steps))
-                    observation = deepcopy(env.reset())
+                    observation, info = deepcopy(env.reset() if seed is None else env.reset(seed=seed))
                     if self.processor is not None:
                         observation = self.processor.process_observation(
                             observation)
@@ -362,7 +357,9 @@ class Agent(object):
                 accumulated_info = {}
                 for _ in range(action_repetition):
                     callbacks.on_action_begin(action)
-                    observation, r, d, info = env.step(action)
+                    observation, r, terminated, truncated, info = env.step(
+                        action)
+                    d = terminated or truncated
                     observation = deepcopy(observation)
                     if self.processor is not None:
                         observation, r, d, info = self.processor.process_step(
@@ -598,7 +595,7 @@ class Processor(object):
         # Returns
             Processed list of states
         """
-        return batch
+        return np.array(batch)
 
     @property
     def metrics(self):

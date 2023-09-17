@@ -9,8 +9,8 @@ setup(name='keras-rl',
       author_email='matthiasplappert@me.com',
       url='https://github.com/keras-rl/keras-rl',
       license='MIT',
-      install_requires=['keras>=2.0.7'],
+      install_requires=['keras>=2.11.0'],
       extras_require={
-          'gym': ['gym'],
+          'gym': ['gym>=0.26.2'],
       },
       packages=find_packages())
